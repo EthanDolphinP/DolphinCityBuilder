@@ -996,7 +996,9 @@ RESEARCH = {
 #   generates extra power the building supplies
 #   fertility_aura   extra fertility the building gives its neighbours
 #   aura_bonus       added to the building's speed_aura bonus
-#   explore_speed / wildlife_speed   added to the building's own
+#   explore_speed / wildlife_speed / attracts   added to the building's own
+#   workers   change to the workers the building needs, e.g. -1 (never below 1)
+#   power     change to the power the building needs, e.g. -2 (never below 0)
 ADDITIONS = {
     "fish_traps": {
         "name": "Fish Traps", "for": ["fishing_dock"], "research": "fish_traps",
@@ -1140,8 +1142,8 @@ ADDITIONS = {
     },
     "food_court": {
         "name": "Food Court", "for": ["shopping_mall", "airport", "maglev_hub"],
-        "cost": {"stone": 80, "gold": 100}, "housing": 2, "aura_bonus": 0.05,
-        "desc": "Room for 2 more people, and a small lift to whatever the building speeds up nearby.",
+        "cost": {"stone": 80, "gold": 100}, "housing": 4,
+        "desc": "Room for 4 more people.",
     },
     "advertising": {
         "name": "Advertising", "for": ["shopping_mall", "drone_port", "container_port"],
@@ -1187,6 +1189,237 @@ ADDITIONS = {
         "name": "Superconductors", "for": ["fusion_plant", "nuclear_plant", "tidal_array"], "research": "fusion_power",
         "cost": {"tools": 100, "electronics": 100}, "generates": 30,
         "desc": "+30 power.",
+    },
+    # ---- a second and third choice for most buildings ----
+    "loft": {
+        "name": "Sleeping Loft", "for": ["hut", "tavern", "stilt_house"],
+        "cost": {"wood": 12}, "housing": 1,
+        "desc": "Houses 1 more person.",
+    },
+    "guest_rooms": {
+        "name": "Guest Rooms", "for": ["tavern", "bath_house", "caravanserai"], "research": "masonry",
+        "cost": {"wood": 30, "stone": 20}, "housing": 3,
+        "desc": "Houses 3 more people.",
+    },
+    "kitchen_garden": {
+        "name": "Kitchen Garden", "for": ["house", "stilt_house"],
+        "cost": {"wood": 10, "food": 15}, "housing": 1,
+        "desc": "Room for 1 more person.",
+    },
+    "lifts": {
+        "name": "Lifts", "for": ["apartments", "high_rise"], "research": "engineering",
+        "cost": {"tools": 30, "gold": 60}, "housing": 8,
+        "desc": "Houses 8 more people.",
+    },
+    "rooftop_gardens": {
+        "name": "Rooftop Gardens", "for": ["apartments", "high_rise", "arcology"], "research": "botany",
+        "cost": {"stone": 60, "gold": 40}, "housing": 6,
+        "desc": "Houses 6 more people.",
+    },
+    "sky_bridges": {
+        "name": "Sky Bridges", "for": ["arcology"],
+        "cost": {"stone": 300, "electronics": 60}, "housing": 25,
+        "desc": "Houses 25 more people.",
+    },
+    "maternity_ward": {
+        "name": "Maternity Ward", "for": ["hospital"],
+        "cost": {"stone": 120, "gold": 150}, "housing": 8,
+        "desc": "Room for 8 more people.",
+    },
+    "compost_heap": {
+        "name": "Compost Heap", "for": ["farm", "orchard", "terrace_farm", "rice_paddy"],
+        "cost": {"food": 15}, "produces": {"food": 1},
+        "desc": "+1 Food per cycle.",
+    },
+    "fishing_nets": {
+        "name": "Fishing Nets", "for": ["fishing_dock", "fishery"],
+        "cost": {"wood": 15}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "ice_house": {
+        "name": "Ice House", "for": ["fishing_dock", "fishery", "hunting_lodge", "dairy"], "research": "masonry",
+        "cost": {"stone": 25}, "produces": {"food": 2},
+        "desc": "+2 Food per cycle.",
+    },
+    "hunting_dogs": {
+        "name": "Hunting Dogs", "for": ["hunting_lodge"], "research": "animal_taming",
+        "cost": {"food": 10, "livestock": 1}, "speed": 1.25,
+        "desc": "25% faster. Costs 1 livestock.",
+    },
+    "sheepdogs": {
+        "name": "Sheepdogs", "for": ["pasture"], "research": "animal_taming",
+        "cost": {"food": 10, "livestock": 1}, "speed": 1.15, "herd": 2,
+        "desc": "15% faster and holds 2 more livestock. Costs 1 livestock.",
+    },
+    "grain_silo": {
+        "name": "Grain Silo", "for": ["irrigated_farm", "industrial_farm"], "research": "engineering",
+        "cost": {"stone": 60, "tools": 20}, "produces": {"food": 5},
+        "desc": "+5 Food per cycle.",
+    },
+    "dry_dock": {
+        "name": "Dry Dock", "for": ["harbor"], "research": "engineering",
+        "cost": {"wood": 80, "stone": 60}, "produces": {"food": 3, "gold": 3},
+        "desc": "+3 Food and +3 Gold per cycle.",
+    },
+    "saw_pit": {
+        "name": "Saw Pit", "for": ["lumber_camp"],
+        "cost": {"wood": 15}, "produces": {"wood": 1},
+        "desc": "+1 Wood per cycle.",
+    },
+    "ox_cart": {
+        "name": "Ox Cart", "for": ["lumber_camp", "quarry", "mine", "peat_cutter", "reed_cutter"], "research": "draft_animals",
+        "cost": {"wood": 20, "livestock": 1}, "speed": 1.15,
+        "desc": "15% faster. Costs 1 livestock.",
+    },
+    "stone_saw": {
+        "name": "Stone Saw", "for": ["quarry"], "research": "masonry",
+        "cost": {"wood": 25, "stone": 10}, "produces": {"stone": 1},
+        "desc": "+1 Stone per cycle.",
+    },
+    "ore_carts": {
+        "name": "Ore Carts", "for": ["mine", "deep_mine"], "research": "mechanics",
+        "cost": {"wood": 40, "ore": 20}, "produces": {"ore": 2},
+        "desc": "+2 Ore per cycle.",
+    },
+    "seasoning_shed": {
+        "name": "Seasoning Shed", "for": ["sawmill"],
+        "cost": {"wood": 40, "stone": 20}, "produces": {"wood": 3},
+        "desc": "+3 Wood per cycle.",
+    },
+    "blast_furnace": {
+        "name": "Blast Furnace", "for": ["smithy", "factory"], "research": "metallurgy",
+        "cost": {"stone": 60, "ore": 30}, "produces": {"tools": 1},
+        "desc": "+1 Tools per cycle.",
+    },
+    "tanning_pits": {
+        "name": "Tanning Pits", "for": ["tannery"],
+        "cost": {"wood": 20, "stone": 20}, "produces": {"gold": 2},
+        "desc": "+2 Gold per cycle.",
+    },
+    "night_shift": {
+        "name": "Night Shift", "for": ["factory", "recycling_centre", "electronics_plant", "container_port"],
+        "cost": {"gold": 150}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "labour_saving": {
+        "name": "Labour-Saving Machines", "for": ["sawmill", "smithy", "mine", "deep_mine", "factory", "fishery", "harbor"], "research": "mechanics",
+        "cost": {"ore": 30, "tools": 10}, "workers": -1,
+        "desc": "Needs 1 fewer worker.",
+    },
+    "automation": {
+        "name": "Automation", "for": ["industrial_farm", "electronics_plant", "shopping_mall", "container_port", "recycling_centre", "research_institute", "vertical_farm", "nuclear_plant", "fusion_plant"], "research": "robotics",
+        "cost": {"tools": 60, "electronics": 60}, "workers": -2,
+        "desc": "Needs 2 fewer workers.",
+    },
+    "counting_house": {
+        "name": "Counting House", "for": ["trading_post", "caravanserai", "salt_works", "weaver"],
+        "cost": {"wood": 20, "stone": 20}, "produces": {"gold": 1},
+        "desc": "+1 Gold per cycle.",
+    },
+    "caravan_yard": {
+        "name": "Caravan Yard", "for": ["caravanserai", "trading_post", "stable"], "research": "draft_animals",
+        "cost": {"wood": 40, "livestock": 1}, "explore_speed": 0.1,
+        "desc": "Expeditions travel 10% faster. Costs 1 livestock.",
+    },
+    "steam_rooms": {
+        "name": "Steam Rooms", "for": ["bath_house"],
+        "cost": {"stone": 40}, "speed": 1.25,
+        "desc": "25% faster.",
+    },
+    "annealing_oven": {
+        "name": "Annealing Oven", "for": ["glassworks"],
+        "cost": {"stone": 50, "ore": 20}, "produces": {"gold": 4},
+        "desc": "+4 Gold per cycle.",
+    },
+    "herb_garden": {
+        "name": "Herb Garden", "for": ["shaman_hut"],
+        "cost": {"food": 15}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "apprentices": {
+        "name": "Apprentices' Lodge", "for": ["shaman_hut", "school"],
+        "cost": {"wood": 25, "food": 20}, "produces": {"knowledge": 1},
+        "desc": "+1 Knowledge per cycle.",
+    },
+    "scriptorium": {
+        "name": "Scriptorium", "for": ["school", "university"], "research": "bookkeeping",
+        "cost": {"wood": 30, "stone": 30}, "produces": {"knowledge": 2},
+        "desc": "+2 Knowledge per cycle.",
+    },
+    "lecture_hall": {
+        "name": "Lecture Hall", "for": ["university", "laboratory"],
+        "cost": {"stone": 80, "gold": 40}, "speed": 1.15,
+        "desc": "15% faster.",
+    },
+    "telescope_dome": {
+        "name": "Telescope Dome", "for": ["observatory"],
+        "cost": {"stone": 50, "gold": 40}, "produces": {"knowledge": 4},
+        "desc": "+4 Knowledge per cycle.",
+    },
+    "specialist_equipment": {
+        "name": "Specialist Equipment", "for": ["laboratory"],
+        "cost": {"tools": 30, "gold": 80}, "produces": {"knowledge": 10},
+        "desc": "+10 Knowledge per cycle.",
+    },
+    "mill_race": {
+        "name": "Mill Race", "for": ["water_mill", "hydro_dam"],
+        "cost": {"stone": 30}, "generates": 2,
+        "desc": "+2 power.",
+    },
+    "bigger_boiler": {
+        "name": "Bigger Boiler", "for": ["steam_engine", "power_plant"], "research": "mechanics",
+        "cost": {"ore": 40, "tools": 10}, "generates": 4,
+        "desc": "+4 power.",
+    },
+    "taller_mast": {
+        "name": "Taller Mast", "for": ["wind_turbine"],
+        "cost": {"stone": 40, "tools": 15}, "generates": 3,
+        "desc": "+3 power.",
+    },
+    "deep_bore": {
+        "name": "Deep Bore", "for": ["geothermal_plant"],
+        "cost": {"stone": 80, "tools": 30}, "generates": 6,
+        "desc": "+6 power.",
+    },
+    "sun_trackers": {
+        "name": "Sun Trackers", "for": ["solar_farm"],
+        "cost": {"tools": 60, "gold": 80}, "generates": 6,
+        "desc": "+6 power.",
+    },
+    "efficient_motors": {
+        "name": "Efficient Motors", "for": ["sawmill", "smithy", "university", "fishery", "glassworks", "observatory", "harbor", "deep_mine"], "research": "mechanics",
+        "cost": {"ore": 25, "tools": 10}, "power": -1,
+        "desc": "Needs 1 less power.",
+    },
+    "smart_meters": {
+        "name": "Smart Meters", "for": ["shopping_mall", "greenhouse", "vertical_farm", "data_centre", "research_institute", "drone_port", "factory", "laboratory"], "research": "smart_grid",
+        "cost": {"tools": 40, "gold": 100}, "power": -3,
+        "desc": "Needs 3 less power.",
+    },
+    "cistern": {
+        "name": "Cistern", "for": ["well", "desalination_plant"],
+        "cost": {"stone": 25}, "fertility_aura": 5,
+        "desc": "+5 more fertility to the surrounding tiles.",
+    },
+    "grindstones": {
+        "name": "Extra Grindstones", "for": ["windmill"],
+        "cost": {"stone": 30}, "aura_bonus": 0.05,
+        "desc": "Surrounding farms get a further 5% faster.",
+    },
+    "fog_bell": {
+        "name": "Fog Bell", "for": ["lighthouse"],
+        "cost": {"ore": 15}, "aura_bonus": 0.05,
+        "desc": "Surrounding water buildings get a further 5% faster.",
+    },
+    "hunters_hide": {
+        "name": "Hunters' Hide", "for": ["salt_lick"],
+        "cost": {"wood": 20}, "wildlife_speed": 0.25,
+        "desc": "Wildlife appears a further 25% more often.",
+    },
+    "paddock": {
+        "name": "Paddock", "for": ["stable"],
+        "cost": {"wood": 30, "livestock": 2}, "explore_speed": 0.1,
+        "desc": "Expeditions travel a further 10% faster. Costs 2 livestock.",
     },
 }
 
@@ -1754,7 +1987,8 @@ def work_plan(state):
                 cycle, notes = tile_cycle(state, area, x, y, tile["building"])
                 if cycle is None and "generates" not in b:
                     continue
-                need = b.get("workers", 0)
+                # Additions can save labour and power, but a staffed building keeps at least one worker.
+                need = max(1, tile_stat(tile, "workers")) if b.get("workers") else 0
                 power_out = tile_stat(tile, "generates")
                 for m in b.get("generates_modifiers", []):
                     power_out *= MODIFIERS[m](area, x, y)[0]
@@ -1766,7 +2000,7 @@ def work_plan(state):
                     "feeds": "food" in b.get("produces", {}) or "food" in b.get("per_head", {}),
                     "herd": tile_stat(tile, "herd"),
                     "herd_before": herd_room,   # pasture room in the buildings ahead of this one
-                    "power_in": b.get("power", 0),
+                    "power_in": max(0, tile_stat(tile, "power")) if b.get("power") else 0,
                     "power_out": round(power_out, 1),
                 })
                 herd_room += tile_stat(tile, "herd")

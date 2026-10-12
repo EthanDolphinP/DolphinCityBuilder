@@ -597,7 +597,7 @@ function buildingRows(b, cycle, produces, live) {
   if (housing) rows.push(['Houses', `${housing} people`]);
   if (b.attracts) rows.push(['Attracts', `${b.attracts} extra arrival per meal`]);
   if (b.generates) rows.push(['Generates', `<span class="good">${num(live ? live.power_out : b.generates)} power</span>`]);
-  if (b.power) rows.push(['Needs', `${b.power} power`]);
+  if (b.power) rows.push(['Needs', `${live ? live.power_in : b.power} power`]);
   if (b.explore_speed) rows.push(['Expeditions', `travel ${Math.round(b.explore_speed * 100)}% faster`]);
   if (b.wildlife_speed) rows.push(['Wildlife', `appears ${Math.round(b.wildlife_speed * 100)}% more often`]);
   if (b.livestock_speed) rows.push(['Herd', `faster the more livestock you own (${Math.floor(view.state.resources.livestock)} now)`]);
@@ -612,7 +612,7 @@ function buildingRows(b, cycle, produces, live) {
   if (cycle && b.generates && b.consumes) rows.push(['Burns', `${plain(b.consumes)} every ${duration(cycle)}`]);
   else if (cycle) rows.push(['Every', `<span class="hi">${duration(cycle)}</span>` +
     (cycle !== b.time ? ` <span class="dim">(normally ${duration(b.time)})</span>` : '')]);
-  if (b.workers) rows.push(['Workers', live ? `${live.staff} of ${b.workers}` : `${b.workers}`]);
+  if (b.workers) rows.push(['Workers', live ? `${live.staff} of ${live.need}` : `${b.workers}`]);
   return rows;
 }
 
