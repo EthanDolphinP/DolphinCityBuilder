@@ -8,29 +8,32 @@
   :root {
     --bg: #0d1110; --panel: #141a18; --line: #2a3531; --text: #cfd8d3; --dim: #7d8a84;
     --accent: #e6c35c; --good: #7fc97f; --bad: #e07a6a;
+    /* set from the Settings tab (see THEMES in the script) */
+    --bright: #fff; --inset: #101614; --button: #1d2623; --faint: #56605b; --hl: #3a3520;
+    --font: Consolas, "Cascadia Mono", "Courier New", monospace; --page: 1050px; --tscale: 1;
     --plains: #9bc46b; --forest: #3f9a5a; --hill: #b79a7a; --water: #5aa7d8; --desert: #e0c070;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.45 Consolas, "Cascadia Mono", "Courier New", monospace; }
-  main { max-width: 1050px; margin: 0 auto; padding: 16px; }
+         font: 15px/1.45 var(--font); }
+  main { max-width: var(--page); margin: 0 auto; padding: 16px; }
   h1 { font-size: 18px; margin: 0 0 4px; color: var(--accent); }
   h2 { font-size: 14px; margin: 0 0 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
   .dim { color: var(--dim); } .good { color: var(--good); } .bad { color: var(--bad); }
-  .hi { color: #fff; }
+  .hi { color: var(--bright); }
   .panel { background: var(--panel); border: 1px solid var(--line); padding: 12px; margin-top: 12px; }
   .cols { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
   .cols > .panel { flex: 1 1 320px; min-width: 0; }
-  button, input, select { font: inherit; color: var(--text); background: #1d2623;
+  button, input, select { font: inherit; color: var(--text); background: var(--button);
                           border: 1px solid var(--line); padding: 5px 10px; }
   button { cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-  button:disabled { color: #56605b; cursor: not-allowed; }
+  button:disabled { color: var(--faint); cursor: not-allowed; }
   input[type=number] { width: 90px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
-  .stat { border: 1px solid var(--line); background: #101614; padding: 6px 9px; min-width: 0; }
+  .stat { border: 1px solid var(--line); background: var(--inset); padding: 6px 9px; min-width: 0; }
   .stat .k { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
-  .stat .v { color: #fff; font-size: 16px; white-space: nowrap; }
+  .stat .v { color: var(--bright); font-size: 16px; white-space: nowrap; }
   .stat .r { font-size: 12px; color: var(--dim); white-space: nowrap; }
   .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .small { font-size: 13px; }
@@ -47,21 +50,22 @@
   details.fold > summary { color: var(--dim); font-size: 13px; }
   details.fold > summary:hover { color: var(--accent); }
   details.fold > div { font-size: 13px; padding: 4px 0 0 14px; }
-  details.sec > summary.cat:hover { color: #fff; }
+  details.sec > summary.cat:hover { color: var(--bright); }
   details.sec > .card:first-of-type { border-top: 0; }
   .checks span { display: inline-block; margin: 8px 18px 0 0; white-space: nowrap; }
   #map { display: inline-grid; gap: 2px; }
-  .tile { position: relative; width: 44px; height: 40px; padding: 0; font-size: 17px; font-weight: bold;
-          background: #101614; overflow: hidden; }
+  /* Map tiles stay dark in every theme: the terrain colours are chosen for a dark background. */
+  .tile { position: relative; width: calc(44px * var(--tscale)); height: calc(40px * var(--tscale)); padding: 0;
+          font-size: calc(17px * var(--tscale)); font-weight: bold; background: #101614; color-scheme: dark; overflow: hidden; }
   .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
-  #map.big .tile { width: 34px; height: 32px; font-size: 14px; }
-  .tile.hl { background: #3a3520; box-shadow: inset 0 0 0 1px var(--accent); }
+  #map.big .tile { width: calc(34px * var(--tscale)); height: calc(32px * var(--tscale)); font-size: calc(14px * var(--tscale)); }
+  .tile.hl { background: var(--hl); box-shadow: inset 0 0 0 1px var(--accent); }
   .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
   #findOut { max-height: 230px; overflow-y: auto; margin-top: 8px; }
   #findOut .row { padding: 5px 4px; border-top: 1px solid var(--line); cursor: pointer; }
-  #findOut .row:hover { background: #1d2623; color: #fff; }
+  #findOut .row:hover { background: var(--button); color: var(--bright); }
   .visiting #finder { display: none; }
-  .tile b { color: #fff; }
+  .tile b { color: #ffffff; }
   .tile i { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
   .tile i.stuck { background: var(--bad); width: 100%; }
   .tile u { position: absolute; right: 2px; top: 0; font-size: 10px; text-decoration: none; color: var(--accent); }
@@ -79,9 +83,9 @@
   th { color: var(--dim); font-weight: normal; border-top: 0; }
   th.sortable { cursor: pointer; } th.sortable:hover, th.sorted { color: var(--accent); }
   td.n, th.n { text-align: right; }
-  tr.me td { color: #fff; }
+  tr.me td { color: var(--bright); }
   [hidden] { display: none !important; }
-  .meter { height: 16px; background: #101614; border: 1px solid var(--line); margin: 4px 0 2px; display: flex; }
+  .meter { height: 16px; background: var(--inset); border: 1px solid var(--line); margin: 4px 0 2px; display: flex; }
   .meter div { height: 100%; background: var(--good); }
   .meter div.warn { background: var(--bad); } .meter div.alt { background: var(--accent); }
   .meter div.empty { background: none; }
@@ -90,17 +94,23 @@
   /* Looking at someone else's city: nothing that changes it is offered. */
   details.panel > summary.cat { margin: 0; padding: 0; border: 0; }
   details.panel[open] > summary.cat { margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-  details.panel > summary.cat:hover { color: #fff; }
+  details.panel > summary.cat:hover { color: var(--bright); }
   details.panel > summary .count { color: var(--dim); }
   .areaCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
-  .areaCard { border: 1px solid var(--line); background: #101614; padding: 10px; display: flex; gap: 12px; }
+  .areaCard { border: 1px solid var(--line); background: var(--inset); padding: 10px; display: flex; gap: 12px; }
   .areaCard.on { border-color: var(--accent); }
   .areaCard .info { flex: 1; min-width: 0; }
-  .areaCard .name { color: #fff; font-size: 16px; overflow-wrap: anywhere; }
+  .areaCard .name { color: var(--bright); font-size: 16px; overflow-wrap: anywhere; }
   .mini { display: grid; gap: 1px; align-self: flex-start; cursor: pointer; flex: none; }
   .mini i { width: 9px; height: 9px; display: block; opacity: .75; }
-  .mini i.b { opacity: 1; box-shadow: inset 0 0 0 2px #fff; }
+  .mini i.b { opacity: 1; box-shadow: inset 0 0 0 2px #ffffff; }
   .mini i.a { opacity: 1; box-shadow: inset 0 0 0 2px #e58fd0; }
+  .setGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px 24px; }
+  .setGrid label { display: block; }
+  .setGrid .k { display: block; color: var(--dim); font-size: 13px; margin-bottom: 3px; }
+  .setGrid select, .setGrid input[type=range] { width: 100%; }
+  label.check { display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
+  .visiting .own { display: none; }
   .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
@@ -149,6 +159,7 @@
       <button data-tab="market">Market</button>
       <button data-tab="board">Leaderboard</button>
       <button data-tab="guide">Guide</button>
+      <button data-tab="settings">Settings</button>
     </div>
 
     <!-- City -->
@@ -191,18 +202,6 @@
       <div class="panel">
         <h2>Chronicle</h2>
         <div id="log" class="dim"></div>
-      </div>
-      <div class="bar">
-        <button id="switch">Sign out</button>
-        <button id="changePass">Change password</button>
-        <button id="restart">Restart this city</button>
-      </div>
-      <form id="passForm" class="bar" hidden>
-        New password <input id="newPass" type="password" minlength="4" maxlength="100" autocomplete="new-password">
-        <button>Save password</button>
-        <span class="dim">Other browsers signed in to this city will have to sign in again.</span>
-      </form>
-      <div>
       </div>
     </div>
 
@@ -333,6 +332,79 @@
       </details>
     </div>
 
+    <!-- Settings -->
+    <div id="tab-settings" hidden>
+      <div class="panel">
+        <h2>Display</h2>
+        <div class="setGrid">
+          <label><span class="k">Theme</span><select data-setting="theme"></select></label>
+          <label><span class="k">Highlight colour</span><select data-setting="accent"></select></label>
+          <label><span class="k">Font</span><select data-setting="font"></select></label>
+          <label><span class="k">Size of everything: <span id="zoomLabel"></span></span>
+            <input data-setting="zoom" type="range" min="70" max="160" step="5"></label>
+          <label><span class="k">Map tile size</span><select data-setting="tile">
+            <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="huge">Extra large</option></select></label>
+          <label><span class="k">Page width</span><select data-setting="width">
+            <option value="narrow">Narrow</option><option value="normal">Normal</option><option value="wide">Wide</option><option value="full">Full window</option></select></label>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Numbers and time</h2>
+        <div class="setGrid">
+          <label><span class="k">Show income</span><select data-setting="rate">
+            <option value="hour">Per hour</option><option value="meal">Per meal (15 minutes)</option><option value="minute">Per minute</option></select></label>
+          <label><span class="k">Clock</span><select data-setting="clock">
+            <option value="auto">Whatever my device uses</option><option value="12">12-hour (3:45 PM)</option><option value="24">24-hour (15:45)</option></select></label>
+          <label class="check"><input data-setting="abbreviate" type="checkbox"> Shorten big numbers (12,345 becomes 12.3k)</label>
+          <label class="check"><input data-setting="separators" type="checkbox"> Commas in big numbers (12,345 not 12345)</label>
+        </div>
+        <p id="numberSample" class="dim small" style="margin-bottom:0"></p>
+      </div>
+      <div class="panel">
+        <h2>Behaviour</h2>
+        <div class="setGrid">
+          <label><span class="k">Check the server for changes</span><select data-setting="poll">
+            <option value="3">Every 3 seconds</option><option value="5">Every 5 seconds</option><option value="10">Every 10 seconds</option><option value="20">Every 20 seconds</option></select></label>
+          <label><span class="k">Open the game on</span><select data-setting="startTab">
+            <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="market">Market</option></select></label>
+          <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
+          <label class="check"><input data-setting="reports" type="checkbox"> Show a report when an expedition returns</label>
+          <label class="check"><input data-setting="confirmDemolish" type="checkbox"> Ask before demolishing a building</label>
+          <label class="check"><input data-setting="mapKey" type="checkbox"> Show the colour key under the map</label>
+        </div>
+        <p class="dim small" style="margin-bottom:0">These settings are saved in this browser only, so each player and each
+          device can have their own. Offers set to keep stocked need the server checked at least every 20 seconds.</p>
+        <div class="bar"><button id="resetSettings">Put every setting back to normal</button></div>
+      </div>
+      <div class="panel own">
+        <h2>Account</h2>
+        <div class="bar" style="margin-top:0">
+          <button id="switch">Sign out</button>
+          <button id="changePass">Change password</button>
+        </div>
+        <form id="passForm" class="bar" hidden>
+          New password <input id="newPass" type="password" minlength="4" maxlength="100" autocomplete="new-password">
+          <button>Save password</button>
+          <span class="dim small">Other browsers signed in to this city will have to sign in again.</span>
+        </form>
+      </div>
+      <div class="panel own">
+        <h2>Privacy</h2>
+        <p class="dim small" style="margin-top:0">A banned city cannot view yours or propose bills to you.</p>
+        <div id="banList"></div>
+        <form id="banForm" class="bar">
+          <input id="banName" list="cityList" maxlength="24" placeholder="city name">
+          <button>Ban this city</button>
+        </form>
+      </div>
+      <div class="panel own" style="border-color:var(--bad)">
+        <h2>Start again</h2>
+        <p class="dim small" style="margin-top:0">Wipes this city and gives it a new map. Its market offers and bills
+          are removed. The password stays the same. This cannot be undone.</p>
+        <button id="restart">Restart this city</button>
+      </div>
+    </div>
+
     <!-- Guide -->
     <div id="tab-guide" hidden>
       <div class="panel">
@@ -404,7 +476,64 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const num = n => Number.isInteger(n) ? n : n.toFixed(1);
+// ---- settings: how this player likes the game shown. Kept in this browser only. ----
+const THEMES = {
+  forest:    { name: 'Forest (dark green)', vars: { bg: '#0d1110', panel: '#141a18', line: '#2a3531', text: '#cfd8d3', dim: '#7d8a84', bright: '#ffffff',
+               inset: '#101614', button: '#1d2623', faint: '#56605b', hl: '#3a3520', accent: '#e6c35c', good: '#7fc97f', bad: '#e07a6a' } },
+  midnight:  { name: 'Midnight (dark blue)', vars: { bg: '#0a0e1a', panel: '#111729', line: '#27325a', text: '#cdd6ea', dim: '#7e8aa8', bright: '#ffffff',
+               inset: '#0d1222', button: '#1a2342', faint: '#55607f', hl: '#2c3566', accent: '#7fb8ff', good: '#7fd6a0', bad: '#f08a7a' } },
+  charcoal:  { name: 'Charcoal (dark grey)', vars: { bg: '#111111', panel: '#1a1a1a', line: '#343434', text: '#d6d6d6', dim: '#8a8a8a', bright: '#ffffff',
+               inset: '#141414', button: '#242424', faint: '#5c5c5c', hl: '#3c3520', accent: '#e6c35c', good: '#8fd08f', bad: '#e58573' } },
+  parchment: { name: 'Parchment (light)', vars: { bg: '#efe6d2', panel: '#f8f1e1', line: '#c9b99a', text: '#3a3226', dim: '#76684f', bright: '#000000',
+               inset: '#ebe0c8', button: '#e4d7ba', faint: '#a8997f', hl: '#5a4d20', accent: '#8a5a00', good: '#2f7d32', bad: '#b3392b' } },
+  paper:     { name: 'Paper (light grey)', vars: { bg: '#eef0f2', panel: '#ffffff', line: '#c5cbd3', text: '#22272e', dim: '#667080', bright: '#000000',
+               inset: '#f1f3f5', button: '#e3e7ec', faint: '#9aa3ae', hl: '#4a4a20', accent: '#0b62c4', good: '#1f7a3a', bad: '#c0392b' } },
+  contrast:  { name: 'High contrast', vars: { bg: '#000000', panel: '#000000', line: '#ffffff', text: '#ffffff', dim: '#d0d0d0', bright: '#ffffff',
+               inset: '#000000', button: '#000000', faint: '#9a9a9a', hl: '#444400', accent: '#ffff00', good: '#66ff66', bad: '#ff7070' } },
+};
+const ACCENTS = { '': 'The theme\'s own', '#e6c35c': 'Gold', '#5ad0d8': 'Cyan', '#7fc97f': 'Green', '#e58fd0': 'Pink',
+                  '#f0a05a': 'Orange', '#b79af0': 'Violet', '#7fb8ff': 'Blue', '#f07a7a': 'Red' };
+const FONTS = {
+  mono:    ['Monospace (the original)', 'Consolas, "Cascadia Mono", "Courier New", monospace'],
+  courier: ['Typewriter', '"Courier New", Courier, monospace'],
+  sans:    ['Sans-serif', 'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'],
+  serif:   ['Serif', 'Georgia, Cambria, "Times New Roman", serif'],
+  rounded: ['Rounded', '"Trebuchet MS", "Lucida Grande", Verdana, sans-serif'],
+};
+const DEFAULT_SETTINGS = { theme: 'forest', accent: '', font: 'mono', zoom: 100, tile: 'medium', width: 'normal',
+                           rate: 'hour', clock: 'auto', abbreviate: false, separators: true,
+                           poll: 5, startTab: 'city', away: true, reports: true, confirmDemolish: false, mapKey: true };
+let settings = { ...DEFAULT_SETTINGS };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
+function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} }
+function applySettings() {
+  const root = document.documentElement.style, theme = THEMES[settings.theme] || THEMES.forest;
+  for (const [k, v] of Object.entries(theme.vars)) root.setProperty('--' + k, v);
+  if (settings.accent) root.setProperty('--accent', settings.accent);
+  root.setProperty('--font', (FONTS[settings.font] || FONTS.mono)[1]);
+  root.setProperty('--page', { narrow: '860px', normal: '1050px', wide: '1400px', full: '100%' }[settings.width] || '1050px');
+  root.setProperty('--tscale', { small: 0.8, medium: 1, large: 1.25, huge: 1.5 }[settings.tile] || 1);
+  document.body.style.zoom = (Number(settings.zoom) || 100) / 100;
+}
+
+// Numbers the way the player asked for them.
+function num(n) {
+  if (typeof n !== 'number' || !isFinite(n)) return n;
+  const size = Math.abs(n);
+  if (settings.abbreviate && size >= 10000) {
+    const [unit, letter] = size >= 1e9 ? [1e9, 'B'] : size >= 1e6 ? [1e6, 'M'] : [1e3, 'k'];
+    return (n / unit).toFixed(size / unit >= 100 ? 0 : 1).replace(/\.0$/, '') + letter;
+  }
+  const v = Math.round(n * 10) / 10;
+  return settings.separators ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : String(v);
+}
+// An amount per hour, shown per hour, per meal or per minute as the player chose.
+function rateText(perHour) {
+  const [v, unit] = settings.rate === 'meal' ? [perHour * (view ? view.status.meal_time : 900) / 3600, 'meal']
+    : settings.rate === 'minute' ? [perHour / 60, 'min'] : [perHour, 'hour'];
+  const shown = Math.abs(v) >= 100 ? num(Math.round(v)) : (Math.round(v * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  return `${v > 0 ? '+' : ''}${shown} / ${unit}`;
+}
 // Only touch the DOM when something changed, so buttons aren't replaced mid-click.
 function setHTML(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; } }
 
@@ -462,7 +591,9 @@ function duration(sec) {
   return `${s}s`;
 }
 function clock(t) {
-  return new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const style = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  if (settings.clock !== 'auto') style.hour12 = settings.clock === '12';
+  return new Date(t * 1000).toLocaleString([], style);
 }
 
 async function api(action, extra) {
@@ -496,6 +627,7 @@ let reportShown = null;   // the expedition report already on screen
 function showReport(r) {
   if (reportShown === r.t) return;
   reportShown = r.t;
+  if (!settings.reports) { act('report_seen'); return; }
   const R = view.defs.resources;
   const loot = Object.entries(r.loot).map(([k, n]) => `<span class="good">+${n} ${esc(R[k])}</span>`).join(', ');
   $('reportBody').innerHTML =
@@ -516,6 +648,7 @@ function showAway(a) {
   if (a.population) gains.push(`<span class="${a.population > 0 ? 'good' : 'bad'}">${a.population > 0 ? '+' : ''}${a.population} Population</span>`);
   if (awayShown === a.since) return;
   awayShown = a.since;
+  if (!settings.away) { act('dismiss_away'); return; }
   if (!gains.length && !a.events.length) { act('dismiss_away'); return; }
   $('awayBody').innerHTML =
     `<p class="dim">You were gone for ${duration(view.now - a.since)}. Your city kept working.</p>` +
@@ -556,10 +689,10 @@ async function refresh() {
 function goods(cost) {
   const R = view.defs.resources, have = view.state.resources;
   return Object.entries(cost).map(([k, v]) =>
-    `<span class="${have[k] >= v ? '' : 'bad'}">${v} ${esc(R[k])}</span>`).join(', ');
+    `<span class="${have[k] >= v ? '' : 'bad'}">${num(v)} ${esc(R[k])}</span>`).join(', ');
 }
 function plain(cost) {
-  return Object.entries(cost).map(([k, v]) => `${v} ${esc(view.defs.resources[k])}`).join(', ');
+  return Object.entries(cost).map(([k, v]) => `${num(v)} ${esc(view.defs.resources[k])}`).join(', ');
 }
 
 // ---------------------------------------------------------------- render --
@@ -596,7 +729,7 @@ function render() {
   setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
     const d = status.rates[k];
     return stat(esc(label), num(state.resources[k]),
-      d ? `<span class="${d > 0 ? 'good' : 'bad'}">${d > 0 ? '+' : ''}${num(d)} / hour</span>` : '');
+      d ? `<span class="${d > 0 ? 'good' : 'bad'}">${rateText(d)}</span>` : '');
   }).join(''));
   const pop = state.population, working = pop - status.idle, unfilled = Math.max(0, status.jobs - working);
   const short = status.power.supply < status.power.demand;
@@ -615,7 +748,7 @@ function render() {
   setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (todo ? ' <span class="good">(mission)</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
-  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'board', 'guide']) $('tab-' + t).hidden = t !== tab;
+  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
   $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
@@ -652,6 +785,8 @@ function render() {
   renderPeople();
   renderBeast();
   renderGuide();
+  renderSettings();
+  $('mapKey').hidden = !settings.mapKey;
   renderResearch();
   renderExplore();
   if (!visiting) renderMarket();
@@ -812,7 +947,7 @@ function renderResearch() {
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   const rate = view.status.rates.knowledge;
   setHTML($('resSummary'),
-    stat('Knowledge', num(state.resources.knowledge), rate ? `<span class="${rate > 0 ? 'good' : 'bad'}">${rate > 0 ? '+' : ''}${num(rate)} / hour</span>` : 'none coming in') +
+    stat('Knowledge', num(state.resources.knowledge), rate ? `<span class="${rate > 0 ? 'good' : 'bad'}">${rateText(rate)}</span>` : 'none coming in') +
     stat('Researched', `${view.research.filter(r => r.done).length} / ${view.research.length}`, '') +
     stat('Ready now', view.research.filter(ready).length, 'can be researched'));
   setHTML($('resFilters'), Object.entries(filters).map(([k, [label, test]]) =>
@@ -965,6 +1100,26 @@ function renderBeast() {
       `<div class="areaCard"><div class="info">${card(b)}<div class="bar"><button data-beast-active="${b.id}">Make active</button></div></div></div>`).join('') + `</div>`
     : `<p class="dim" style="margin:0">None yet.</p>`) +
     `<p class="dim small">Each expedition has about a ${bv.egg_chance}% chance of finding an egg one area from home, and more further out.</p>`);
+}
+
+function renderSettings() {
+  // Fill the menus once, then show the current choices.
+  const fill = (key, options) => {
+    const el = document.querySelector(`[data-setting=${key}]`);
+    if (!el.options.length) el.innerHTML = options.map(([v, name]) => `<option value="${esc(v)}">${esc(name)}</option>`).join('');
+  };
+  fill('theme', Object.entries(THEMES).map(([k, t]) => [k, t.name]));
+  fill('accent', Object.entries(ACCENTS));
+  fill('font', Object.entries(FONTS).map(([k, f]) => [k, f[0]]));
+  document.querySelectorAll('[data-setting]').forEach(el => {
+    if (el === document.activeElement && el.type === 'range') return;   // don't fight a slider being dragged
+    if (el.type === 'checkbox') el.checked = !!settings[el.dataset.setting];
+    else el.value = settings[el.dataset.setting];
+  });
+  $('zoomLabel').textContent = settings.zoom + '%';
+  $('numberSample').textContent = `For example: 1234567 is shown as ${num(1234567)}, and 480 an hour as ${rateText(480)}.`;
+  setHTML($('banList'), myBanned.length ? myBanned.map(c =>
+    `<div class="opt"><button data-unban="${esc(c)}">Unban</button>${esc(c)}</div>`).join('') : `<span class="dim">You have not banned anyone.</span>`);
 }
 
 function renderPeople() {
@@ -1273,6 +1428,7 @@ function tick() {
 
 async function enter(name) {
   city = name; view = null; sel = null; board = null; areaIdx = 0; visiting = null;
+  tab = settings.startTab || 'city';
   let data;
   try { data = await api(); } catch { data = { error: 'Could not reach the server.' }; }
   if (!data.state) return signOut(data.error);
@@ -1336,7 +1492,9 @@ $('tile').onclick = e => {
   else if (e.target.dataset.add) act('add', { x: sel.x, y: sel.y, addition: e.target.dataset.add });
   else if ('tame' in e.target.dataset) act('tame', { x: sel.x, y: sel.y });
   else if (e.target.dataset.priority) act('priority', { x: sel.x, y: sel.y, priority: +e.target.dataset.priority });
-  else if ('demolish' in e.target.dataset) act('demolish', { x: sel.x, y: sel.y });
+  else if ('demolish' in e.target.dataset) {
+    if (!settings.confirmDemolish || confirm('Demolish this building? You get back half of what it cost.')) act('demolish', { x: sel.x, y: sel.y });
+  }
 };
 function showArea(i) { areaIdx = i; sel = null; refresh(); }
 $('findKind').onchange = () => { finder.kind = $('findKind').value; findChoices(); refresh(); };
@@ -1441,7 +1599,29 @@ for (const id of ['guideSearch', 'guideTech', 'guideCat']) $(id).oninput = () =>
 
 setInterval(tick, 1000);
 // Pick up trades and changes made by other players.
-setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+(function poll() {
+  if (!document.hidden) refresh();
+  setTimeout(poll, (Number(settings.poll) || 5) * 1000);
+})();
+
+// ---- settings events ----
+$('tab-settings').addEventListener('input', e => {
+  const key = e.target.dataset.setting;
+  if (!key) return;
+  const el = e.target;
+  settings[key] = el.type === 'checkbox' ? el.checked : (el.type === 'range' || key === 'poll') ? Number(el.value) : el.value;
+  saveSettings();
+  applySettings();
+  if (view) render();
+});
+$('resetSettings').onclick = () => { settings = { ...DEFAULT_SETTINGS }; saveSettings(); applySettings(); if (view) render(); };
+$('banList').onclick = e => { if (e.target.dataset.unban) act('unban', { target: e.target.dataset.unban }); };
+$('banForm').onsubmit = e => {
+  e.preventDefault();
+  const name = $('banName').value.trim();
+  if (name) { act('ban', { target: name }); $('banName').value = ''; }
+};
+applySettings();
 
 const saved = stored();
 if (saved.city && saved.token) { token = saved.token; enter(saved.city); } else $('login').hidden = false;
