@@ -27,7 +27,25 @@
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   button:disabled { color: #56605b; cursor: not-allowed; }
   input[type=number] { width: 90px; }
-  #resources span { display: inline-block; margin-right: 18px; white-space: nowrap; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+  .stat { border: 1px solid var(--line); background: #101614; padding: 6px 9px; min-width: 0; }
+  .stat .k { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .stat .v { color: #fff; font-size: 16px; white-space: nowrap; }
+  .stat .r { font-size: 12px; color: var(--dim); white-space: nowrap; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .small { font-size: 13px; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 6px 0 2px; }
+  .kv > :nth-child(odd) { color: var(--dim); }
+  .cat { margin: 16px 0 0; padding-bottom: 3px; border-bottom: 1px solid var(--line); color: var(--accent);
+         font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .card { padding: 9px 0; border-top: 1px solid var(--line); }
+  .cat + .card { border-top: 0; }
+  .card .desc { color: var(--dim); font-size: 13px; margin-top: 2px; }
+  details { margin-top: 6px; }
+  summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+  summary:hover { color: var(--accent); }
+  details > div { font-size: 13px; padding: 4px 0 0 14px; }
+  .checks span { display: inline-block; margin: 8px 18px 0 0; white-space: nowrap; }
   #map { display: inline-grid; gap: 2px; }
   .tile { position: relative; width: 44px; height: 40px; padding: 0; font-size: 17px; font-weight: bold;
           background: #101614; overflow: hidden; }
@@ -92,8 +110,8 @@
     <div id="status" class="dim"></div>
 
     <div class="panel">
-      <div id="resources"></div>
-      <div id="people" class="dim"></div>
+      <div id="resources" class="stats"></div>
+      <div id="people" class="stats" style="margin-top:8px"></div>
       <div id="msg" class="bad"></div>
     </div>
 
@@ -110,10 +128,11 @@
     <!-- City -->
     <div id="tab-city">
       <div class="panel">
-        <div class="bar" style="margin-top:0">
+        <div class="head">
+          <span id="advanceTitle" class="hi"></span>
           <button id="advance"></button>
-          <span id="advanceInfo" class="dim"></span>
         </div>
+        <div id="advanceInfo" class="checks"></div>
       </div>
       <div class="cols">
         <div class="panel">
@@ -374,7 +393,7 @@ function plain(cost) {
 function render() {
   const { state, status, defs } = view;
   const area = state.areas[view.area];
-  const tech = defs.tech[state.tech], next = defs.tech[state.tech + 1];
+  const tech = defs.tech[state.tech];
 
   // Countdown timers, advanced locally between server updates by tick().
   timers = { meal: { cycle: status.meal_time, progress: state.meal, speed: 1, waiting: [] } };
@@ -394,32 +413,33 @@ function render() {
   $('visitName').textContent = visiting || '';
   $('status').textContent = `Tech level ${state.tech + 1} of ${defs.tech.length}  |  ${state.areas.length} ${state.areas.length === 1 ? 'area' : 'areas'}  |  Founded ${clock(state.founded)}`;
 
+  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
     const d = status.rates[k];
-    const rate = d ? ` <span class="${d > 0 ? 'good' : 'bad'}">(${d > 0 ? '+' : ''}${num(d)}/h)</span>` : '';
-    return `<span>${esc(label)}: ${num(state.resources[k])}${rate}</span>`;
+    return stat(esc(label), num(state.resources[k]),
+      d ? `<span class="${d > 0 ? 'good' : 'bad'}">${d > 0 ? '+' : ''}${num(d)} / hour</span>` : '');
   }).join(''));
+  const pop = state.population, working = pop - status.idle, unfilled = Math.max(0, status.jobs - working);
+  const short = status.power.supply < status.power.demand;
   setHTML($('people'),
-    `Population ${state.population} / ${status.housing} housing  |  Jobs ${status.jobs}  |  ` +
-    (status.idle ? `${status.idle} idle` : (status.jobs > state.population ? '<span class="bad">short of workers</span>' : 'all working')) +
-    (status.power.supply || status.power.demand ? `  |  Power <span class="${status.power.supply < status.power.demand ? 'bad' : ''}">${num(status.power.supply)} of ${num(status.power.demand)} needed</span>` : '') +
-    `  |  Next meal in <span data-timer="meal"></span>` +
-    (state.hungry ? `  |  <span class="bad">HUNGRY: non-food buildings at half speed</span>` : ''));
+    stat('Population', `${pop} / ${status.housing}`,
+      pop >= status.housing ? '<span class="bad">housing full</span>' : `${status.housing - pop} places free`) +
+    stat('Workers', `${working} / ${status.jobs} jobs`,
+      unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${status.idle} idle` : 'all filled') +
+    (status.power.supply || status.power.demand ? stat('Power', `${num(status.power.supply)} / ${num(status.power.demand)}`,
+      short ? '<span class="bad">not enough</span>' : 'enough') : '') +
+    stat('Next meal', `<span data-timer="meal"></span>`,
+      state.hungry ? '<span class="bad">HUNGRY: half speed</span>' : `eats ${pop} food`));
 
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   for (const t of ['city', 'people', 'explore', 'research', 'market', 'board', 'guide']) $('tab-' + t).hidden = t !== tab;
 
-  if (next) {
-    const popOk = state.population >= next.population;
-    const resOk = Object.entries(next.cost).every(([k, v]) => state.resources[k] >= v);
-    $('advance').textContent = `Advance to ${next.name}`;
-    $('advance').disabled = !(popOk && resOk);
-    setHTML($('advanceInfo'), `needs <span class="${popOk ? '' : 'bad'}">${next.population} population</span>, ${goods(next.cost)}`);
-  } else {
-    $('advance').textContent = 'Max tech reached';
-    $('advance').disabled = true;
-    setHTML($('advanceInfo'), '');
-  }
+  const adv = status.advance;
+  $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
+  $('advance').hidden = !adv;
+  if (adv) { $('advance').textContent = `Advance to ${adv.name}`; $('advance').disabled = !adv.ready; }
+  setHTML($('advanceInfo'), adv ? adv.checks.map(c =>
+    `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join('') : '');
 
   setHTML($('areas'), view.areas.length < 2 ? '' : view.areas.map((a, i) =>
     `<button data-area="${i}" class="${i === view.area ? 'on' : ''}">${esc(a.name)}</button>`).join(''));
@@ -449,87 +469,112 @@ function render() {
   tick();
 }
 
-function buildingFacts(b, cycle, notes, produces, housing, powerOut) {
-  let html = '';
-  if (housing) html += `<br>Houses ${housing}`;
-  if (b.generates) html += `<br><span class="good">Generates ${num(powerOut === undefined ? b.generates : powerOut)} power</span>` +
-    (b.workers ? ` with ${b.workers} workers` : '') + (b.consumes ? `, burning ${plain(b.consumes)} every ${duration(cycle)}` : '');
-  if (b.power) html += `<br>Needs ${b.power} power`;
-  if (b.generates) return html;
-  if (b.herd) html += `<br>Each animal it holds adds ${Object.entries(b.per_head).map(([k, v]) =>
-    `${v} ${esc(view.defs.resources[k])}`).join(', ')} per cycle (rounded down)`;
-  if (cycle) {
-    const out = Object.keys(produces || {}).length ? `+${plain(produces)}` : 'Nothing yet';
-    html += `<br><span class="good">${out}</span>` +
-      (b.consumes ? ` for ${plain(b.consumes)}` : '') +
-      ` every <span class="hi">${duration(cycle)}</span> with ${b.workers} workers` +
-      ` <span class="dim">(base ${duration(b.time)})</span>`;
-    if (notes.length) html += `<br>${esc(notes.join('; '))}`;
+// Sections the player has opened in the tile panel; kept so a refresh doesn't close them.
+const openDetails = new Set();
+function fold(key, summary, lines) {
+  if (!lines.length) return '';
+  return `<details data-fold="${key}" ${openDetails.has(key) ? 'open' : ''}><summary>${summary} (${lines.length})</summary>` +
+    lines.map(l => `<div>${l}</div>`).join('') + `</details>`;
+}
+const kv = rows => rows.length ? `<div class="kv">` + rows.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('') + `</div>` : '';
+
+// The facts about a building as [label, value] rows. `live` is the tile's
+// current figures for a building that is standing; absent for a build option.
+function buildingRows(b, cycle, produces, live) {
+  const R = view.defs.resources, rows = [];
+  const housing = live ? live.housing : b.housing;
+  if (housing) rows.push(['Houses', `${housing} people`]);
+  if (b.attracts) rows.push(['Attracts', `${b.attracts} extra arrival per meal`]);
+  if (b.generates) rows.push(['Generates', `<span class="good">${num(live ? live.power_out : b.generates)} power</span>`]);
+  if (b.power) rows.push(['Needs', `${b.power} power`]);
+  if (b.fertility_aura) rows.push(['Nearby', `+${b.fertility_aura} fertility on the 8 tiles around it`]);
+  if (b.speed_aura) rows.push(['Nearby', `${b.speed_aura.for.map(f => esc(view.defs.buildings[f].name)).join(', ')} ${Math.round(b.speed_aura.bonus * 100)}% faster`]);
+  if (cycle && !b.generates) {
+    const made = Object.keys(produces || {}).length ? `<span class="good">+${plain(produces)}</span>` : 'nothing yet';
+    rows.push(['Makes', made + (b.consumes ? ` from ${plain(b.consumes)}` : '')]);
   }
-  return html;
+  if (b.herd) rows.push(['Livestock', (live ? `holds ${live.herd} of ${live.herd_room}; ` : `holds up to ${b.herd}; `) +
+    `each adds ${Object.entries(b.per_head).map(([k, v]) => `${v} ${esc(R[k])}`).join(', ')} per cycle`]);
+  if (cycle && b.generates && b.consumes) rows.push(['Burns', `${plain(b.consumes)} every ${duration(cycle)}`]);
+  else if (cycle) rows.push(['Every', `<span class="hi">${duration(cycle)}</span>` +
+    (cycle !== b.time ? ` <span class="dim">(normally ${duration(b.time)})</span>` : '')]);
+  if (b.workers) rows.push(['Workers', live ? `${live.staff} of ${b.workers}` : `${b.workers}`]);
+  return rows;
 }
 
 function renderTile() {
   const box = $('tile');
-  if (!sel) { setHTML(box, 'Select a tile on the map.'); return; }
+  if (!sel) { setHTML(box, '<span class="dim">Select a tile on the map.</span>'); return; }
   const { state, defs } = view;
   const t = state.areas[view.area].tiles[sel.y][sel.x], info = view.tiles[sel.y][sel.x], status = view.status;
   const terr = defs.terrains[t.terrain];
-
   const water = (terr.groups || []).includes('water');
-  let html = `<div><span style="color:${esc(terr.color)}">${esc(terr.name)}</span> at (${sel.x},${sel.y})</div>` +
-    `<div>Height ${t.height}  |  Temperature ${t.temp}C  |  ` +
-    (water ? `Fish ${t.fish}%` : `Fertility ${info.fertility}%`) +
-    (!water && info.fertility !== t.fertility ? ` <span class="good">(base ${t.fertility}%)</span>` : '') + `</div>` +
-    (terr.desc ? `<div class="dim">${esc(terr.desc)}</div>` : '');
 
+  // ---- the ground ----
+  let html = `<div class="head"><span class="big" style="color:${esc(terr.color)}">${esc(terr.name)}</span>` +
+    `<span class="dim small">tile ${sel.x}, ${sel.y}</span></div>` +
+    kv([['Height', t.height], ['Temperature', `${t.temp}C`],
+        water ? ['Fish', `${t.fish}%`]
+              : ['Fertility', `${info.fertility}%` + (info.fertility !== t.fertility ? ` <span class="good">(${t.fertility}% before nearby buildings)</span>` : '')]]) +
+    (terr.desc ? `<div class="dim small">${esc(terr.desc)}</div>` : '');
+
+  // ---- wildlife ----
   if (t.animal) {
     const w = defs.wildlife[t.animal], tame = info.tame;
-    html += `<div class="opt"><button data-tame ${tame.problem || !tame.affordable ? 'disabled' : ''}>Tame</button>` +
-      `<span class="animal">${esc(w.name)}</span> are here.<br>Taming them is worth ` +
-      `<span class="good">+${w.livestock} Livestock</span> and takes ${goods(tame.cost)} as bait.` +
-      (tame.problem ? `<br><span class="bad">${esc(tame.problem)}</span>` : '') +
-      `<br><span class="dim">Building on this tile drives them away.</span></div>`;
+    html += `<div class="cat">Wildlife</div><div class="card"><div class="head"><span class="animal">${esc(w.name)}</span>` +
+      `<button data-tame ${tame.problem || !tame.affordable ? 'disabled' : ''}>Tame</button></div>` +
+      kv([['Worth', `<span class="good">+${w.livestock} Livestock</span>`], ['Bait', goods(tame.cost)]]) +
+      (tame.problem ? `<div class="bad small">${esc(tame.problem)}</div>` : '') +
+      `<div class="desc">Building on this tile drives them away.</div></div>`;
   }
 
   if (t.building) {
+    // ---- the building standing here ----
     const b = defs.buildings[t.building];
-    html += `<div class="opt"><button data-demolish>Demolish</button>` +
-      `<span class="hi">${esc(b.name)}</span><br>${esc(b.desc)}` +
-      buildingFacts(b, info.cycle, info.notes || [], info.produces, info.housing, info.power_out);
-    if ('herd' in info) html += `<br>Livestock held ${info.herd}/${info.herd_room}`;
-    if ('need' in info) html += `<br>Workers ${info.staff}/${info.need}`;
-    if (info.need && !visiting) html += `<br>Staffing: ` + [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) =>
-      `<button data-priority="${p}" class="${info.priority === p ? 'on' : ''}" style="float:none;margin:2px 4px 2px 0">${label}</button>`).join('') +
-      `<br><span class="dim">First: gets workers before other buildings. Off: gets none.</span>`;
-    if (info.power_in && status.power.supply < status.power.demand) html += `<br><span class="bad">Short of power: ` +
-      `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs</span>`;
-    if (info.cycle) html += `<br>Status: <span class="hi" data-timer="${sel.x},${sel.y}"></span>`;
-    html += `</div>`;
+    const rows = buildingRows(b, info.cycle, info.produces, info);
+    if (info.cycle) rows.push(['Status', `<span class="hi" data-timer="${sel.x},${sel.y}"></span>`]);
+    html += `<div class="cat">Building</div><div class="card"><div class="head"><span class="hi big">${esc(b.name)}</span>` +
+      `<button data-demolish>Demolish</button></div><div class="desc">${esc(b.desc)}</div>` + kv(rows);
+    if (info.power_in && status.power.supply < status.power.demand) html += `<div class="bad small">Short of power: ` +
+      `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs.</div>`;
+    if (info.need && !visiting) html += `<div class="bar" style="margin-top:6px"><span class="dim">Staffing</span>` +
+      [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) =>
+        `<button data-priority="${p}" class="${info.priority === p ? 'on' : ''}">${label}</button>`).join('') + `</div>` +
+      `<div class="desc">First: gets workers before other buildings. Off: gets none.</div>`;
+    html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) + `</div>`;
 
-    const A = defs.additions, full = t.additions.length >= defs.max_additions;
+    // ---- additions ----
+    const A = defs.additions;
     if (t.additions.length || info.additions.length) {
-      html += `<div class="opt"><span class="dim">ADDITIONS ${t.additions.length}/${defs.max_additions}</span>` +
-        t.additions.map(a => `<br><span class="good">+ ${esc(A[a].name)}</span> - ${esc(A[a].desc)}`).join('') + `</div>`;
+      html += `<div class="cat">Additions ${t.additions.length} of ${defs.max_additions}</div>`;
+      for (const a of t.additions) html += `<div class="card"><span class="good">${esc(A[a].name)}</span> <span class="dim small">attached</span>` +
+        `<div class="desc">${esc(A[a].desc)}</div></div>`;
       const can = visiting ? [] : info.additions.filter(o => !o.problem), cannot = visiting ? [] : info.additions.filter(o => o.problem);
-      for (const o of can) {
-        html += `<div class="opt"><button data-add="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Add</button>` +
-          `<span class="hi">${esc(A[o.id].name)}</span> - ${goods(A[o.id].cost)}<br>${esc(A[o.id].desc)}</div>`;
+      for (const o of can) html += `<div class="card"><div class="head"><span class="hi">${esc(A[o.id].name)}</span>` +
+        `<button data-add="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Add</button></div>` +
+        kv([['Cost', goods(A[o.id].cost)]]) + `<div class="desc">${esc(A[o.id].desc)}</div></div>`;
+      if (t.additions.length < defs.max_additions) html += fold('noadd', 'Not available yet',
+        cannot.map(o => `${esc(A[o.id].name)}: ${esc(o.problem)}`));
+    }
+  } else if (!visiting) {
+    // ---- what can be built here, by category ----
+    const can = info.build.filter(o => !o.problem), cannot = info.build.filter(o => o.problem);
+    if (!can.length) html += `<div class="cat">Build</div><div class="card dim">Nothing you know how to build fits this tile.</div>`;
+    for (const [cat, label] of Object.entries(defs.categories)) {
+      const options = can.filter(o => defs.buildings[o.id].category === cat);
+      if (!options.length) continue;
+      html += `<div class="cat">Build: ${esc(label)}</div>`;
+      for (const o of options) {
+        const b = defs.buildings[o.id];
+        html += `<div class="card"><div class="head"><span class="hi">${esc(b.name)}</span>` +
+          `<button data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Build</button></div>` +
+          kv([['Cost', goods(b.cost)], ...buildingRows(b, o.cycle, b.produces)]) +
+          `<div class="desc">${esc(b.desc)}</div>` +
+          fold('speed:' + o.id, 'What changes its speed here', (o.notes || []).map(esc)) + `</div>`;
       }
-      if (cannot.length && !full) html += `<div class="opt">` + cannot.map(o =>
-        `${esc(A[o.id].name)}: ${esc(o.problem)}`).join('<br>') + `</div>`;
     }
-  } else {
-    const can = visiting ? [] : info.build.filter(o => !o.problem), cannot = visiting ? [] : info.build.filter(o => o.problem);
-    if (!can.length && !visiting) html += `<div class="opt">Nothing you know how to build fits this tile.</div>`;
-    for (const o of can) {
-      const b = defs.buildings[o.id];
-      html += `<div class="opt"><button data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Build</button>` +
-        `<span class="hi">${esc(b.name)}</span> - ${goods(b.cost)}<br>${esc(b.desc)}` +
-        buildingFacts(b, o.cycle, o.notes, b.produces, b.housing) + `</div>`;
-    }
-    if (cannot.length) html += `<div class="opt">` + cannot.map(o =>
-      `${esc(defs.buildings[o.id].name)}: ${esc(o.problem)}`).join('<br>') + `</div>`;
+    html += fold('nobuild', "Can't be built on this tile", cannot.map(o =>
+      `${esc(defs.buildings[o.id].name)}: ${esc(o.problem)}`));
   }
   setHTML(box, html);
 }
@@ -544,7 +589,7 @@ function renderResearch() {
     for (const a of Object.values(defs.additions)) if (a.research === id)
       out.push(`new addition: ${esc(a.name)} (${a.for.map(f => esc(defs.buildings[f].name)).join(', ')})`);
     if (R[id].effect) out.push(esc(R[id].effect));
-    return out.join('; ');
+    return out.join('<br>');
   };
   setHTML($('research'), defs.tech.map((level, i) => {
     const items = view.research.filter(r => R[r.id].tech === i);
@@ -557,7 +602,7 @@ function renderResearch() {
           : `<button data-research="${esc(r.id)}" ${r.problem || !r.affordable ? 'disabled' : ''}>Research</button>`;
         return `<div class="opt ${i > state.tech ? 'dim' : ''}">${right}` +
           `<span class="${i > state.tech ? '' : 'hi'}">${esc(d.name)}</span>` + (r.done ? '' : ` - ${goods(d.cost)}`) +
-          `<br>${esc(d.desc)}<br><span class="${r.done ? 'good' : ''}">${gives(r.id)}</span>` +
+          `<div class="dim small">${esc(d.desc)}</div><div class="small ${r.done ? 'good' : ''}">${gives(r.id)}</div>` +
           (!r.done && r.problem && i <= state.tech ? `<br><span class="bad">${esc(r.problem)}</span>` : '') + `</div>`;
       }).join('');
   }).join(''));
@@ -802,6 +847,10 @@ $('map').onclick = e => {
   const b = e.target.closest('.tile');
   if (b) { sel = { x: +b.dataset.x, y: +b.dataset.y }; render(); }
 };
+$('tile').addEventListener('toggle', e => {   // remember which sections are open
+  const key = e.target.dataset && e.target.dataset.fold;
+  if (key) e.target.open ? openDetails.add(key) : openDetails.delete(key);
+}, true);
 $('tile').onclick = e => {
   if (e.target.dataset.build) act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build });
   else if (e.target.dataset.add) act('add', { x: sel.x, y: sel.y, addition: e.target.dataset.add });

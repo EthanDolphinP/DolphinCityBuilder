@@ -132,17 +132,37 @@ MAX_WILDLIFE = 4            # wild animals an area holds at once
 TAME_FOOD_PER_HEAD = 3      # food used as bait, per livestock the animal is worth
 AWAY_TIME = 5 * MIN         # unwatched for this long -> the player gets a "while you were away" report
 
-# Index 0 is the starting level. "cost" and "population" are what it takes to
-# advance *into* that level.
+# Index 0 is the starting level. The other entries say what it takes to advance
+# *into* that level:
+#   population  people the city must have
+#   cost        resources paid
+#   research    how many things the city must have researched (of any level)
+#   areas       how many areas the city must own, counting home
 TECH_LEVELS = [
     {"name": "Tribe"},
-    {"name": "Village", "population": 8,  "cost": {"food": 40, "wood": 60, "stone": 30}},
-    {"name": "Town",    "population": 18, "cost": {"wood": 120, "stone": 100, "ore": 40, "gold": 30}},
-    {"name": "City",    "population": 35, "cost": {"stone": 200, "tools": 30, "gold": 120}},
+    {"name": "Village", "population": 12, "research": 3,
+     "cost": {"food": 100, "wood": 150, "stone": 80, "knowledge": 20}},
+    {"name": "Town", "population": 30, "research": 8, "areas": 2,
+     "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100}},
+    {"name": "City", "population": 60, "research": 15, "areas": 3,
+     "cost": {"stone": 800, "ore": 300, "tools": 120, "gold": 500, "knowledge": 300}},
 ]
+
+# Groups the build menu is divided into, in the order they are shown. Every
+# building names one of these as its "category".
+CATEGORIES = {
+    "housing": "Housing",
+    "food": "Food",
+    "materials": "Materials",
+    "trade": "Trade",
+    "knowledge": "Knowledge",
+    "power": "Power",
+    "support": "Support",
+}
 
 # Building fields (all optional except name/glyph/tech/terrain/cost):
 #   tech           minimum tech level index
+#   category       which group of the build menu it is listed in (see CATEGORIES)
 #   terrain        list of terrains it can stand on
 #   cost           resources paid to build
 #   workers        people needed to work at full speed
@@ -166,48 +186,48 @@ TECH_LEVELS = [
 BUILDINGS = {
     # ---- Tribe ----
     "hut": {
-        "name": "Hut", "glyph": "h", "tech": 0,
+        "name": "Hut", "glyph": "h", "tech": 0, "category": "housing",
         "terrain": ["plains", "forest", "desert", "hill"],
         "cost": {"wood": 10}, "housing": 3,
         "desc": "Simple shelter.",
     },
     "farm": {
-        "name": "Farm", "glyph": "F", "tech": 0,
+        "name": "Farm", "glyph": "F", "tech": 0, "category": "food",
         "terrain": ["plains", "oasis", "marsh"], "max_height": 2, "min_fertility": 40,
         "cost": {"wood": 8}, "workers": 2, "time": 12 * MIN, "produces": {"food": 6},
         "modifiers": ["fertility", "crop_temperature", "adjacent_water"],
         "desc": "Needs flat, fertile ground. Faster on fertile soil, near fresh water and in mild temperatures.",
     },
     "fishing_dock": {
-        "name": "Fishing Dock", "glyph": "D", "tech": 0,
+        "name": "Fishing Dock", "glyph": "D", "tech": 0, "category": "food",
         "terrain": ["water"], "min_temp": 1,
         "cost": {"wood": 12}, "workers": 1, "time": 10 * MIN, "produces": {"food": 3},
         "modifiers": ["fish", "open_water"],
         "desc": "Fishes the water tile it stands on: the more fish there, the faster. Bigger bodies of water help too. Cannot be built on frozen water.",
     },
     "lumber_camp": {
-        "name": "Lumber Camp", "glyph": "L", "tech": 0,
+        "name": "Lumber Camp", "glyph": "L", "tech": 0, "category": "materials",
         "terrain": ["forest"],
         "cost": {"wood": 5}, "workers": 2, "time": 10 * MIN, "produces": {"wood": 4},
         "modifiers": ["deep_forest"],
         "desc": "Cuts timber. Faster with more forest around it.",
     },
     "quarry": {
-        "name": "Quarry", "glyph": "Q", "tech": 0,
+        "name": "Quarry", "glyph": "Q", "tech": 0, "category": "materials",
         "terrain": ["hill"],
         "cost": {"wood": 15}, "workers": 2, "time": 15 * MIN, "produces": {"stone": 4},
         "modifiers": ["height"],
         "desc": "Cuts stone from a hill. Faster on higher hills.",
     },
     "shaman_hut": {
-        "name": "Shaman Hut", "glyph": "s", "tech": 0,
+        "name": "Shaman Hut", "glyph": "s", "tech": 0, "category": "knowledge",
         "terrain": ["plains", "forest", "desert", "hill"],
         "cost": {"wood": 15, "food": 10}, "workers": 1, "time": 15 * MIN, "produces": {"knowledge": 2},
         "modifiers": ["deep_forest"],
         "desc": "The shaman gathers knowledge, which pays for research. Faster with forest around it.",
     },
     "pasture": {
-        "name": "Pasture", "glyph": "P", "tech": 0, "research": "animal_husbandry",
+        "name": "Pasture", "glyph": "P", "tech": 0, "category": "food", "research": "animal_husbandry",
         "terrain": ["plains"],
         "cost": {"wood": 20}, "workers": 1, "time": 15 * MIN,
         "herd": 10, "per_head": {"food": 0.6},
@@ -215,14 +235,14 @@ BUILDINGS = {
         "desc": "Keeps up to 10 of your livestock and farms them for food. Faster on fertile grass.",
     },
     "hunting_lodge": {
-        "name": "Hunting Lodge", "glyph": "N", "tech": 0,
+        "name": "Hunting Lodge", "glyph": "N", "tech": 0, "category": "food",
         "terrain": ["forest"],
         "cost": {"wood": 12}, "workers": 1, "time": 15 * MIN, "produces": {"food": 3},
         "modifiers": ["deep_forest"],
         "desc": "Hunters bring in game from the woods. Faster with more forest around it.",
     },
     "reed_cutter": {
-        "name": "Reed Cutter", "glyph": "R", "tech": 0,
+        "name": "Reed Cutter", "glyph": "R", "tech": 0, "category": "materials",
         "terrain": ["river", "lake"],
         "cost": {"wood": 8}, "workers": 1, "time": 12 * MIN, "produces": {"wood": 2},
         "modifiers": ["open_water"],
@@ -230,66 +250,66 @@ BUILDINGS = {
     },
     # ---- Village ----
     "house": {
-        "name": "House", "glyph": "H", "tech": 1,
+        "name": "House", "glyph": "H", "tech": 1, "category": "housing",
         "terrain": ["plains", "forest", "desert", "hill"],
         "cost": {"wood": 20, "stone": 15}, "housing": 6,
         "desc": "Sturdy family home.",
     },
     "mine": {
-        "name": "Mine", "glyph": "M", "tech": 1,
+        "name": "Mine", "glyph": "M", "tech": 1, "category": "materials",
         "terrain": ["hill"], "min_height": 5,
         "cost": {"wood": 30, "stone": 20}, "workers": 3, "time": 20 * MIN, "produces": {"ore": 4},
         "modifiers": ["height"],
         "desc": "Digs ore. Needs a tall hill; faster on higher hills.",
     },
     "well": {
-        "name": "Well", "glyph": "W", "tech": 1,
+        "name": "Well", "glyph": "W", "tech": 1, "category": "support",
         "terrain": ["plains", "desert"],
         "cost": {"stone": 20}, "fertility_aura": 25,
         "desc": "Adds +25 fertility to the 8 surrounding tiles.",
     },
     "trading_post": {
-        "name": "Trading Post", "glyph": "$", "tech": 1,
+        "name": "Trading Post", "glyph": "$", "tech": 1, "category": "trade",
         "terrain": ["plains", "desert"], "max_height": 2,
         "cost": {"wood": 30, "stone": 20}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 5},
         "modifiers": ["customers"],
         "desc": "Earns gold. Needs flat ground. Faster with homes next to it.",
     },
     "school": {
-        "name": "School", "glyph": "K", "tech": 1,
+        "name": "School", "glyph": "K", "tech": 1, "category": "knowledge",
         "terrain": ["plains", "desert"],
         "cost": {"wood": 40, "stone": 30}, "workers": 2, "time": 15 * MIN, "produces": {"knowledge": 5},
         "modifiers": ["customers"],
         "desc": "Teaches and studies. Needed for Village research. Faster with homes next to it.",
     },
     "windmill": {
-        "name": "Windmill", "glyph": "*", "tech": 1, "research": "windmills",
+        "name": "Windmill", "glyph": "*", "tech": 1, "category": "support", "research": "windmills",
         "terrain": ["plains", "hill"],
         "cost": {"wood": 40, "stone": 20},
         "speed_aura": {"for": ["farm", "irrigated_farm"], "bonus": 0.2},
         "desc": "Mills grain for the farms on the 8 surrounding tiles, making them 20% faster.",
     },
     "tavern": {
-        "name": "Tavern", "glyph": "v", "tech": 1,
+        "name": "Tavern", "glyph": "v", "tech": 1, "category": "housing",
         "terrain": ["plains", "forest", "desert", "hill"],
         "cost": {"wood": 40, "stone": 20}, "housing": 1, "attracts": 1,
         "desc": "Word gets around: one extra person may arrive at every meal. Each arrival still needs a free place to live and a spare meal in store. Has a bed for 1.",
     },
     "stilt_house": {
-        "name": "Stilt House", "glyph": "t", "tech": 1,
+        "name": "Stilt House", "glyph": "t", "tech": 1, "category": "housing",
         "terrain": ["river", "lake"],
         "cost": {"wood": 35}, "housing": 4,
         "desc": "A home on stilts over fresh water, leaving the land free.",
     },
     "orchard": {
-        "name": "Orchard", "glyph": "Y", "tech": 1, "research": "grafting",
+        "name": "Orchard", "glyph": "Y", "tech": 1, "category": "food", "research": "grafting",
         "terrain": ["plains", "oasis"], "min_fertility": 30,
         "cost": {"wood": 30}, "workers": 2, "time": 15 * MIN, "produces": {"food": 5, "wood": 2},
         "modifiers": ["fertility", "crop_temperature"],
         "desc": "Fruit trees: food, plus wood from pruning. Tolerates slopes a farm can't use.",
     },
     "tannery": {
-        "name": "Tannery", "glyph": "n", "tech": 1, "research": "tanning",
+        "name": "Tannery", "glyph": "n", "tech": 1, "category": "trade", "research": "tanning",
         "terrain": ["plains", "desert", "hill"],
         "cost": {"wood": 30, "stone": 10}, "workers": 2, "time": 20 * MIN,
         "consumes": {"livestock": 1}, "produces": {"gold": 6, "food": 4},
@@ -297,13 +317,13 @@ BUILDINGS = {
         "desc": "Turns livestock into hides to sell and meat to eat. Faster next to fresh water.",
     },
     "caravanserai": {
-        "name": "Caravanserai", "glyph": "C", "tech": 1,
+        "name": "Caravanserai", "glyph": "C", "tech": 1, "category": "trade",
         "terrain": ["desert"], "adjacent": "fresh",
         "cost": {"wood": 30, "stone": 30}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 7},
         "desc": "A desert inn for passing caravans. Must be on desert next to fresh water.",
     },
     "lighthouse": {
-        "name": "Lighthouse", "glyph": "i", "tech": 1, "research": "navigation",
+        "name": "Lighthouse", "glyph": "i", "tech": 1, "category": "support", "research": "navigation",
         "terrain": ["plains", "hill", "desert"], "adjacent": "water",
         "cost": {"wood": 20, "stone": 40},
         "speed_aura": {"for": ["fishing_dock", "fishery", "harbor", "reed_cutter"], "bonus": 0.2},
@@ -311,28 +331,28 @@ BUILDINGS = {
     },
     # ---- Town ----
     "university": {
-        "name": "University", "glyph": "U", "tech": 2, "power": 2,
+        "name": "University", "glyph": "U", "tech": 2, "category": "knowledge", "power": 2,
         "terrain": ["plains", "desert"], "max_height": 2,
         "cost": {"stone": 80, "ore": 20, "gold": 30}, "workers": 4, "time": 20 * MIN,
         "produces": {"knowledge": 14},
         "desc": "Serious scholarship. Needed for Town and City research. Needs flat ground.",
     },
     "sawmill": {
-        "name": "Sawmill", "glyph": "S", "tech": 2, "power": 2,
+        "name": "Sawmill", "glyph": "S", "tech": 2, "category": "materials", "power": 2,
         "terrain": ["forest"],
         "cost": {"wood": 30, "stone": 30, "ore": 10}, "workers": 3, "time": 12 * MIN, "produces": {"wood": 10},
         "modifiers": ["deep_forest"],
         "desc": "Industrial timber. Faster with more forest around it.",
     },
     "irrigated_farm": {
-        "name": "Irrigated Farm", "glyph": "I", "tech": 2,
+        "name": "Irrigated Farm", "glyph": "I", "tech": 2, "category": "food",
         "terrain": ["plains", "desert"], "max_height": 3, "adjacent": "fresh",
         "cost": {"wood": 30, "stone": 20, "ore": 10}, "workers": 3, "time": 12 * MIN, "produces": {"food": 12},
         "modifiers": ["crop_temperature"],
         "desc": "Ignores fertility but must be next to fresh water. Works on desert.",
     },
     "smithy": {
-        "name": "Smithy", "glyph": "X", "tech": 2, "power": 2,
+        "name": "Smithy", "glyph": "X", "tech": 2, "category": "materials", "power": 2,
         "terrain": ["plains", "desert", "hill"],
         "cost": {"stone": 40, "ore": 20}, "workers": 2, "time": 25 * MIN,
         "consumes": {"ore": 4}, "produces": {"tools": 2},
@@ -340,34 +360,34 @@ BUILDINGS = {
         "desc": "Turns ore into tools. Faster next to a mine.",
     },
     "water_mill": {
-        "name": "Water Mill", "glyph": "w", "tech": 2,
+        "name": "Water Mill", "glyph": "w", "tech": 2, "category": "power",
         "terrain": ["river"],
         "cost": {"wood": 50, "stone": 30}, "workers": 1, "generates": 4,
         "desc": "A wheel in the river. Steady power with no fuel.",
     },
     "steam_engine": {
-        "name": "Steam Engine", "glyph": "E", "tech": 2,
+        "name": "Steam Engine", "glyph": "E", "tech": 2, "category": "power",
         "terrain": ["plains", "desert", "hill"],
         "cost": {"stone": 40, "ore": 25}, "workers": 2, "generates": 6,
         "time": 15 * MIN, "consumes": {"wood": 4},
         "desc": "Burns wood for power. Stops when the wood runs out.",
     },
     "fishery": {
-        "name": "Fishery", "glyph": "f", "tech": 2, "power": 2,
+        "name": "Fishery", "glyph": "f", "tech": 2, "category": "food", "power": 2,
         "terrain": ["lake", "ocean"], "min_temp": 1,
         "cost": {"wood": 50, "stone": 20, "ore": 10}, "workers": 3, "time": 12 * MIN, "produces": {"food": 10},
         "modifiers": ["fish", "open_water"],
         "desc": "Nets, boats and a packing shed on a lake or ocean. Faster with more fish and bigger water.",
     },
     "glassworks": {
-        "name": "Glassworks", "glyph": "G", "tech": 2, "power": 3, "research": "glassmaking",
+        "name": "Glassworks", "glyph": "G", "tech": 2, "category": "trade", "power": 3, "research": "glassmaking",
         "terrain": ["desert"],
         "cost": {"stone": 50, "ore": 15}, "workers": 3, "time": 20 * MIN,
         "consumes": {"wood": 3}, "produces": {"gold": 12},
         "desc": "Melts desert sand into glass to sell. Burns wood.",
     },
     "observatory": {
-        "name": "Observatory", "glyph": "Z", "tech": 2, "power": 1, "research": "astronomy",
+        "name": "Observatory", "glyph": "Z", "tech": 2, "category": "knowledge", "power": 1, "research": "astronomy",
         "terrain": ["hill"], "min_height": 6,
         "cost": {"stone": 70, "gold": 30}, "workers": 2, "time": 20 * MIN, "produces": {"knowledge": 9},
         "modifiers": ["height"],
@@ -375,13 +395,13 @@ BUILDINGS = {
     },
     # ---- City ----
     "apartments": {
-        "name": "Apartments", "glyph": "A", "tech": 3,
+        "name": "Apartments", "glyph": "A", "tech": 3, "category": "housing",
         "terrain": ["plains", "desert"],
         "cost": {"stone": 60, "tools": 10, "gold": 30}, "housing": 15,
         "desc": "Dense housing.",
     },
     "harbor": {
-        "name": "Harbor", "glyph": "B", "tech": 3, "power": 3,
+        "name": "Harbor", "glyph": "B", "tech": 3, "category": "food", "power": 3,
         "terrain": ["ocean", "lake"], "min_temp": 1,
         "cost": {"wood": 60, "stone": 40, "tools": 10}, "workers": 3, "time": 15 * MIN,
         "produces": {"food": 8, "gold": 5},
@@ -389,7 +409,7 @@ BUILDINGS = {
         "desc": "Fishing fleet and trade by boat, on a lake or ocean. Faster with more fish and bigger water.",
     },
     "deep_mine": {
-        "name": "Deep Mine", "glyph": "V", "tech": 3, "power": 4,
+        "name": "Deep Mine", "glyph": "V", "tech": 3, "category": "materials", "power": 4,
         "terrain": ["hill"], "min_height": 5,
         "cost": {"stone": 60, "tools": 15}, "workers": 4, "time": 20 * MIN,
         "produces": {"ore": 9, "stone": 4},
@@ -397,40 +417,40 @@ BUILDINGS = {
         "desc": "Deep shafts for ore and stone. Faster on higher hills.",
     },
     "wind_turbine": {
-        "name": "Wind Turbine", "glyph": "y", "tech": 3, "research": "electricity",
+        "name": "Wind Turbine", "glyph": "y", "tech": 3, "category": "power", "research": "electricity",
         "terrain": ["plains", "hill", "desert"],
         "cost": {"stone": 40, "tools": 15}, "workers": 1, "generates": 5,
         "generates_modifiers": ["height"],
         "desc": "Power from the wind, with no fuel. Gives more the higher it stands.",
     },
     "hydro_dam": {
-        "name": "Hydro Dam", "glyph": "=", "tech": 3, "research": "electricity",
+        "name": "Hydro Dam", "glyph": "=", "tech": 3, "category": "power", "research": "electricity",
         "terrain": ["river"], "adjacent": "hill",
         "cost": {"stone": 150, "tools": 25}, "workers": 3, "generates": 16,
         "desc": "Dams a river against a hill for a great deal of power with no fuel.",
     },
     "power_plant": {
-        "name": "Power Plant", "glyph": "!", "tech": 3, "research": "electricity",
+        "name": "Power Plant", "glyph": "!", "tech": 3, "category": "power", "research": "electricity",
         "terrain": ["plains", "desert"], "max_height": 2,
         "cost": {"stone": 100, "ore": 40, "tools": 20}, "workers": 4, "generates": 22,
         "time": 15 * MIN, "consumes": {"wood": 10},
         "desc": "Burns a lot of wood for a lot of power. Needs flat ground.",
     },
     "factory": {
-        "name": "Factory", "glyph": "&", "tech": 3, "power": 6, "research": "mass_production",
+        "name": "Factory", "glyph": "&", "tech": 3, "category": "materials", "power": 6, "research": "mass_production",
         "terrain": ["plains", "desert"], "max_height": 2,
         "cost": {"stone": 120, "tools": 30, "gold": 60}, "workers": 5, "time": 20 * MIN,
         "consumes": {"ore": 8, "wood": 4}, "produces": {"tools": 7},
         "desc": "Makes tools in bulk from ore and wood. Needs flat ground.",
     },
     "greenhouse": {
-        "name": "Greenhouse", "glyph": "u", "tech": 3, "power": 3, "research": "botany",
+        "name": "Greenhouse", "glyph": "u", "tech": 3, "category": "food", "power": 3, "research": "botany",
         "terrain": ["plains", "desert", "hill"],
         "cost": {"stone": 60, "tools": 15, "gold": 30}, "workers": 3, "time": 12 * MIN, "produces": {"food": 14},
         "desc": "Heated glass houses that grow food anywhere, whatever the soil or weather.",
     },
     "laboratory": {
-        "name": "Laboratory", "glyph": "J", "tech": 3, "power": 5, "research": "scientific_method",
+        "name": "Laboratory", "glyph": "J", "tech": 3, "category": "knowledge", "power": 5, "research": "scientific_method",
         "terrain": ["plains", "desert"],
         "cost": {"stone": 100, "tools": 25, "gold": 80}, "workers": 4, "time": 20 * MIN,
         "produces": {"knowledge": 30},
@@ -1467,15 +1487,27 @@ def research(state, now, rid):
     return None
 
 
+def advance_checks(state):
+    """Everything the next tech level asks for, and whether the city has it yet."""
+    if state["tech"] + 1 >= len(TECH_LEVELS):
+        return []
+    nxt = TECH_LEVELS[state["tech"] + 1]
+    checks = [(state["population"], nxt["population"], "population")]
+    checks += [(int(state["resources"][k]), v, RESOURCES[k]) for k, v in nxt["cost"].items()]
+    if nxt.get("research"):
+        checks.append((len(state["research"]), nxt["research"], "things researched"))
+    if nxt.get("areas"):
+        checks.append((len(state["areas"]), nxt["areas"], "areas owned"))
+    return [{"ok": have >= need, "text": f"{have} of {need} {what}"} for have, need, what in checks]
+
+
 def advance(state, now):
     if state["tech"] + 1 >= len(TECH_LEVELS):
         return "You have reached the highest tech level."
     nxt = TECH_LEVELS[state["tech"] + 1]
-    if state["population"] < nxt["population"]:
-        return f"Need {nxt['population']} population to become a {nxt['name']}."
-    missing = _missing(state, nxt["cost"])
-    if missing:
-        return f"Not enough resources to advance (need {fmt_goods(missing)})."
+    unmet = [c["text"] for c in advance_checks(state) if not c["ok"]]
+    if unmet:
+        return f"Not ready to become a {nxt['name']} yet: {', '.join(unmet)}."
     _pay(state, nxt["cost"])
     state["tech"] += 1
     _expand_area(state["areas"][0])
@@ -1766,6 +1798,7 @@ def view(state, ai=0):
             "housing_from": housing_sources(state),
             "growth": growth_checks(state, housing),
             "arrivals_max": 1 + city_attracts(state),
+            "advance": advance_view(state),
             "arrivals_next": next_arrivals(state, housing),
         },
         "tiles": tiles,
@@ -1783,6 +1816,7 @@ def view(state, ai=0):
             "resources": RESOURCES,
             "tradeable": [k for k in RESOURCES if k not in UNTRADEABLE],
             "buildings": BUILDINGS,
+            "categories": CATEGORIES,
             "tech": TECH_LEVELS,
             "research": RESEARCH,
             "additions": ADDITIONS,
@@ -1791,6 +1825,14 @@ def view(state, ai=0):
             "wildlife": WILDLIFE,
         },
     }
+
+
+def advance_view(state):
+    checks = advance_checks(state)
+    if not checks:
+        return None
+    return {"name": TECH_LEVELS[state["tech"] + 1]["name"], "checks": checks,
+            "ready": all(c["ok"] for c in checks)}
 
 
 def housing_sources(state):
