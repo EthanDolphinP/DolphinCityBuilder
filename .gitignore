@@ -1,0 +1,8 @@
+# Live game data: holds password hashes, and must survive code updates.
+saves/
+old_saves/
+market.json
+*.tmp
+
+__pycache__/
+.claude/

@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text City Builder</title>
+<style>
+  :root {
+    --bg: #0d1110; --panel: #141a18; --line: #2a3531; --text: #cfd8d3; --dim: #7d8a84;
+    --accent: #e6c35c; --good: #7fc97f; --bad: #e07a6a;
+    --plains: #9bc46b; --forest: #3f9a5a; --hill: #b79a7a; --water: #5aa7d8; --desert: #e0c070;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 Consolas, "Cascadia Mono", "Courier New", monospace; }
+  main { max-width: 1050px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: var(--accent); }
+  h2 { font-size: 14px; margin: 0 0 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .dim { color: var(--dim); } .good { color: var(--good); } .bad { color: var(--bad); }
+  .hi { color: #fff; }
+  .panel { background: var(--panel); border: 1px solid var(--line); padding: 12px; margin-top: 12px; }
+  .cols { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+  .cols > .panel { flex: 1 1 320px; min-width: 0; }
+  button, input, select { font: inherit; color: var(--text); background: #1d2623;
+                          border: 1px solid var(--line); padding: 5px 10px; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { color: #56605b; cursor: not-allowed; }
+  input[type=number] { width: 90px; }
+  #resources span { display: inline-block; margin-right: 18px; white-space: nowrap; }
+  #map { display: inline-grid; gap: 2px; }
+  .tile { position: relative; width: 44px; height: 40px; padding: 0; font-size: 17px; font-weight: bold;
+          background: #101614; overflow: hidden; }
+  .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tile b { color: #fff; }
+  .tile i { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
+  .tile i.stuck { background: var(--bad); width: 100%; }
+  .tile u { position: absolute; right: 2px; top: 0; font-size: 10px; text-decoration: none; color: var(--accent); }
+  .opt { border-top: 1px solid var(--line); padding: 7px 0; }
+  .opt button { float: right; margin-left: 8px; }
+  #log { max-height: 180px; overflow-y: auto; white-space: pre-wrap; }
+  #msg { min-height: 1.45em; margin-top: 8px; }
+  .glyph { display: inline-block; min-width: 2.2em; font-weight: bold; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  .tile em, .animal { font-style: normal; color: #e58fd0; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 5px 12px 5px 0; border-top: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--dim); font-weight: normal; border-top: 0; }
+  th.sortable { cursor: pointer; } th.sortable:hover, th.sorted { color: var(--accent); }
+  td.n, th.n { text-align: right; }
+  tr.me td { color: #fff; }
+  [hidden] { display: none !important; }
+  .meter { height: 16px; background: #101614; border: 1px solid var(--line); margin: 4px 0 2px; display: flex; }
+  .meter div { height: 100%; background: var(--good); }
+  .meter div.warn { background: var(--bad); } .meter div.alt { background: var(--accent); }
+  .meter div.empty { background: none; }
+  .big { font-size: 17px; }
+  #visitBar { border-color: var(--accent); }
+  /* Looking at someone else's city: nothing that changes it is offered. */
+  .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
+  .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
+  .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
+  #away { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
+          align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  #away .panel { max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; margin: 0;
+                 border-color: var(--accent); }
+  #away .gain span { display: inline-block; margin-right: 16px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <div id="login" class="panel" hidden>
+    <h1>Text City Builder</h1>
+    <p class="dim">To start a new city, pick a name and a password for it. To carry on with a city,
+      enter its name and password. People who share a city share its password.</p>
+    <form id="loginForm" class="bar">
+      <input id="cityName" maxlength="24" placeholder="city name" autocomplete="username" autofocus>
+      <input id="cityPass" type="password" minlength="4" maxlength="100" placeholder="password" autocomplete="current-password">
+      <button>Enter</button>
+    </form>
+    <div id="loginMsg" class="bad"></div>
+  </div>
+
+  <div id="game" hidden>
+    <div id="visitBar" class="panel bar" style="margin:0 0 12px" hidden>
+      <span>You are viewing <span id="visitName" class="hi"></span>. This is read-only.</span>
+      <button id="leave">Back to my city</button>
+    </div>
+    <h1 id="title"></h1>
+    <div id="status" class="dim"></div>
+
+    <div class="panel">
+      <div id="resources"></div>
+      <div id="people" class="dim"></div>
+      <div id="msg" class="bad"></div>
+    </div>
+
+    <div class="bar tabs">
+      <button data-tab="city">City</button>
+      <button data-tab="people">People</button>
+      <button data-tab="explore">Explore</button>
+      <button data-tab="research">Research</button>
+      <button data-tab="market">Market</button>
+      <button data-tab="board">Leaderboard</button>
+      <button data-tab="guide">Guide</button>
+    </div>
+
+    <!-- City -->
+    <div id="tab-city">
+      <div class="panel">
+        <div class="bar" style="margin-top:0">
+          <button id="advance"></button>
+          <span id="advanceInfo" class="dim"></span>
+        </div>
+      </div>
+      <div class="cols">
+        <div class="panel">
+          <h2>Map</h2>
+          <div id="areas" class="bar" style="margin:0 0 10px"></div>
+          <div id="map"></div>
+        </div>
+        <div class="panel">
+          <h2>Tile</h2>
+          <div id="tile" class="dim"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Chronicle</h2>
+        <div id="log" class="dim"></div>
+      </div>
+      <div class="bar">
+        <button id="switch">Sign out</button>
+        <button id="changePass">Change password</button>
+        <button id="restart">Restart this city</button>
+      </div>
+      <form id="passForm" class="bar" hidden>
+        New password <input id="newPass" type="password" minlength="4" maxlength="100" autocomplete="new-password">
+        <button>Save password</button>
+        <span class="dim">Other browsers signed in to this city will have to sign in again.</span>
+      </form>
+      <div>
+      </div>
+    </div>
+
+    <!-- People -->
+    <div id="tab-people" hidden>
+      <div class="panel"><h2>Will the city grow?</h2><div id="pplGrowth"></div></div>
+      <div class="cols">
+        <div class="panel"><h2>Food</h2><div id="pplFood"></div></div>
+        <div class="panel"><h2>Housing</h2><div id="pplHousing"></div></div>
+      </div>
+      <div class="panel"><h2>Work</h2><div id="pplWork"></div></div>
+    </div>
+
+    <!-- Explore -->
+    <div id="tab-explore" hidden>
+      <div class="panel">
+        <h2>Your areas</h2>
+        <div id="known" class="scroll"></div>
+      </div>
+      <div class="panel">
+        <h2>Send an expedition</h2>
+        <p class="dim">An expedition team maps one new area next to land you already know. The supplies it
+          needs depend on the kind of land it is heading into and how far that is from home.
+          People, materials and research are shared by all your areas.</p>
+        <div id="trip"></div>
+        <div id="explore" class="scroll"></div>
+      </div>
+    </div>
+
+    <!-- Research -->
+    <div id="tab-research" hidden>
+      <div class="panel">
+        <h2>Research</h2>
+        <p class="dim">Research is paid for with Knowledge, which comes from Shaman Huts, Schools and
+          Universities. Each tech level's research needs its research building standing in your city.</p>
+        <div id="research"></div>
+      </div>
+    </div>
+
+    <!-- Market -->
+    <div id="tab-market" hidden>
+      <div class="panel">
+        <h2>Post an offer</h2>
+        <form id="offerForm" class="bar" style="margin-top:0">
+          I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select>
+          and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select>
+          <button>Post offer</button>
+        </form>
+        <p class="dim">Every trade is between two cities. What you offer leaves your stock and is held
+          until another city accepts or you cancel. To buy something, offer what you will pay for it.</p>
+      </div>
+      <div class="panel">
+        <h2>Open offers</h2>
+        <div id="offers" class="scroll"></div>
+      </div>
+      <div class="panel">
+        <h2>Bills</h2>
+        <form id="billForm" class="bar" style="margin-top:0">
+          Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours I send
+          <input id="billGiveQty" type="number" min="1" step="1" value="10"> <select id="billGiveRes"></select>
+          to <input id="billTo" list="cityList" maxlength="24" placeholder="city name">
+          and receive <input id="billWantQty" type="number" min="1" step="1" value="20"> <select id="billWantRes"></select>
+          <button>Propose bill</button>
+        </form>
+        <datalist id="cityList"></datalist>
+        <p class="dim">A bill is a repeating trade with one other city. It starts once they accept, and
+          either of you can cancel it at any time. If either city can't pay when it comes due, nothing
+          changes hands that time; three misses in a row cancel the bill. Active bills are counted in the
+          per-hour figures at the top.</p>
+        <div id="bills" class="scroll"></div>
+      </div>
+      <div class="panel">
+        <h2>Recent trades</h2>
+        <div id="trades" class="dim"></div>
+      </div>
+    </div>
+
+    <!-- Guide -->
+    <div id="tab-guide" hidden>
+      <div class="panel">
+        <h2>Reading the map</h2>
+        <p class="dim">Each tile shows its terrain symbol. If something is on it, the second character
+          is the building (white) or the wild animal (pink). The bar under a building shows how far
+          through its cycle it is, and a + in the corner is an addition. Click any tile for its details.</p>
+      </div>
+      <div class="panel"><h2>Terrain</h2><div id="guideTerrain" class="scroll"></div></div>
+      <div class="panel"><h2>Buildings</h2><div id="guideBuildings" class="scroll"></div></div>
+      <div class="panel"><h2>Wildlife</h2><div id="guideWildlife" class="scroll"></div></div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div id="tab-board" hidden>
+      <div class="panel">
+        <h2>Leaderboard</h2>
+        <div id="board" class="scroll dim">Loading...</div>
+        <p class="dim">Click a column to rank by it. View opens another city read-only. Ban stops a city
+          from viewing yours and from proposing bills to you.</p>
+      </div>
+    </div>
+  </div>
+  <div id="away" hidden>
+    <div class="panel">
+      <h1>While you were away</h1>
+      <div id="awayBody"></div>
+      <div class="bar"><button id="awayOk">Continue</button></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = n => Number.isInteger(n) ? n : n.toFixed(1);
+// Only touch the DOM when something changed, so buttons aren't replaced mid-click.
+function setHTML(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; } }
+
+let city = null, view = null, sel = null, tab = 'city', areaIdx = 0;
+let visiting = null;   // name of another city being viewed read-only
+let myBanned = [];     // cities this player's city has banned
+let awayShown = null;  // the away report already on screen or dismissed
+let fetchedAt = 0, lastFetch = 0, timers = {};
+let board = null, boardSort = 'tech';
+
+let token = null;      // proof to the server that this browser signed in to `city`
+function stored() { try { return { city: localStorage.getItem('city'), token: localStorage.getItem('token') }; } catch { return {}; } }
+function remember(name) {
+  try {
+    if (name) { localStorage.setItem('city', name); localStorage.setItem('token', token); }
+    else { localStorage.removeItem('city'); localStorage.removeItem('token'); }
+  } catch {}
+}
+function signOut(message) {
+  remember(null);
+  token = city = view = visiting = null;
+  $('game').hidden = true; $('away').hidden = true; $('passForm').hidden = true;
+  $('login').hidden = false;
+  $('loginMsg').textContent = message || '';
+}
+
+function duration(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m) return `${m}m ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
+}
+function clock(t) {
+  return new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function api(action, extra) {
+  const opts = action
+    ? { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Token': token},
+        body: JSON.stringify({ city, action, area: areaIdx, ...extra }) }
+    : { headers: {'X-Token': token} };
+  const res = await fetch(action ? '/api/action'
+    : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}`
+    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}`, opts);
+  return res.json();
+}
+
+function accept(data) {
+  // Ignore an answer about a city we have since stopped (or started) looking at.
+  if ((data.visiting ? data.state.name : null) !== visiting) return;
+  if (!visiting) myBanned = data.state.banned;
+  // A different area, or the map grew and coordinates shifted.
+  if (view && (view.area !== data.area ||
+      view.state.areas[view.area].size !== data.state.areas[data.area].size)) sel = null;
+  view = data;
+  areaIdx = data.area;
+  fetchedAt = performance.now();
+  render();
+  if (data.away) showAway(data.away);
+}
+
+function showAway(a) {
+  const R = view.defs.resources;
+  const gains = Object.entries(a.resources).filter(([, v]) => v).map(([k, v]) =>
+    `<span class="${v > 0 ? 'good' : 'bad'}">${v > 0 ? '+' : ''}${num(v)} ${esc(R[k])}</span>`);
+  if (a.population) gains.push(`<span class="${a.population > 0 ? 'good' : 'bad'}">${a.population > 0 ? '+' : ''}${a.population} Population</span>`);
+  if (awayShown === a.since) return;
+  awayShown = a.since;
+  if (!gains.length && !a.events.length) { act('dismiss_away'); return; }
+  $('awayBody').innerHTML =
+    `<p class="dim">You were gone for ${duration(view.now - a.since)}. Your city kept working.</p>` +
+    `<h2>Change in your stores</h2><p class="gain">${gains.join('') || '<span class="dim">Nothing changed.</span>'}</p>` +
+    (a.hungry ? `<p class="bad">Your city is out of food. Non-food buildings are working at half speed.</p>` : '') +
+    `<h2>What happened</h2>` + (a.events.length
+      ? a.events.slice().reverse().map(e => `<div class="opt"><span class="dim">[${clock(e.t)}]</span> ${esc(e.text)}</div>`).join('')
+      : `<p class="dim">Nothing else to report.</p>`);
+  $('away').hidden = false;
+}
+
+function visit(name) { visiting = name; areaIdx = 0; sel = null; tab = 'city'; $('msg').textContent = ''; refresh(); }
+function leave() { visiting = null; areaIdx = 0; sel = null; refresh(); }
+
+async function act(action, extra) {
+  if (visiting) return;
+  let data;
+  try { data = await api(action, extra); }
+  catch { $('msg').textContent = 'Lost contact with the server.'; return; }
+  if (data.auth) return signOut(data.error);
+  if (data.state) accept(data);
+  $('msg').textContent = data.error || '';
+  if (tab === 'board') loadBoard();
+}
+
+async function refresh() {
+  if (!city) return;
+  lastFetch = performance.now();
+  try {
+    const data = await api();
+    if (data.auth) return signOut(data.error);
+    if (data.state) accept(data);
+    else if (visiting) { visiting = null; $('msg').textContent = data.error || ''; refresh(); }
+    if (tab === 'board') loadBoard();
+  } catch {}
+}
+
+function goods(cost) {
+  const R = view.defs.resources, have = view.state.resources;
+  return Object.entries(cost).map(([k, v]) =>
+    `<span class="${have[k] >= v ? '' : 'bad'}">${v} ${esc(R[k])}</span>`).join(', ');
+}
+function plain(cost) {
+  return Object.entries(cost).map(([k, v]) => `${v} ${esc(view.defs.resources[k])}`).join(', ');
+}
+
+// ---------------------------------------------------------------- render --
+
+function render() {
+  const { state, status, defs } = view;
+  const area = state.areas[view.area];
+  const tech = defs.tech[state.tech], next = defs.tech[state.tech + 1];
+
+  // Countdown timers, advanced locally between server updates by tick().
+  timers = { meal: { cycle: status.meal_time, progress: state.meal, speed: 1, waiting: [] } };
+  area.tiles.forEach((row, y) => row.forEach((t, x) => {
+    const info = view.tiles[y][x];
+    if (info.cycle) timers[`${x},${y}`] = { cycle: info.cycle, progress: t.progress, speed: info.speed, waiting: info.waiting, staffed: info.staff > 0 || !info.need, off: info.priority < 0 };
+  }));
+  const trip = view.explore.expedition;
+  if (trip) timers.trip = { cycle: trip.arrive - trip.left, progress: view.now - trip.left, speed: 1, waiting: [] };
+  for (const b of view.market.bills) {
+    if (b.status === 'active') timers['bill' + b.id] = { cycle: b.every, progress: b.every - (b.next - view.now), speed: 1, waiting: [] };
+  }
+
+  $('title').textContent = `${state.name} - ${tech.name}`;
+  $('game').classList.toggle('visiting', !!visiting);
+  $('visitBar').hidden = !visiting;
+  $('visitName').textContent = visiting || '';
+  $('status').textContent = `Tech level ${state.tech + 1} of ${defs.tech.length}  |  ${state.areas.length} ${state.areas.length === 1 ? 'area' : 'areas'}  |  Founded ${clock(state.founded)}`;
+
+  setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
+    const d = status.rates[k];
+    const rate = d ? ` <span class="${d > 0 ? 'good' : 'bad'}">(${d > 0 ? '+' : ''}${num(d)}/h)</span>` : '';
+    return `<span>${esc(label)}: ${num(state.resources[k])}${rate}</span>`;
+  }).join(''));
+  setHTML($('people'),
+    `Population ${state.population} / ${status.housing} housing  |  Jobs ${status.jobs}  |  ` +
+    (status.idle ? `${status.idle} idle` : (status.jobs > state.population ? '<span class="bad">short of workers</span>' : 'all working')) +
+    (status.power.supply || status.power.demand ? `  |  Power <span class="${status.power.supply < status.power.demand ? 'bad' : ''}">${num(status.power.supply)} of ${num(status.power.demand)} needed</span>` : '') +
+    `  |  Next meal in <span data-timer="meal"></span>` +
+    (state.hungry ? `  |  <span class="bad">HUNGRY: non-food buildings at half speed</span>` : ''));
+
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  for (const t of ['city', 'people', 'explore', 'research', 'market', 'board', 'guide']) $('tab-' + t).hidden = t !== tab;
+
+  if (next) {
+    const popOk = state.population >= next.population;
+    const resOk = Object.entries(next.cost).every(([k, v]) => state.resources[k] >= v);
+    $('advance').textContent = `Advance to ${next.name}`;
+    $('advance').disabled = !(popOk && resOk);
+    setHTML($('advanceInfo'), `needs <span class="${popOk ? '' : 'bad'}">${next.population} population</span>, ${goods(next.cost)}`);
+  } else {
+    $('advance').textContent = 'Max tech reached';
+    $('advance').disabled = true;
+    setHTML($('advanceInfo'), '');
+  }
+
+  setHTML($('areas'), view.areas.length < 2 ? '' : view.areas.map((a, i) =>
+    `<button data-area="${i}" class="${i === view.area ? 'on' : ''}">${esc(a.name)}</button>`).join(''));
+  $('areas').hidden = view.areas.length < 2;
+
+  $('map').style.gridTemplateColumns = `repeat(${area.size}, auto)`;
+  setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
+    const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
+    const on = sel && sel.x === x && sel.y === y ? ' sel' : '';
+    const bar = timers[`${x},${y}`] ? `<i data-bar="${x},${y}"></i>` : '';
+    const adds = t.additions.map(a => defs.additions[a].name);
+    return `<button class="tile${on}" style="color:${esc(defs.terrains[t.terrain].color)}" data-x="${x}" data-y="${y}" ` +
+      `title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">` +
+      (b ? `${g}<b>${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
+  }).join('')).join(''));
+
+  renderTile();
+  renderPeople();
+  renderGuide();
+  renderResearch();
+  renderExplore();
+  if (!visiting) renderMarket();
+
+  const text = state.log.slice().reverse().map(e => `[${clock(e.t)}] ${e.text}`).join('\n');
+  if ($('log').textContent !== text) $('log').textContent = text;
+
+  tick();
+}
+
+function buildingFacts(b, cycle, notes, produces, housing, powerOut) {
+  let html = '';
+  if (housing) html += `<br>Houses ${housing}`;
+  if (b.generates) html += `<br><span class="good">Generates ${num(powerOut === undefined ? b.generates : powerOut)} power</span>` +
+    (b.workers ? ` with ${b.workers} workers` : '') + (b.consumes ? `, burning ${plain(b.consumes)} every ${duration(cycle)}` : '');
+  if (b.power) html += `<br>Needs ${b.power} power`;
+  if (b.generates) return html;
+  if (b.herd) html += `<br>Each animal it holds adds ${Object.entries(b.per_head).map(([k, v]) =>
+    `${v} ${esc(view.defs.resources[k])}`).join(', ')} per cycle (rounded down)`;
+  if (cycle) {
+    const out = Object.keys(produces || {}).length ? `+${plain(produces)}` : 'Nothing yet';
+    html += `<br><span class="good">${out}</span>` +
+      (b.consumes ? ` for ${plain(b.consumes)}` : '') +
+      ` every <span class="hi">${duration(cycle)}</span> with ${b.workers} workers` +
+      ` <span class="dim">(base ${duration(b.time)})</span>`;
+    if (notes.length) html += `<br>${esc(notes.join('; '))}`;
+  }
+  return html;
+}
+
+function renderTile() {
+  const box = $('tile');
+  if (!sel) { setHTML(box, 'Select a tile on the map.'); return; }
+  const { state, defs } = view;
+  const t = state.areas[view.area].tiles[sel.y][sel.x], info = view.tiles[sel.y][sel.x], status = view.status;
+  const terr = defs.terrains[t.terrain];
+
+  const water = (terr.groups || []).includes('water');
+  let html = `<div><span style="color:${esc(terr.color)}">${esc(terr.name)}</span> at (${sel.x},${sel.y})</div>` +
+    `<div>Height ${t.height}  |  Temperature ${t.temp}C  |  ` +
+    (water ? `Fish ${t.fish}%` : `Fertility ${info.fertility}%`) +
+    (!water && info.fertility !== t.fertility ? ` <span class="good">(base ${t.fertility}%)</span>` : '') + `</div>` +
+    (terr.desc ? `<div class="dim">${esc(terr.desc)}</div>` : '');
+
+  if (t.animal) {
+    const w = defs.wildlife[t.animal], tame = info.tame;
+    html += `<div class="opt"><button data-tame ${tame.problem || !tame.affordable ? 'disabled' : ''}>Tame</button>` +
+      `<span class="animal">${esc(w.name)}</span> are here.<br>Taming them is worth ` +
+      `<span class="good">+${w.livestock} Livestock</span> and takes ${goods(tame.cost)} as bait.` +
+      (tame.problem ? `<br><span class="bad">${esc(tame.problem)}</span>` : '') +
+      `<br><span class="dim">Building on this tile drives them away.</span></div>`;
+  }
+
+  if (t.building) {
+    const b = defs.buildings[t.building];
+    html += `<div class="opt"><button data-demolish>Demolish</button>` +
+      `<span class="hi">${esc(b.name)}</span><br>${esc(b.desc)}` +
+      buildingFacts(b, info.cycle, info.notes || [], info.produces, info.housing, info.power_out);
+    if ('herd' in info) html += `<br>Livestock held ${info.herd}/${info.herd_room}`;
+    if ('need' in info) html += `<br>Workers ${info.staff}/${info.need}`;
+    if (info.need && !visiting) html += `<br>Staffing: ` + [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) =>
+      `<button data-priority="${p}" class="${info.priority === p ? 'on' : ''}" style="float:none;margin:2px 4px 2px 0">${label}</button>`).join('') +
+      `<br><span class="dim">First: gets workers before other buildings. Off: gets none.</span>`;
+    if (info.power_in && status.power.supply < status.power.demand) html += `<br><span class="bad">Short of power: ` +
+      `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs</span>`;
+    if (info.cycle) html += `<br>Status: <span class="hi" data-timer="${sel.x},${sel.y}"></span>`;
+    html += `</div>`;
+
+    const A = defs.additions, full = t.additions.length >= defs.max_additions;
+    if (t.additions.length || info.additions.length) {
+      html += `<div class="opt"><span class="dim">ADDITIONS ${t.additions.length}/${defs.max_additions}</span>` +
+        t.additions.map(a => `<br><span class="good">+ ${esc(A[a].name)}</span> - ${esc(A[a].desc)}`).join('') + `</div>`;
+      const can = visiting ? [] : info.additions.filter(o => !o.problem), cannot = visiting ? [] : info.additions.filter(o => o.problem);
+      for (const o of can) {
+        html += `<div class="opt"><button data-add="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Add</button>` +
+          `<span class="hi">${esc(A[o.id].name)}</span> - ${goods(A[o.id].cost)}<br>${esc(A[o.id].desc)}</div>`;
+      }
+      if (cannot.length && !full) html += `<div class="opt">` + cannot.map(o =>
+        `${esc(A[o.id].name)}: ${esc(o.problem)}`).join('<br>') + `</div>`;
+    }
+  } else {
+    const can = visiting ? [] : info.build.filter(o => !o.problem), cannot = visiting ? [] : info.build.filter(o => o.problem);
+    if (!can.length && !visiting) html += `<div class="opt">Nothing you know how to build fits this tile.</div>`;
+    for (const o of can) {
+      const b = defs.buildings[o.id];
+      html += `<div class="opt"><button data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Build</button>` +
+        `<span class="hi">${esc(b.name)}</span> - ${goods(b.cost)}<br>${esc(b.desc)}` +
+        buildingFacts(b, o.cycle, o.notes, b.produces, b.housing) + `</div>`;
+    }
+    if (cannot.length) html += `<div class="opt">` + cannot.map(o =>
+      `${esc(defs.buildings[o.id].name)}: ${esc(o.problem)}`).join('<br>') + `</div>`;
+  }
+  setHTML(box, html);
+}
+
+function renderResearch() {
+  const { state, defs } = view, R = defs.research;
+  // What each research gives: technique boosts plus the buildings/additions that name it.
+  const gives = id => {
+    const out = Object.entries(R[id].boost || {}).map(([b, m]) =>
+      `${esc(defs.buildings[b].name)} ${Math.round((m - 1) * 100)}% faster`);
+    for (const b of Object.values(defs.buildings)) if (b.research === id) out.push(`new building: ${esc(b.name)}`);
+    for (const a of Object.values(defs.additions)) if (a.research === id)
+      out.push(`new addition: ${esc(a.name)} (${a.for.map(f => esc(defs.buildings[f].name)).join(', ')})`);
+    if (R[id].effect) out.push(esc(R[id].effect));
+    return out.join('; ');
+  };
+  setHTML($('research'), defs.tech.map((level, i) => {
+    const items = view.research.filter(r => R[r.id].tech === i);
+    if (!items.length) return '';
+    return `<div class="opt"><span class="${i <= state.tech ? 'hi' : 'dim'}">${esc(level.name.toUpperCase())}</span>` +
+      (i > state.tech ? ` <span class="dim">- not reached yet</span>` : '') + `</div>` +
+      items.map(r => {
+        const d = R[r.id];
+        const right = r.done ? `<span class="good" style="float:right">Researched</span>`
+          : `<button data-research="${esc(r.id)}" ${r.problem || !r.affordable ? 'disabled' : ''}>Research</button>`;
+        return `<div class="opt ${i > state.tech ? 'dim' : ''}">${right}` +
+          `<span class="${i > state.tech ? '' : 'hi'}">${esc(d.name)}</span>` + (r.done ? '' : ` - ${goods(d.cost)}`) +
+          `<br>${esc(d.desc)}<br><span class="${r.done ? 'good' : ''}">${gives(r.id)}</span>` +
+          (!r.done && r.problem && i <= state.tech ? `<br><span class="bad">${esc(r.problem)}</span>` : '') + `</div>`;
+      }).join('');
+  }).join(''));
+}
+
+function renderExplore() {
+  const { defs, explore } = view, E = defs.environments;
+  setHTML($('known'), `<table><tr><th>Area</th><th>Land</th><th class="n">Size</th><th class="n">Buildings</th><th class="n">Wildlife</th><th></th></tr>` +
+    view.areas.map((a, i) => `<tr class="${i === view.area ? 'me' : ''}"><td>${esc(a.name)}</td><td>${esc(E[a.env].name)}</td>` +
+      `<td class="n">${a.size}x${a.size}</td><td class="n">${a.buildings}</td><td class="n">${a.animals}</td>` +
+      `<td><button data-view="${i}">View</button></td></tr>`).join('') + `</table>`);
+
+  const trip = explore.expedition;
+  setHTML($('trip'), trip ? `<p class="hi">An expedition is on its way to the ${esc(E[trip.env].name.toLowerCase())} ` +
+    `${esc(trip.where)} of home. It arrives in <span data-timer="trip"></span>.</p>` : '');
+
+  setHTML($('explore'), `<table><tr><th>Where</th><th>Land</th><th class="n">Distance</th><th>Supplies needed</th><th>Travel time</th><th></th></tr>` +
+    explore.destinations.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}</td>` +
+      `<td class="n">${d.distance}</td><td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>` +
+      (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
+        : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>Send expedition</button>`) +
+      `</td></tr>`).join('') + `</table>`);
+}
+
+function renderPeople() {
+  const { state, status } = view, pop = state.population, food = Math.floor(state.resources.food);
+  const meter = (parts, total) => `<div class="meter">` + parts.map(([n, cls]) =>
+    `<div class="${cls || ''}" style="width:${total ? Math.min(100, n / total * 100) : 0}%"></div>`).join('') + `</div>`;
+  const perHour = 3600 / status.meal_time;
+
+  // Growth
+  const ready = status.growth.every(g => g.ok);
+  setHTML($('pplGrowth'),
+    `<p class="big ${ready ? 'good' : 'bad'}">` + (state.hungry ? 'Hungry - the city cannot grow'
+      : ready ? `+${status.arrivals_next} ${status.arrivals_next === 1 ? 'person' : 'people'} at the next meal` : 'Not growing') +
+    ` <span class="dim">(next meal in <span data-timer="meal"></span>)</span></p>` +
+    `<p class="dim">A meal happens every ${duration(status.meal_time)}. At each meal everyone eats 1 food, ` +
+    `and if both things below are true one new person joins - so at best ${perHour * status.arrivals_max} people per hour.` +
+    (status.arrivals_max > 1 ? ` Your taverns let up to <span class="hi">${status.arrivals_max}</span> arrive per meal; each extra arrival needs ` +
+      `its own free place to live and enough food in store to cover one more mouth.` :` A Tavern (Village) lets one more arrive per meal.`) + `</p>` +
+    status.growth.map(g => `<div class="opt"><span class="${g.ok ? 'good' : 'bad'}">[${g.ok ? 'x' : ' '}]</span> ${esc(g.text)}` +
+      (g.ok ? '' : `<br><span class="hi">What to do:</span> ${esc(g.fix)}`) + `</div>`).join('') +
+    (state.hungry ? `<div class="opt bad">The food has run out. Nobody leaves or dies, but every building that does not make food works at half speed until a meal can be served in full.</div>` : ''));
+
+  // Food
+  const top = Math.max(status.food_made, status.food_eaten, 1);
+  const net = status.rates.food, meals = pop ? Math.floor(food / pop) : 0;
+  setHTML($('pplFood'),
+    `Made per hour: <span class="good">${num(status.food_made)}</span>` + meter([[status.food_made]], top) +
+    `Eaten per hour: <span class="${status.food_eaten > status.food_made ? 'bad' : ''}">${num(status.food_eaten)}</span> ` +
+    `<span class="dim">(${pop} people x 1 food x ${perHour} meals)</span>` +
+    meter([[status.food_eaten, status.food_eaten > status.food_made ? 'warn' : 'alt']], top) +
+    `<p>Each hour your store ${net >= 0 ? 'grows' : 'shrinks'} by <span class="${net >= 0 ? 'good' : 'bad'}">${num(Math.abs(net))}</span> food.</p>` +
+    `<p>In store: <span class="hi">${food}</span> food = <span class="hi">${meals}</span> ${meals === 1 ? 'meal' : 'meals'}` +
+    (net < 0 ? `. At this rate it runs out in about <span class="bad">${duration(food / -net * 3600)}</span>.` : '.') + `</p>`);
+
+  // Housing
+  setHTML($('pplHousing'),
+    `<span class="hi">${pop}</span> people in housing for <span class="hi">${status.housing}</span>` +
+    meter([[Math.min(pop, status.housing), pop >= status.housing ? 'warn' : '']], Math.max(status.housing, pop)) +
+    `<p class="${pop >= status.housing ? 'bad' : 'dim'}">` + (pop >= status.housing ? 'Full. Nobody new can move in until you build more.'
+      : `${status.housing - pop} free ${status.housing - pop === 1 ? 'place' : 'places'}.`) + `</p>` +
+    status.housing_from.map(([name, n]) => `<div class="opt">${esc(name)} <span style="float:right">${n}</span></div>`).join(''));
+
+  // Work
+  const staffed = pop - status.idle, short = Math.max(0, status.jobs - staffed);
+  setHTML($('pplWork'),
+    `<span class="hi">${staffed}</span> of ${pop} people working, <span class="hi">${status.jobs}</span> jobs in total` +
+    meter([[staffed], [status.idle, 'alt'], [short, 'empty']], Math.max(pop, status.jobs)) +
+    `<p class="dim"><span class="good">Green</span>: working. <span style="color:var(--accent)">Yellow</span>: idle people. Empty: jobs with nobody to do them.</p>` +
+    `<p>` + (short ? `<span class="bad">${short} ${short === 1 ? 'job has' : 'jobs have'} nobody to do ${short === 1 ? 'it' : 'them'}.</span> ` +
+        `Grow the population, or select a building and use its Staffing buttons to choose which ones get workers first.`
+      : status.idle ? `${status.idle} ${status.idle === 1 ? 'person has' : 'people have'} nothing to do. They still eat, so build something for them to work in.`
+      : 'Everyone has a job and every job is filled.') + `</p>`);
+}
+
+function renderGuide() {
+  const { defs } = view, T = defs.terrains;
+  const label = k => T[k] ? T[k].name : ({ water: 'any water', fresh: 'fresh water' }[k] || k);
+  const range = r => r[0] === r[1] ? r[0] : `${r[0]}-${r[1]}`;
+  setHTML($('guideTerrain'), `<table><tr><th>Tile</th><th>Height</th><th>Fertility</th><th>Fish</th><th>Notes</th></tr>` +
+    Object.values(T).map(t => `<tr><td><span class="glyph" style="color:${esc(t.color)}">${esc(t.glyph + t.glyph)}</span> ${esc(t.name)}</td>` +
+      `<td>${range(t.height)}</td><td>${range(t.fertility)}%</td><td>${t.fish ? range(t.fish) + '%' : '-'}</td>` +
+      `<td class="dim" style="white-space:normal">${esc(t.desc || '')}${t.from ? ' Rare; found more often far from home.' : ''}</td></tr>`).join('') + `</table>`);
+  setHTML($('guideBuildings'), `<table><tr><th>Building</th><th>Tech</th><th>Built on</th><th>Notes</th></tr>` +
+    Object.values(defs.buildings).map(b => `<tr><td><span class="glyph hi">${esc(b.glyph)}</span> ${esc(b.name)}</td>` +
+      `<td>${esc(defs.tech[b.tech].name)}</td><td>${b.terrain.map(k => esc(label(k))).join(', ')}</td>` +
+      `<td class="dim" style="white-space:normal">${esc(b.desc)}${b.generates ? ` Generates ${b.generates} power.` : ''}${b.power ? ` Needs ${b.power} power.` : ''}${b.research ? ` Needs research: ${esc(defs.research[b.research].name)}.` : ''}</td></tr>`).join('') + `</table>`);
+  setHTML($('guideWildlife'), `<table><tr><th>Animal</th><th>Found on</th><th class="n">Livestock when tamed</th></tr>` +
+    Object.values(defs.wildlife).map(w => `<tr><td><span class="glyph animal">${esc(w.glyph)}</span> ${esc(w.name)}</td>` +
+      `<td>${w.terrain.map(k => esc(label(k))).join(', ')}</td><td class="n">${w.livestock}</td></tr>`).join('') + `</table>`);
+}
+
+function renderMarket() {
+  const { state, defs, market } = view, R = defs.resources;
+  for (const id of ['giveRes', 'wantRes', 'billGiveRes', 'billWantRes']) {
+    if (!$(id).options.length) {
+      $(id).innerHTML = defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
+      $(id).value = /give/i.test(id) ? 'wood' : 'gold';
+    }
+  }
+
+  const offers = market.offers.slice().reverse();
+  setHTML($('offers'), offers.length ? `<table><tr><th>City</th><th>Gives</th><th>Wants</th><th>Posted</th><th></th></tr>` +
+    offers.map(o => {
+      const mine = o.city === state.name, can = state.resources[o.want] >= o.want_qty;
+      return `<tr class="${mine ? 'me' : ''}"><td>${esc(o.city)}</td>` +
+        `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
+        `<td class="${mine || can ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
+        `<td class="dim">${clock(o.posted)}</td><td>` +
+        (mine ? `<button data-cancel="${o.id}">Cancel</button>`
+              : `<button data-accept="${o.id}" ${can ? '' : 'disabled'}>Accept</button>`) + `</td></tr>`;
+    }).join('') + `</table>` : `<span class="dim">Nobody is offering anything right now.</span>`);
+
+  setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
+  const bills = market.bills.filter(b => b.from === state.name || b.to === state.name);
+  setHTML($('bills'), bills.length ? `<table><tr><th>With</th><th>You send</th><th>You receive</th><th>Every</th><th>Status</th><th></th></tr>` +
+    bills.map(b => {
+      const mine = b.from === state.name, other = mine ? b.to : b.from;
+      const send = mine ? [b.give, b.give_qty] : [b.want, b.want_qty];
+      const get = mine ? [b.want, b.want_qty] : [b.give, b.give_qty];
+      const status = b.status === 'active'
+        ? `next in <span class="hi" data-timer="bill${b.id}"></span>` + (b.missed ? ` <span class="bad">(${b.missed} missed)</span>` : '')
+        : mine ? `waiting for ${esc(other)} to accept` : `<span class="hi">${esc(other)} proposes this</span>`;
+      const buttons = b.status === 'active' ? `<button data-bill-cancel="${b.id}">Cancel</button>`
+        : mine ? `<button data-bill-cancel="${b.id}">Withdraw</button>`
+        : `<button data-bill-accept="${b.id}">Accept</button> <button data-bill-cancel="${b.id}">Decline</button>`;
+      return `<tr><td>${esc(other)}</td>` +
+        `<td class="${state.resources[send[0]] >= send[1] ? '' : 'bad'}">${send[1]} ${esc(R[send[0]])}</td>` +
+        `<td>${get[1]} ${esc(R[get[0]])}</td><td>${duration(b.every)}</td><td>${status}</td><td>${buttons}</td></tr>`;
+    }).join('') + `</table>` : `<span class="dim">You have no bills.</span>`);
+
+  setHTML($('trades'), market.history.length ? market.history.slice().reverse().map(h =>
+    `[${clock(h.t)}] ${esc(h.seller)} gave ${h.give_qty} ${esc(R[h.give])} to ${esc(h.buyer)} for ${h.want_qty} ${esc(R[h.want])}`
+  ).join('<br>') : 'No trades yet.');
+}
+
+async function loadBoard() {
+  try { board = (await (await fetch('/api/leaderboard')).json()).cities; } catch { return; }
+  renderBoard();
+}
+
+function renderBoard() {
+  if (!board || !view) return;
+  const R = view.defs.resources;
+  const cols = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas'],
+                ...Object.entries(R)];
+  const val = (c, k) => k in R ? c.resources[k] : c[k];
+  const rows = board.slice().sort((a, b) =>
+    val(b, boardSort) - val(a, boardSort) || b.tech - a.tech || b.population - a.population || a.name.localeCompare(b.name));
+  setHTML($('board'), `<table><tr><th class="n">#</th><th>City</th>` +
+    cols.map(([k, label]) => `<th class="n sortable${k === boardSort ? ' sorted' : ''}" data-sort="${esc(k)}">${esc(label)}${k === boardSort ? ' v' : ''}</th>`).join('') + `<th></th></tr>` +
+    rows.map((c, i) => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${i + 1}</td><td>${esc(c.name)}</td>` +
+      cols.map(([k]) => `<td class="n">${k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : val(c, k)}</td>`).join('') +
+      `<td>` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
+        (visiting ? '' : myBanned.includes(c.name) ? `<button data-unban="${esc(c.name)}">Unban</button>`
+                                                   : `<button data-ban="${esc(c.name)}">Ban</button>`)) +
+      `</td></tr>`).join('') + `</table>`);
+}
+
+// ------------------------------------------------------------------ time --
+
+function tick() {
+  if (!view) return;
+  const elapsed = (performance.now() - fetchedAt) / 1000;
+  let due = false;
+  const left = {};
+  for (const [key, t] of Object.entries(timers)) {
+    if (!t.speed || t.waiting.length) { left[key] = null; continue; }
+    left[key] = (t.cycle - t.progress) / t.speed - elapsed;
+    if (left[key] <= 0) due = true;
+  }
+  document.querySelectorAll('[data-timer]').forEach(el => {
+    const key = el.dataset.timer, t = timers[key];
+    if (!t) return;
+    let text;
+    if (t.waiting.length) text = 'waiting for ' + t.waiting.map(k => view.defs.resources[k]).join(', ');
+    else if (!t.speed) text = t.off ? 'switched off' : t.staffed ? 'stopped - no power' : 'stopped - no workers';
+    else text = (/^\d+,\d+$/.test(key) ? 'done in ' : '') + duration(left[key]) + (t.speed < 1 && key !== 'meal' ? ` (working at ${Math.round(t.speed * 100)}% speed)` : '');
+    if (el.textContent !== text) el.textContent = text;
+  });
+  document.querySelectorAll('[data-bar]').forEach(el => {
+    const key = el.dataset.bar, t = timers[key];
+    if (!t) return;
+    const stuck = left[key] === null;
+    el.classList.toggle('stuck', stuck);
+    el.style.width = stuck ? '' : Math.max(0, Math.min(100, (1 - left[key] * t.speed / t.cycle) * 100)) + '%';
+  });
+  // Something just finished: ask the server for the result.
+  if (due && performance.now() - lastFetch > 1500) refresh();
+}
+
+// ---------------------------------------------------------------- events --
+
+async function enter(name) {
+  city = name; view = null; sel = null; board = null; areaIdx = 0; visiting = null;
+  let data;
+  try { data = await api(); } catch { data = { error: 'Could not reach the server.' }; }
+  if (!data.state) return signOut(data.error);
+  remember(name);
+  $('login').hidden = true; $('game').hidden = false;
+  $('msg').textContent = '';
+  accept(data);
+}
+
+$('loginForm').onsubmit = async e => {
+  e.preventDefault();
+  const name = $('cityName').value.trim();
+  let data;
+  try {
+    data = await (await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ city: name, password: $('cityPass').value }) })).json();
+  } catch { data = { error: 'Could not reach the server.' }; }
+  if (!data.token) { $('loginMsg').textContent = data.error || 'Could not sign in.'; return; }
+  token = data.token;
+  $('cityPass').value = ''; $('loginMsg').textContent = '';
+  await enter(name);
+  if (data.claimed) $('msg').textContent = 'This city had no password. It now uses the one you just entered.';
+};
+$('changePass').onclick = () => { $('passForm').hidden = !$('passForm').hidden; };
+$('passForm').onsubmit = async e => {
+  e.preventDefault();
+  await act('set_password', { password: $('newPass').value });
+  if (!$('msg').textContent) { $('newPass').value = ''; $('passForm').hidden = true; $('msg').textContent = 'Password changed.'; }
+};
+$('advance').onclick = () => act('advance');
+$('leave').onclick = leave;
+$('awayOk').onclick = () => { $('away').hidden = true; act('dismiss_away'); };
+$('switch').onclick = async () => { try { await api('sign_out'); } catch {} signOut(''); };
+$('restart').onclick = () => {
+  if (confirm('Wipe this city and start over on a new map? Its market offers are removed too.')) { sel = null; areaIdx = 0; act('restart'); }
+};
+
+document.querySelector('.tabs').onclick = e => {
+  if (!e.target.dataset.tab) return;
+  tab = e.target.dataset.tab;
+  $('msg').textContent = '';
+  render();
+  if (tab === 'board') loadBoard();
+};
+$('map').onclick = e => {
+  const b = e.target.closest('.tile');
+  if (b) { sel = { x: +b.dataset.x, y: +b.dataset.y }; render(); }
+};
+$('tile').onclick = e => {
+  if (e.target.dataset.build) act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build });
+  else if (e.target.dataset.add) act('add', { x: sel.x, y: sel.y, addition: e.target.dataset.add });
+  else if ('tame' in e.target.dataset) act('tame', { x: sel.x, y: sel.y });
+  else if (e.target.dataset.priority) act('priority', { x: sel.x, y: sel.y, priority: +e.target.dataset.priority });
+  else if ('demolish' in e.target.dataset) act('demolish', { x: sel.x, y: sel.y });
+};
+function showArea(i) { areaIdx = i; sel = null; refresh(); }
+$('areas').onclick = e => { if (e.target.dataset.area) showArea(+e.target.dataset.area); };
+$('known').onclick = e => {
+  if (e.target.dataset.view) { tab = 'city'; showArea(+e.target.dataset.view); }
+};
+$('explore').onclick = e => {
+  if (!e.target.dataset.send) return;
+  const [rx, ry] = e.target.dataset.send.split(',').map(Number);
+  act('explore', { rx, ry });
+};
+$('research').onclick = e => {
+  if (e.target.dataset.research) act('research', { research: e.target.dataset.research });
+};
+$('offers').onclick = e => {
+  if (e.target.dataset.accept) act('offer_accept', { offer: +e.target.dataset.accept });
+  else if (e.target.dataset.cancel) act('offer_cancel', { offer: +e.target.dataset.cancel });
+};
+$('offerForm').onsubmit = e => {
+  e.preventDefault();
+  act('offer_post', { give: $('giveRes').value, give_qty: Number($('giveQty').value),
+                      want: $('wantRes').value, want_qty: Number($('wantQty').value) });
+};
+$('billForm').onsubmit = e => {
+  e.preventDefault();
+  act('bill_propose', { to: $('billTo').value.trim(), hours: Number($('billHours').value),
+                        give: $('billGiveRes').value, give_qty: Number($('billGiveQty').value),
+                        want: $('billWantRes').value, want_qty: Number($('billWantQty').value) });
+};
+$('bills').onclick = e => {
+  if (e.target.dataset.billAccept) act('bill_accept', { bill: +e.target.dataset.billAccept });
+  else if (e.target.dataset.billCancel) act('bill_cancel', { bill: +e.target.dataset.billCancel });
+};
+$('board').addEventListener('click', e => {
+  const d = e.target.dataset;
+  if (d.visit) visit(d.visit);
+  else if (d.ban) act('ban', { target: d.ban });
+  else if (d.unban) act('unban', { target: d.unban });
+});
+$('board').onclick = e => {
+  if (e.target.dataset.sort) { boardSort = e.target.dataset.sort; renderBoard(); }
+};
+
+setInterval(tick, 1000);
+// Pick up trades and changes made by other players.
+setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+
+const saved = stored();
+if (saved.city && saved.token) { token = saved.token; enter(saved.city); } else $('login').hidden = false;
+</script>
+</body>
+</html>
