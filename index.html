@@ -231,6 +231,11 @@
         <h2>Research</h2>
         <p class="dim">Research is paid for with Knowledge, which comes from Shaman Huts, Schools and
           Universities. Each tech level's research needs its research building standing in your city.</p>
+        <div id="resSummary" class="stats" style="margin-bottom:10px"></div>
+        <div class="bar" style="margin-top:0">
+          <input id="resSearch" type="search" placeholder="Search research, e.g. farm, power, livestock" style="flex:1 1 240px">
+          <span id="resFilters" class="bar" style="margin:0"></span>
+        </div>
         <div id="research"></div>
       </div>
     </div>
@@ -317,6 +322,7 @@ let visiting = null;   // name of another city being viewed read-only
 let myBanned = [];     // cities this player's city has banned
 let awayShown = null;  // the away report already on screen or dismissed
 let finder = { kind: '', what: '' };   // what the Find box is searching for
+let resFilter = 'all';  // which research the Research tab lists
 let jump = null;       // a tile to select once its area has loaded
 const findParam = () => finder.kind && !visiting ? `${finder.kind}:${finder.what}` : '';
 let fetchedAt = 0, lastFetch = 0, timers = {};
@@ -651,21 +657,47 @@ function renderResearch() {
     if (R[id].effect) out.push(esc(R[id].effect));
     return out.join('<br>');
   };
-  setHTML($('research'), defs.tech.map((level, i) => {
-    const items = view.research.filter(r => R[r.id].tech === i);
+  const ready = r => !r.done && !r.problem && r.affordable;
+  const filters = { all: ['All', () => true], ready: ['Can research now', ready],
+                    todo: ['Not researched yet', r => !r.done], done: ['Researched', r => r.done] };
+  const words = $('resSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const text = r => (R[r.id].name + ' ' + R[r.id].desc + ' ' + gives(r.id).replace(/<[^>]+>/g, ' ')).toLowerCase();
+  const matches = r => filters[resFilter][1](r) && words.every(w => text(r).includes(w));
+
+  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
+  const rate = view.status.rates.knowledge;
+  setHTML($('resSummary'),
+    stat('Knowledge', num(state.resources.knowledge), rate ? `<span class="${rate > 0 ? 'good' : 'bad'}">${rate > 0 ? '+' : ''}${num(rate)} / hour</span>` : 'none coming in') +
+    stat('Researched', `${view.research.filter(r => r.done).length} / ${view.research.length}`, '') +
+    stat('Ready now', view.research.filter(ready).length, 'can be researched'));
+  setHTML($('resFilters'), Object.entries(filters).map(([k, [label, test]]) =>
+    `<button data-filter="${k}" class="${k === resFilter ? 'on' : ''}">${label} (${view.research.filter(test).length})</button>`).join(''));
+
+  // Within a level: what can be done now first, finished research last.
+  const order = r => r.done ? 3 : ready(r) ? 0 : r.problem ? 2 : 1;
+  const searching = words.length || resFilter !== 'all';
+  const html = defs.tech.map((level, i) => {
+    const all = view.research.filter(r => R[r.id].tech === i);
+    const items = all.filter(matches).sort((a, b) => order(a) - order(b));
     if (!items.length) return '';
-    return `<div class="opt"><span class="${i <= state.tech ? 'hi' : 'dim'}">${esc(level.name.toUpperCase())}</span>` +
-      (i > state.tech ? ` <span class="dim">- not reached yet</span>` : '') + `</div>` +
+    const title = `${esc(level.name)}: ${all.filter(r => r.done).length} of ${all.length} researched` +
+      (i > state.tech ? ' - level not reached yet' : '') + (searching ? ` (${items.length} shown)` : '');
+    // While searching or filtering every level with a match is open; otherwise the player's own choice.
+    return (searching ? section('resfind:' + i, title, true) : section('res:' + i, title, i === state.tech)) +
       items.map(r => {
-        const d = R[r.id];
-        const right = r.done ? `<span class="good" style="float:right">Researched</span>`
+        const d = R[r.id], locked = i > state.tech;
+        const right = r.done ? `<span class="good">Researched</span>`
           : `<button data-research="${esc(r.id)}" ${r.problem || !r.affordable ? 'disabled' : ''}>Research</button>`;
-        return `<div class="opt ${i > state.tech ? 'dim' : ''}">${right}` +
-          `<span class="${i > state.tech ? '' : 'hi'}">${esc(d.name)}</span>` + (r.done ? '' : ` - ${goods(d.cost)}`) +
-          `<div class="dim small">${esc(d.desc)}</div><div class="small ${r.done ? 'good' : ''}">${gives(r.id)}</div>` +
-          (!r.done && r.problem && i <= state.tech ? `<br><span class="bad">${esc(r.problem)}</span>` : '') + `</div>`;
-      }).join('');
-  }).join(''));
+        const rows = [];
+        if (!r.done) rows.push(['Cost', goods(d.cost)]);
+        if (!r.done) rows.push([r.problem ? 'Blocked' : 'Needs', r.problem ? `<span class="bad">${esc(r.problem)}</span>`
+          : `a ${esc(defs.buildings[d.building].name)} <span class="dim">(you have one)</span>`]);
+        rows.push(['Gives', `<span class="${r.done ? 'good' : ''}">${gives(r.id)}</span>`]);
+        return `<div class="card ${locked ? 'dim' : ''}"><div class="head"><span class="${locked ? '' : 'hi'}">${esc(d.name)}</span>${right}</div>` +
+          `<div class="desc">${esc(d.desc)}</div>` + kv(rows) + `</div>`;
+      }).join('') + `</details>`;
+  }).join('');
+  setHTML($('research'), html || `<p class="dim">Nothing matches.</p>`);
 }
 
 function renderExplore() {
@@ -992,6 +1024,14 @@ $('explore').onclick = e => {
 };
 $('research').onclick = e => {
   if (e.target.dataset.research) act('research', { research: e.target.dataset.research });
+};
+$('research').addEventListener('toggle', e => {
+  const key = e.target.dataset && e.target.dataset.fold;
+  if (key && key.startsWith('res:')) foldState.set(key, e.target.open);
+}, true);
+$('resSearch').oninput = () => renderResearch();
+$('resFilters').onclick = e => {
+  if (e.target.dataset.filter) { resFilter = e.target.dataset.filter; renderResearch(); }
 };
 $('offers').onclick = e => {
   if (e.target.dataset.accept) act('offer_accept', { offer: +e.target.dataset.accept });
