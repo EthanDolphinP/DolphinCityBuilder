@@ -41,10 +41,14 @@
   .card { padding: 9px 0; border-top: 1px solid var(--line); }
   .cat + .card { border-top: 0; }
   .card .desc { color: var(--dim); font-size: 13px; margin-top: 2px; }
-  details { margin-top: 6px; }
-  summary { cursor: pointer; color: var(--dim); font-size: 13px; }
-  summary:hover { color: var(--accent); }
-  details > div { font-size: 13px; padding: 4px 0 0 14px; }
+  #tile { max-height: 70vh; overflow-y: auto; padding-right: 8px; }
+  summary { cursor: pointer; }
+  details.fold { margin-top: 6px; }
+  details.fold > summary { color: var(--dim); font-size: 13px; }
+  details.fold > summary:hover { color: var(--accent); }
+  details.fold > div { font-size: 13px; padding: 4px 0 0 14px; }
+  details.sec > summary.cat:hover { color: #fff; }
+  details.sec > .card:first-of-type { border-top: 0; }
   .checks span { display: inline-block; margin: 8px 18px 0 0; white-space: nowrap; }
   #map { display: inline-grid; gap: 2px; }
   .tile { position: relative; width: 44px; height: 40px; padding: 0; font-size: 17px; font-weight: bold;
@@ -470,11 +474,16 @@ function render() {
 }
 
 // Sections the player has opened in the tile panel; kept so a refresh doesn't close them.
-const openDetails = new Set();
+const foldState = new Map();
+const isOpen = (key, byDefault) => foldState.has(key) ? foldState.get(key) : byDefault;
 function fold(key, summary, lines) {
   if (!lines.length) return '';
-  return `<details data-fold="${key}" ${openDetails.has(key) ? 'open' : ''}><summary>${summary} (${lines.length})</summary>` +
+  return `<details class="fold" data-fold="${key}" ${isOpen(key, false) ? 'open' : ''}><summary>${summary} (${lines.length})</summary>` +
     lines.map(l => `<div>${l}</div>`).join('') + `</details>`;
+}
+// Start of a collapsible section of the tile panel; close it with </details>.
+function section(key, title, byDefault) {
+  return `<details class="sec" data-fold="${key}" ${isOpen(key, byDefault) ? 'open' : ''}><summary class="cat">${title}</summary>`;
 }
 const kv = rows => rows.length ? `<div class="kv">` + rows.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('') + `</div>` : '';
 
@@ -521,11 +530,11 @@ function renderTile() {
   // ---- wildlife ----
   if (t.animal) {
     const w = defs.wildlife[t.animal], tame = info.tame;
-    html += `<div class="cat">Wildlife</div><div class="card"><div class="head"><span class="animal">${esc(w.name)}</span>` +
+    html += section('wildlife', 'Wildlife', true) + `<div class="card"><div class="head"><span class="animal">${esc(w.name)}</span>` +
       `<button data-tame ${tame.problem || !tame.affordable ? 'disabled' : ''}>Tame</button></div>` +
       kv([['Worth', `<span class="good">+${w.livestock} Livestock</span>`], ['Bait', goods(tame.cost)]]) +
       (tame.problem ? `<div class="bad small">${esc(tame.problem)}</div>` : '') +
-      `<div class="desc">Building on this tile drives them away.</div></div>`;
+      `<div class="desc">Building on this tile drives them away.</div></div></details>`;
   }
 
   if (t.building) {
@@ -533,7 +542,7 @@ function renderTile() {
     const b = defs.buildings[t.building];
     const rows = buildingRows(b, info.cycle, info.produces, info);
     if (info.cycle) rows.push(['Status', `<span class="hi" data-timer="${sel.x},${sel.y}"></span>`]);
-    html += `<div class="cat">Building</div><div class="card"><div class="head"><span class="hi big">${esc(b.name)}</span>` +
+    html += section('building', 'Building', true) + `<div class="card"><div class="head"><span class="hi big">${esc(b.name)}</span>` +
       `<button data-demolish>Demolish</button></div><div class="desc">${esc(b.desc)}</div>` + kv(rows);
     if (info.power_in && status.power.supply < status.power.demand) html += `<div class="bad small">Short of power: ` +
       `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs.</div>`;
@@ -541,12 +550,12 @@ function renderTile() {
       [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) =>
         `<button data-priority="${p}" class="${info.priority === p ? 'on' : ''}">${label}</button>`).join('') + `</div>` +
       `<div class="desc">First: gets workers before other buildings. Off: gets none.</div>`;
-    html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) + `</div>`;
+    html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) + `</div></details>`;
 
     // ---- additions ----
     const A = defs.additions;
     if (t.additions.length || info.additions.length) {
-      html += `<div class="cat">Additions ${t.additions.length} of ${defs.max_additions}</div>`;
+      html += section('additions', `Additions: ${t.additions.length} of ${defs.max_additions} attached`, true);
       for (const a of t.additions) html += `<div class="card"><span class="good">${esc(A[a].name)}</span> <span class="dim small">attached</span>` +
         `<div class="desc">${esc(A[a].desc)}</div></div>`;
       const can = visiting ? [] : info.additions.filter(o => !o.problem), cannot = visiting ? [] : info.additions.filter(o => o.problem);
@@ -555,6 +564,7 @@ function renderTile() {
         kv([['Cost', goods(A[o.id].cost)]]) + `<div class="desc">${esc(A[o.id].desc)}</div></div>`;
       if (t.additions.length < defs.max_additions) html += fold('noadd', 'Not available yet',
         cannot.map(o => `${esc(A[o.id].name)}: ${esc(o.problem)}`));
+      html += `</details>`;
     }
   } else if (!visiting) {
     // ---- what can be built here, by category ----
@@ -563,7 +573,8 @@ function renderTile() {
     for (const [cat, label] of Object.entries(defs.categories)) {
       const options = can.filter(o => defs.buildings[o.id].category === cat);
       if (!options.length) continue;
-      html += `<div class="cat">Build: ${esc(label)}</div>`;
+      // With only a few options there is nothing to hide; otherwise start closed.
+      html += section('build:' + cat, `Build: ${esc(label)} (${options.length})`, can.length <= 3);
       for (const o of options) {
         const b = defs.buildings[o.id];
         html += `<div class="card"><div class="head"><span class="hi">${esc(b.name)}</span>` +
@@ -572,6 +583,7 @@ function renderTile() {
           `<div class="desc">${esc(b.desc)}</div>` +
           fold('speed:' + o.id, 'What changes its speed here', (o.notes || []).map(esc)) + `</div>`;
       }
+      html += `</details>`;
     }
     html += fold('nobuild', "Can't be built on this tile", cannot.map(o =>
       `${esc(defs.buildings[o.id].name)}: ${esc(o.problem)}`));
@@ -849,7 +861,7 @@ $('map').onclick = e => {
 };
 $('tile').addEventListener('toggle', e => {   // remember which sections are open
   const key = e.target.dataset && e.target.dataset.fold;
-  if (key) e.target.open ? openDetails.add(key) : openDetails.delete(key);
+  if (key) foldState.set(key, e.target.open);
 }, true);
 $('tile').onclick = e => {
   if (e.target.dataset.build) act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build });
