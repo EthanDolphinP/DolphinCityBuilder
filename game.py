@@ -584,10 +584,17 @@ BUILDINGS = {
 #   taming            True - wild animals can be tamed
 #   breeding          True - pastured herds grow
 #   explore_range     how far from home expeditions can go
+#   surveying         True - the Find box can search tiles (terrain, building sites)
 #   explore_discount  multiplier on expedition costs
 # Buildings and additions unlocked by a research name it in their "research" field.
 RESEARCH = {
     # ---- Tribe ----
+    "surveying": {
+        "name": "Surveying", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 6},
+        "surveying": True,
+        "effect": "the Find box under the map can search every area for a kind of terrain, and for the best places to put a building",
+        "desc": "Walking the land and remembering it.",
+    },
     "stone_tools": {
         "name": "Stone Tools", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 10},
         "boost": {"lumber_camp": 1.15, "quarry": 1.15},
@@ -1932,6 +1939,7 @@ def view(state, ai=0):
         job["speed"] = _speed(state, job, power)
         job["waiting"] = list(_missing(state, job["b"].get("consumes", {})))
         job["output"] = job_output(state, job)
+        job["status"] = job_status(state, job, power)
         if job["speed"] and not job["waiting"] and job["cycle"]:
             per_hour = 3600 / job["cycle"] * job["speed"]
             for k, v in job["output"].items():
@@ -1955,7 +1963,7 @@ def view(state, ai=0):
             if job:
                 cell.update(cycle=job["cycle"], notes=job["notes"], speed=job["speed"],
                             staff=job["staff"], need=job["need"], waiting=job["waiting"],
-                            priority=job["priority"],
+                            priority=job["priority"], status=job["status"],
                             produces=job["output"],
                             power_in=job["power_in"], power_out=job["power_out"])
                 if "herd" in job["b"]:
@@ -2003,8 +2011,10 @@ def view(state, ai=0):
         "area": ai,
         "areas": [{"name": area_name(a), "env": a["env"], "size": a["size"],
                    "buildings": sum(1 for row in a["tiles"] for t in row if t["building"]),
-                   "animals": sum(1 for row in a["tiles"] for t in row if t["animal"])}
-                  for a in state["areas"]],
+                   "animals": sum(1 for row in a["tiles"] for t in row if t["animal"]),
+                   # buildings that are not working properly
+                   "problems": sum(1 for j in jobs if j["area"] == i and j["status"] != "working")}
+                  for i, a in enumerate(state["areas"])],
         "status": {
             "housing": housing,
             "jobs": totals["jobs"],
@@ -2053,6 +2063,76 @@ def advance_view(state):
         return None
     return {"name": TECH_LEVELS[state["tech"] + 1]["name"], "checks": checks,
             "ready": all(c["ok"] for c in checks)}
+
+
+def job_status(state, job, power):
+    """In a few words, how a working building is doing: "working" or what is wrong."""
+    if job["priority"] < 0:
+        return "switched off"
+    if job["need"] and not job["staff"]:
+        return "no workers"
+    missing = _missing(state, job["b"].get("consumes", {}))
+    if missing:
+        return "waiting for " + ", ".join(RESOURCES[k] for k in missing)
+    if job["power_in"] and power <= 0:
+        return "no power"
+    slow = []
+    if job["staff"] < job["need"]:
+        slow.append(f"short of workers ({job['staff']} of {job['need']})")
+    if job["power_in"] and power < 1:
+        slow.append("short of power")
+    if state["hungry"] and not job["feeds"]:
+        slow.append("hungry")
+    return ", ".join(slow) or "working"
+
+
+def _clock(seconds):
+    return f"{int(seconds) // 60}m {int(seconds) % 60:02d}s"
+
+
+FIND_LIMIT = 60     # most results the Find box is given
+
+
+def find(state, kind, what):
+    """Search every area of the city. Returns {"results": [...], "total": n} or
+    {"locked": research name} if the search needs research the city lacks.
+
+    kind is "buildings" (what = a building id, or "" for all), "problems",
+    "wildlife", "sites" (what = a building id: where it could go, fastest
+    first) or "terrain" (what = a terrain id).
+    """
+    if kind in ("sites", "terrain") and not _researched(state, "surveying"):
+        return {"locked": next(r["name"] for r in RESEARCH.values() if r.get("surveying"))}
+    found = []   # (sort key, result)
+    jobs, _, _ = work_plan(state)
+    power = power_status(state, jobs)[2]
+    by_tile = {(j["area"], j["x"], j["y"]): j for j in jobs}
+    for ai, area in enumerate(state["areas"]):
+        for y, row in enumerate(area["tiles"]):
+            for x, tile in enumerate(row):
+                hit = lambda label, note, key=0: found.append(
+                    (key, {"area": ai, "x": x, "y": y, "label": label, "note": note}))
+                bid, terrain = tile["building"], TERRAINS[tile["terrain"]]
+                job = by_tile.get((ai, x, y))
+                if kind in ("buildings", "problems") and bid and (not what or bid == what):
+                    status = job_status(state, job, power) if job else ""
+                    if kind == "buildings" or (job and status != "working"):
+                        hit(BUILDINGS[bid]["name"], status)
+                elif kind == "wildlife" and tile["animal"]:
+                    w = WILDLIFE[tile["animal"]]
+                    hit(w["name"], f"worth {w['livestock']} livestock, on {terrain['name'].lower()}", -w["livestock"])
+                elif kind == "terrain" and tile["terrain"] == what:
+                    fact = (f"fish {tile['fish']}%" if terrain_is(tile["terrain"], "water")
+                            else f"fertility {effective_fertility(area, x, y)}%")
+                    hit(terrain["name"], f"{fact}, height {tile['height']}, "
+                        + (BUILDINGS[bid]["name"] if bid else "nothing built"), 1 if bid else 0)
+                elif (kind == "sites" and what in BUILDINGS and not bid
+                      and not placement_problem(state, area, x, y, what)):
+                    cycle = tile_cycle(state, area, x, y, what)[0]
+                    hit(terrain["name"], f"one cycle every {_clock(cycle)}" if cycle else "can be built here",
+                        cycle or 0)
+    found.sort(key=lambda f: f[0])
+    return {"results": [r for _, r in found[:FIND_LIMIT]], "total": len(found)}
 
 
 def housing_sources(state):

@@ -173,8 +173,10 @@ def run_bills(now):
     market.run_bills(MARKET, now, lambda name: find_city(name, now))
 
 
-def city_view(state, now, area=0):
+def city_view(state, now, area=0, find=None):
     out = game.view(state, area if isinstance(area, int) else 0)
+    if isinstance(find, str) and ":" in find:      # the Find box: "kind:what"
+        out["found"] = game.find(state, *find.split(":", 1))
     out["state"] = {k: v for k, v in state.items() if k not in PRIVATE}
     out["now"] = now
     out["market"] = MARKET
@@ -202,7 +204,7 @@ def handle_get(path, query, token, now):
         state = get_city(name, now)
         if not signed_in(state, token):
             return 401, SIGN_IN
-        out = city_view(state, now, _area(query.get("area", ["0"])[0]))
+        out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0])
         out["away"] = game.check_in(state, now)
         return 200, out
 
@@ -281,7 +283,7 @@ def handle_post(path, data, token, now):
     else:
         error = game.apply_action(state, now, action, data)
     flush()
-    out = city_view(state, now, 0 if action == "restart" else data.get("area", 0))
+    out = city_view(state, now, 0 if action == "restart" else data.get("area", 0), data.get("find"))
     out["error"] = error
     return 200, out
 

@@ -54,6 +54,12 @@
   .tile { position: relative; width: 44px; height: 40px; padding: 0; font-size: 17px; font-weight: bold;
           background: #101614; overflow: hidden; }
   .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tile.hl { background: #3a3520; box-shadow: inset 0 0 0 1px var(--accent); }
+  .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
+  #findOut { max-height: 230px; overflow-y: auto; margin-top: 8px; }
+  #findOut .row { padding: 5px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+  #findOut .row:hover { background: #1d2623; color: #fff; }
+  .visiting #finder { display: none; }
   .tile b { color: #fff; }
   .tile i { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
   .tile i.stuck { background: var(--bad); width: 100%; }
@@ -143,6 +149,23 @@
           <h2>Map</h2>
           <div id="areas" class="bar" style="margin:0 0 10px"></div>
           <div id="map"></div>
+          <div id="mapKey" class="dim small" style="margin-top:8px"></div>
+          <div id="finder">
+            <div class="cat">Find</div>
+            <div class="bar" style="margin-top:8px">
+              <select id="findKind">
+                <option value="">Find...</option>
+                <option value="problems">Buildings needing attention</option>
+                <option value="buildings">My buildings</option>
+                <option value="wildlife">Wildlife to tame</option>
+                <option value="sites">Where can I build...</option>
+                <option value="terrain">Land of a kind...</option>
+              </select>
+              <select id="findWhat" hidden></select>
+              <button id="findClear" hidden>Clear</button>
+            </div>
+            <div id="findOut" class="small"></div>
+          </div>
         </div>
         <div class="panel">
           <h2>Tile</h2>
@@ -284,6 +307,9 @@ let city = null, view = null, sel = null, tab = 'city', areaIdx = 0;
 let visiting = null;   // name of another city being viewed read-only
 let myBanned = [];     // cities this player's city has banned
 let awayShown = null;  // the away report already on screen or dismissed
+let finder = { kind: '', what: '' };   // what the Find box is searching for
+let jump = null;       // a tile to select once its area has loaded
+const findParam = () => finder.kind && !visiting ? `${finder.kind}:${finder.what}` : '';
 let fetchedAt = 0, lastFetch = 0, timers = {};
 let board = null, boardSort = 'tech';
 
@@ -317,11 +343,11 @@ function clock(t) {
 async function api(action, extra) {
   const opts = action
     ? { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Token': token},
-        body: JSON.stringify({ city, action, area: areaIdx, ...extra }) }
+        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), ...extra }) }
     : { headers: {'X-Token': token} };
   const res = await fetch(action ? '/api/action'
     : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}`
-    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}`, opts);
+    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}`, opts);
   return res.json();
 }
 
@@ -334,6 +360,7 @@ function accept(data) {
       view.state.areas[view.area].size !== data.state.areas[data.area].size)) sel = null;
   view = data;
   areaIdx = data.area;
+  if (jump && jump.area === data.area) { sel = { x: jump.x, y: jump.y }; jump = null; }
   fetchedAt = performance.now();
   render();
   if (data.away) showAway(data.away);
@@ -446,20 +473,28 @@ function render() {
     `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join('') : '');
 
   setHTML($('areas'), view.areas.length < 2 ? '' : view.areas.map((a, i) =>
-    `<button data-area="${i}" class="${i === view.area ? 'on' : ''}">${esc(a.name)}</button>`).join(''));
+    `<button data-area="${i}" class="${i === view.area ? 'on' : ''}"` +
+    (a.problems ? ` title="${a.problems} ${a.problems === 1 ? 'building is' : 'buildings are'} not working properly"` : '') +
+    `>${esc(a.name)}${a.problems ? ` <span class="bad">${a.problems}!</span>` : ''}</button>`).join(''));
+  const marked = new Set(((view.found && view.found.results) || []).filter(r => r.area === view.area).map(r => `${r.x},${r.y}`));
   $('areas').hidden = view.areas.length < 2;
 
   $('map').style.gridTemplateColumns = `repeat(${area.size}, auto)`;
   setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
     const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
-    const on = sel && sel.x === x && sel.y === y ? ' sel' : '';
+    const on = (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' : '');
+    const info = view.tiles[y][x];
+    const state_ = !('need' in info) ? '' : info.priority < 0 ? 'off' : info.status === 'working' ? '' : 'stop';
     const bar = timers[`${x},${y}`] ? `<i data-bar="${x},${y}"></i>` : '';
     const adds = t.additions.map(a => defs.additions[a].name);
     return `<button class="tile${on}" style="color:${esc(defs.terrains[t.terrain].color)}" data-x="${x}" data-y="${y}" ` +
       `title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">` +
-      (b ? `${g}<b>${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
+      (b ? `${g}<b class="${state_}">${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
   }).join('')).join(''));
 
+  setHTML($('mapKey'), `Second letter: <b class="hi">white</b> working building, <span class="bad">red</span> something wrong, ` +
+    `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results.`);
+  renderFinder();
   renderTile();
   renderPeople();
   renderGuide();
@@ -641,6 +676,39 @@ function renderExplore() {
       (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
         : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>Send expedition</button>`) +
       `</td></tr>`).join('') + `</table>`);
+}
+
+function renderFinder() {
+  const found = view.found, out = $('findOut');
+  $('findClear').hidden = !finder.kind;
+  if (!finder.kind || !found) { setHTML(out, ''); return; }
+  if (found.locked) {
+    setHTML(out, `<span class="bad">Research ${esc(found.locked)} (Research tab, Tribe level) to search the land.</span>`);
+    return;
+  }
+  if (!found.results.length) {
+    setHTML(out, `<span class="dim">${finder.kind === 'problems' ? 'Every building is working properly.' : 'Nothing found in any of your areas.'}</span>`);
+    return;
+  }
+  setHTML(out, `<div class="dim">${found.total} found` + (found.total > found.results.length ? `, showing the first ${found.results.length}` : '') +
+    (finder.kind === 'sites' ? ', fastest first' : '') + `. Click one to go there.</div>` +
+    found.results.map(r => `<div class="row" data-go="${r.area},${r.x},${r.y}">` +
+      `<span class="hi">${esc(r.label)}</span> <span class="dim">${esc(view.areas[r.area].name)}, tile ${r.x}, ${r.y}</span>` +
+      (r.note ? `<br><span class="${finder.kind === 'problems' ? 'bad' : 'dim'}">${esc(r.note)}</span>` : '') + `</div>`).join(''));
+}
+
+// Fill the second Find menu for the kind of search chosen.
+function findChoices() {
+  const { state, defs } = view, what = $('findWhat');
+  const byName = list => list.sort((a, b) => a[1].localeCompare(b[1]));
+  const known = ([, b]) => b.tech <= state.tech && (!b.research || state.research.includes(b.research));
+  let options = null;
+  if (finder.kind === 'buildings') options = [['', 'All buildings'], ...byName(Object.entries(defs.buildings).map(([k, b]) => [k, b.name]))];
+  if (finder.kind === 'sites') options = byName(Object.entries(defs.buildings).filter(known).map(([k, b]) => [k, b.name]));
+  if (finder.kind === 'terrain') options = byName(Object.entries(defs.terrains).map(([k, t]) => [k, t.name]));
+  what.hidden = !options;
+  what.innerHTML = (options || []).map(([k, name]) => `<option value="${esc(k)}">${esc(name)}</option>`).join('');
+  finder.what = options ? options[0][0] : '';
 }
 
 function renderPeople() {
@@ -875,6 +943,18 @@ $('tile').onclick = e => {
   else if ('demolish' in e.target.dataset) act('demolish', { x: sel.x, y: sel.y });
 };
 function showArea(i) { areaIdx = i; sel = null; refresh(); }
+$('findKind').onchange = () => { finder.kind = $('findKind').value; findChoices(); refresh(); };
+$('findWhat').onchange = () => { finder.what = $('findWhat').value; refresh(); };
+$('findClear').onclick = () => { finder = { kind: '', what: '' }; $('findKind').value = ''; $('findWhat').hidden = true; refresh(); };
+$('findOut').onclick = e => {
+  const row = e.target.closest('[data-go]');
+  if (!row) return;
+  const [area, x, y] = row.dataset.go.split(',').map(Number);
+  // Open the right part of the build menu when the search was for a place to build.
+  if (finder.kind === 'sites') foldState.set('build:' + view.defs.buildings[finder.what].category, true);
+  jump = { area, x, y };
+  if (area === view.area) { sel = { x, y }; jump = null; render(); } else { areaIdx = area; sel = null; refresh(); }
+};
 $('areas').onclick = e => { if (e.target.dataset.area) showArea(+e.target.dataset.area); };
 $('known').onclick = e => {
   if (e.target.dataset.view) { tab = 'city'; showArea(+e.target.dataset.view); }
