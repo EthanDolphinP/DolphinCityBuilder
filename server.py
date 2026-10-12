@@ -263,7 +263,7 @@ def handle_post(path, data, token, now):
         error = market.cancel(MARKET, state, now, data.get("offer"))
     elif action == "offer_accept":
         error = market.accept(MARKET, state, now, data.get("offer"),
-                              lambda seller: find_city(seller, now))
+                              lambda seller: find_city(seller, now), data.get("lots"))
     elif action == "bill_propose":
         error = market.propose_bill(MARKET, state, now, data,
                                     lambda other: find_city(other, now))

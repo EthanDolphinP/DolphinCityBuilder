@@ -63,6 +63,22 @@ TERRAINS = {
                "height": (4, 8), "fertility": (10, 30), "temp": 0},
     "desert": {"name": "Desert", "glyph": ":", "color": "#e0c070", "weight": 13,
                "height": (1, 3), "fertility": (0, 15), "temp": 10},
+    "savanna": {"name": "Savanna", "glyph": "'", "color": "#d6c46a", "weight": 3, "groups": ["plains"],
+                "height": (1, 2), "fertility": (25, 55), "temp": 8,
+                "boost": {"pasture": 1.3, "hunting_lodge": 1.2},
+                "desc": "Hot, dry grassland dotted with trees. Thin soil for crops, but fine grazing and good hunting."},
+    "steppe": {"name": "Steppe", "glyph": "-", "color": "#b9c48a", "weight": 3, "groups": ["plains"],
+               "height": (1, 3), "fertility": (20, 45), "temp": -4,
+               "boost": {"pasture": 1.2, "wind_turbine": 1.2},
+               "desc": "Cold, windswept grass to the horizon. Poor for crops, good for herds and for wind turbines."},
+    "taiga": {"name": "Pine Forest", "glyph": "\u2191", "color": "#4f8f7a", "weight": 2, "groups": ["forest"],
+              "height": (1, 4), "fertility": (30, 55), "temp": -6,
+              "boost": {"lumber_camp": 1.15, "sawmill": 1.15},
+              "desc": "Cold evergreen forest. Straight, even timber that is quick to cut."},
+    "jungle": {"name": "Jungle", "glyph": "\u2660", "color": "#2fae5a", "weight": 2, "groups": ["forest"],
+               "height": (1, 4), "fertility": (70, 95), "temp": 8,
+               "boost": {"hunting_lodge": 1.3, "shaman_hut": 1.2, "lumber_camp": 0.9},
+               "desc": "Hot, wet and teeming with life. Hunters and shamans do well; the tangle slows logging."},
     # ---- water features (placed by _carve_water) ----
     "river":  {"name": "River", "glyph": "~", "color": "#5aa7d8", "groups": ["water", "fresh"],
                "height": (0, 0), "fertility": (0, 0), "fish": (30, 70), "temp": -2,
@@ -96,7 +112,46 @@ TERRAINS = {
                  "height": (1, 2), "fertility": (90, 100), "temp": 6,
                  "boost": {"farm": 1.25},
                  "desc": "Warm black soil, the richest farmland there is."},
+    "canyon": {"name": "Canyon", "glyph": "\u2261", "color": "#c98a5a",
+               "from": "hill", "chance": 0.08, "groups": ["hill"],
+               "height": (5, 7), "fertility": (0, 10), "temp": 4,
+               "boost": {"quarry": 1.4, "mine": 1.3, "deep_mine": 1.3},
+               "desc": "A gorge cut through layered rock. The seams are laid bare, so quarries and mines work much faster."},
+    "mesa": {"name": "Mesa", "glyph": "\u2229", "color": "#d9a066",
+             "from": "desert", "chance": 0.08, "groups": ["hill", "desert"],
+             "height": (5, 8), "fertility": (0, 10), "temp": 8,
+             "boost": {"observatory": 1.3, "wind_turbine": 1.3},
+             "desc": "A flat-topped rock standing over the desert. High, dry and clear: ideal for observatories and wind turbines."},
+    "lava_field": {"name": "Lava Field", "glyph": "\u2591", "color": "#c9584a",
+                   "from": "hill", "chance": 0.03, "groups": ["hill"], "research": "volcanology",
+                   "height": (4, 9), "fertility": (0, 0), "temp": 15,
+                   "boost": {"quarry": 1.5, "mine": 1.4, "deep_mine": 1.4},
+                   "desc": "Black rock, still warm underfoot. Rich in stone and ore, and a Geothermal Plant can stand on it."},
     # ---- land that forms beside its own kind (see _spread_terrain) ----
+    "beach": {"name": "Beach", "glyph": "`", "color": "#f2e6b0",
+              "spread_from": ["plains", "desert", "forest", "savanna"], "near": ["ocean"], "need": 1, "chance": 0.3,
+              "groups": ["desert"],
+              "height": (1, 1), "fertility": (0, 15), "temp": 3,
+              "boost": {"glassworks": 1.2},
+              "desc": "Sand where the land meets the ocean. Desert buildings can stand here, and later a Resort."},
+    "mangrove": {"name": "Mangrove", "glyph": "\u00a5", "color": "#3f9f8a",
+                 "spread_from": ["forest", "jungle", "swamp", "plains"], "near": ["ocean"], "need": 1, "chance": 0.2,
+                 "groups": ["forest"],
+                 "height": (1, 1), "fertility": (50, 80), "temp": 4,
+                 "boost": {"hunting_lodge": 1.2, "lumber_camp": 0.85},
+                 "desc": "Trees standing in the tide at the ocean's edge. Good hunting among the roots; awkward to log."},
+    "coral_reef": {"name": "Coral Reef", "glyph": "\u00a4", "color": "#ff9fb0",
+                   "spread_from": ["ocean"], "near": ["ocean"], "need": 3, "chance": 0.1,
+                   "groups": ["water"],
+                   "height": (0, 0), "fertility": (0, 0), "fish": (85, 100), "temp": 2,
+                   "boost": {"fishing_dock": 1.2, "fishery": 1.2},
+                   "desc": "Shallow sea crowded with fish: the best fishing water there is."},
+    "bamboo": {"name": "Bamboo Grove", "glyph": "|", "color": "#a6d96a",
+               "spread_from": ["forest", "jungle"], "near": ["river", "lake", "marsh"], "need": 1, "chance": 0.15,
+               "groups": ["forest"],
+               "height": (1, 2), "fertility": (60, 85), "temp": 3,
+               "boost": {"lumber_camp": 1.5, "sawmill": 1.3},
+               "desc": "Fast-growing cane by the water. It grows back as quickly as it is cut, so timber buildings are much faster."},
     "sand_dunes": {"name": "Sand Dunes", "glyph": ")", "color": "#f0d890",
                    "spread_from": ["desert"], "near": ["desert"], "need": 2, "chance": 0.45,
                    "groups": ["desert"], "research": "desert_lore",
@@ -558,7 +613,7 @@ BUILDINGS = {
     },
     "geothermal_plant": {
         "name": "Geothermal Plant", "glyph": "0", "tech": 3, "category": "power", "research": "electricity",
-        "terrain": ["hot_springs", "volcanic"],
+        "terrain": ["hot_springs", "volcanic", "lava_field"],
         "cost": {"stone": 120, "tools": 25}, "workers": 2, "generates": 14,
         "desc": "Power from the heat underground, with no fuel. Only on hot springs or a volcanic plain.",
     },
@@ -568,6 +623,13 @@ BUILDINGS = {
         "cost": {"stone": 120, "gold": 80, "livestock": 8}, "workers": 3, "time": 20 * MIN, "produces": {"gold": 20},
         "livestock_speed": True, "attracts": 1,
         "desc": "People come from far away to see the animals: gold, and one extra arrival per meal. Works faster the more livestock the city owns: normal speed at 10. Costs 8 livestock to stock.",
+    },
+    "resort": {
+        "name": "Resort", "glyph": "}", "tech": 3, "category": "trade", "power": 3,
+        "terrain": ["beach"],
+        "cost": {"wood": 80, "stone": 120, "gold": 100}, "workers": 4, "time": 20 * MIN, "produces": {"gold": 26},
+        "housing": 4, "attracts": 1,
+        "desc": "Hotels along a beach. Earns gold, has rooms for 4, and brings one extra arrival per meal.",
     },
     "wind_turbine": {
         "name": "Wind Turbine", "glyph": "y", "tech": 3, "category": "power", "research": "electricity",
@@ -888,6 +950,11 @@ RESEARCH = {
         "name": "Water Wheels", "tech": 2, "building": "university", "cost": {"knowledge": 60},
         "desc": "River power for saws and hammers.",
     },
+    "volcanology": {
+        "name": "Volcanology", "tech": 2, "building": "university", "cost": {"knowledge": 60},
+        "effect": "lava fields can be built on",
+        "desc": "Knowing when the ground is safe to stand on.",
+    },
     "metallurgy": {
         "name": "Metallurgy", "tech": 2, "building": "university", "cost": {"knowledge": 70},
         "boost": {"smithy": 1.3, "mine": 1.15},
@@ -1171,12 +1238,12 @@ ADDITIONS = {
         "desc": "One more extra arrival per meal.",
     },
     "food_court": {
-        "name": "Food Court", "for": ["shopping_mall", "airport", "maglev_hub"],
+        "name": "Food Court", "for": ["shopping_mall", "airport", "maglev_hub", "resort"],
         "cost": {"stone": 80, "gold": 100}, "housing": 4,
         "desc": "Room for 4 more people.",
     },
     "advertising": {
-        "name": "Advertising", "for": ["shopping_mall", "drone_port", "container_port", "zoo"],
+        "name": "Advertising", "for": ["shopping_mall", "drone_port", "container_port", "zoo", "resort"],
         "cost": {"gold": 200}, "produces": {"gold": 10},
         "desc": "+10 Gold per cycle.",
     },
@@ -1227,7 +1294,7 @@ ADDITIONS = {
         "desc": "Houses 1 more person.",
     },
     "guest_rooms": {
-        "name": "Guest Rooms", "for": ["tavern", "bath_house", "caravanserai"], "research": "masonry",
+        "name": "Guest Rooms", "for": ["tavern", "bath_house", "caravanserai", "resort"], "research": "masonry",
         "cost": {"wood": 30, "stone": 20}, "housing": 3,
         "desc": "Houses 3 more people.",
     },
@@ -1482,7 +1549,7 @@ ADDITIONS = {
 # Kinds of area an expedition can find. Fields:
 #   weight   how common it is (0 = never found by exploring)
 #   terrain  multipliers on how common each terrain is (ordinary or rare)
-#   river / lake / ocean   chance the area has one; lakes = how many tries
+#   river / lake / ocean   chance the area has one; rivers / lakes / oceans = how many tries
 #   temp     added to the home climate
 #   cost     what an expedition there needs, per step of distance from home
 ENVIRONMENTS = {
@@ -1509,6 +1576,31 @@ ENVIRONMENTS = {
     "coast":     {"name": "Coast",     "weight": 1, "terrain": {}, "temp": 0,
                   "river": 0.5, "lake": 0.1, "ocean": 1,
                   "cost": {"food": 30, "wood": 40}},
+    "jungle":    {"name": "Jungle",    "weight": 2, "terrain": {"jungle": 25, "forest": 1.5, "dense_forest": 1.5}, "temp": 8,
+                  "river": 0.7, "lake": 0.3, "ocean": 0.02,
+                  "cost": {"food": 50, "wood": 30}},
+    "savanna":   {"name": "Savanna",   "weight": 2, "terrain": {"savanna": 14, "plains": 1.5}, "temp": 8,
+                  "river": 0.3, "lake": 0.2, "ocean": 0.02,
+                  "cost": {"food": 40, "wood": 15}},
+    "steppe":    {"name": "Steppe",    "weight": 2, "terrain": {"steppe": 14, "hill": 1.2}, "temp": -4,
+                  "river": 0.3, "lake": 0.2, "ocean": 0,
+                  "cost": {"food": 45, "wood": 20}},
+    "taiga":     {"name": "Taiga",     "weight": 2, "terrain": {"taiga": 20, "forest": 1.5}, "temp": -8,
+                  "river": 0.5, "lake": 0.5, "ocean": 0.02,
+                  "cost": {"food": 50, "wood": 30}},
+    "badlands":  {"name": "Badlands",  "weight": 1, "terrain": {"desert": 3, "hill": 2.5, "canyon": 5, "mesa": 5}, "temp": 5,
+                  "river": 0.25, "lake": 0, "ocean": 0,
+                  "cost": {"food": 70, "wood": 30}},
+    "volcanic":  {"name": "Volcanic Fields", "weight": 1,
+                  "terrain": {"hill": 2.5, "volcanic": 6, "lava_field": 30, "mountain": 0.6}, "temp": 4,
+                  "river": 0.2, "lake": 0.2, "ocean": 0.05,
+                  "cost": {"food": 60, "wood": 40}},
+    "delta":     {"name": "River Delta", "weight": 1, "terrain": {"marsh": 6, "plains": 1.5}, "temp": 2,
+                  "river": 1, "rivers": 2, "lake": 0.5, "ocean": 0.6,
+                  "cost": {"food": 35, "wood": 40}},
+    "islands":   {"name": "Islands",   "weight": 1, "terrain": {"jungle": 4}, "temp": 4,
+                  "river": 0.2, "lake": 0.1, "ocean": 1, "oceans": 2,
+                  "cost": {"food": 40, "wood": 70}},
 }
 
 # Wild animals. terrain is where they appear; livestock is what one is worth
@@ -1531,8 +1623,8 @@ WILDLIFE = {
     "turkey":  {"name": "Wild Turkeys",   "glyph": "t", "terrain": ["forest", "foothills"], "livestock": 2, "weight": 3},
     "geese":   {"name": "Geese",          "glyph": "u", "terrain": ["river", "lake", "marsh"], "livestock": 2, "weight": 3},
     "beaver":  {"name": "Beavers",        "glyph": "v", "terrain": ["river", "lake", "swamp"], "livestock": 2, "weight": 2},
-    "turtle":  {"name": "Sea Turtles",    "glyph": "w", "terrain": ["ocean"],              "livestock": 2, "weight": 3},
-    "seal":    {"name": "Seals",          "glyph": "q", "terrain": ["ocean"],              "livestock": 3, "weight": 2},
+    "turtle":  {"name": "Sea Turtles",    "glyph": "w", "terrain": ["ocean", "coral_reef"], "livestock": 2, "weight": 3},
+    "seal":    {"name": "Seals",          "glyph": "q", "terrain": ["ocean", "coral_reef"], "livestock": 3, "weight": 2},
     "ostrich": {"name": "Ostriches",      "glyph": "s", "terrain": ["desert", "salt_flat"], "livestock": 3, "weight": 2},
     "ibex":    {"name": "Ibex",           "glyph": "i", "terrain": ["mountain", "glacier", "hot_springs"], "livestock": 3, "weight": 3},
     "donkey":  {"name": "Wild Asses",     "glyph": "j", "terrain": ["desert", "foothills"], "livestock": 4, "weight": 2},
@@ -1540,6 +1632,12 @@ WILDLIFE = {
     "elk":     {"name": "Elk",            "glyph": "m", "terrain": ["dense_forest", "ancient_grove", "swamp"], "livestock": 5, "weight": 2},
     "muskox":  {"name": "Musk Oxen",      "glyph": "z", "terrain": ["glacier", "mountain"], "livestock": 6, "weight": 1},
     "elephant": {"name": "Elephants",     "glyph": "h", "terrain": ["plains", "swamp"],    "livestock": 10, "weight": 0.4},
+    "crab":     {"name": "Crabs",         "glyph": "C", "terrain": ["beach", "mangrove"],  "livestock": 1, "weight": 4},
+    "flamingo": {"name": "Flamingos",     "glyph": "F", "terrain": ["salt_flat", "beach", "marsh"], "livestock": 2, "weight": 2},
+    "tapir":    {"name": "Tapirs",        "glyph": "T", "terrain": ["jungle", "bamboo", "mangrove"], "livestock": 3, "weight": 3},
+    "zebra":    {"name": "Zebras",        "glyph": "Z", "terrain": ["savanna"],            "livestock": 4, "weight": 4},
+    "reindeer": {"name": "Reindeer",      "glyph": "R", "terrain": ["taiga", "steppe"],    "livestock": 4, "weight": 4},
+    "saiga":    {"name": "Saiga Antelope", "glyph": "S", "terrain": ["steppe", "savanna"], "livestock": 3, "weight": 3},
 }
 
 
@@ -1682,28 +1780,32 @@ def _new_area(rx, ry, env, climate, rng):
 
 
 def _carve_water(area, rng):
-    """Lay an ocean, a river and lakes over a freshly made area, as its environment allows."""
+    """Lay oceans, rivers and lakes over a freshly made area, as its environment allows."""
     env, n, tiles = ENVIRONMENTS[area["env"]], area["size"], area["tiles"]
 
     def put(x, y, terrain):
         if 0 <= x < n and 0 <= y < n and not terrain_is(tiles[y][x]["terrain"], "water"):
             tiles[y][x] = _make_tile(terrain, area["climate"], rng)
 
-    if rng.random() < env["ocean"]:        # a ragged band along one side, about half the map
-        side, depth = rng.randrange(4), rng.randint(2, 3)
-        for i in range(n):
-            depth = max(1, min(n - 2, depth + rng.choice((-1, 0, 0, 1))))
-            for d in range(depth):
-                put(*[(d, i), (n - 1 - d, i), (i, d), (i, n - 1 - d)][side], "ocean")
-    if rng.random() < env["river"]:        # a wandering line from one side to the other
-        across, pos = rng.random() < 0.5, rng.randrange(n)
-        for i in range(n):
-            put(*((i, pos) if across else (pos, i)), "river")
-            step = rng.choice((-1, 0, 0, 0, 1))
-            if 0 <= pos + step < n:
-                pos += step
+    sides = [0, 1, 2, 3]
+    rng.shuffle(sides)
+    for side in sides[:env.get("oceans", 1)]:   # a ragged band along one side
+        if rng.random() < env["ocean"]:
+            depth = rng.randint(2, 3) if env.get("oceans", 1) == 1 else rng.randint(1, 2)
+            for i in range(n):
+                depth = max(1, min(n - 2, depth + rng.choice((-1, 0, 0, 1))))
+                for d in range(depth):
+                    put(*[(d, i), (n - 1 - d, i), (i, d), (i, n - 1 - d)][side], "ocean")
+    for _ in range(env.get("rivers", 1)):       # a wandering line from one side to the other
+        if rng.random() < env["river"]:
+            across, pos = rng.random() < 0.5, rng.randrange(n)
+            for i in range(n):
                 put(*((i, pos) if across else (pos, i)), "river")
-    for _ in range(env.get("lakes", 1)):   # a clump of 2-5 tiles
+                step = rng.choice((-1, 0, 0, 0, 1))
+                if 0 <= pos + step < n:
+                    pos += step
+                    put(*((i, pos) if across else (pos, i)), "river")
+    for _ in range(env.get("lakes", 1)):        # a clump of 2-5 tiles
         if rng.random() < env["lake"]:
             cells = [(rng.randrange(n), rng.randrange(n))]
             for _ in range(rng.randint(2, 6)):

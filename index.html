@@ -276,8 +276,10 @@
           and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select>
           <button>Post offer</button>
         </form>
+        <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
         <p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
-          until another city accepts or you cancel. To buy something, offer what you will pay for it.</p>
+          until it is sold or you cancel. The two amounts set the price, and other cities can buy any part
+          of the offer at that price, a lot at a time. To buy something, offer what you will pay for it.</p>
       </details>
 
       <details class="panel" open>
@@ -379,6 +381,19 @@ let awayShown = null;  // the away report already on screen or dismissed
 let finder = { kind: '', what: '' };   // what the Find box is searching for
 let resFilter = 'all';  // which research the Research tab lists
 let mktFilter = 'all';  // which offers the Market tab lists
+const lotInput = new Map();   // how many lots the player has typed for each offer
+const gcd = (a, b) => b ? gcd(b, a % b) : a;
+// The smallest piece of an offer that keeps both sides whole, and how many are left.
+const lotOf = o => { const lots = gcd(o.give_qty, o.want_qty) || 1; return { give: o.give_qty / lots, want: o.want_qty / lots, lots }; };
+function lotPreview() {
+  if (!view) return;
+  const R = view.defs.resources, give = Math.floor(+$('giveQty').value), want = Math.floor(+$('wantQty').value);
+  if (!(give >= 1 && want >= 1)) { $('lotPreview').textContent = ''; return; }
+  const l = lotOf({ give_qty: give, want_qty: want });
+  $('lotPreview').textContent = l.lots > 1
+    ? `Sells in lots of ${l.give} ${R[$('giveRes').value]} for ${l.want} ${R[$('wantRes').value]}: buyers can take any number of the ${l.lots} lots.`
+    : `These amounts share no common factor, so this can only be taken all at once. Round numbers split into more lots.`;
+}
 let boardView = 'overview', boardBanned = false;   // which columns and cities the Leaderboard shows
 let jump = null;       // a tile to select once its area has loaded
 const findParam = () => finder.kind && !visiting ? `${finder.kind}:${finder.what}` : '';
@@ -956,7 +971,7 @@ function renderMarket() {
   }
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   const mine = o => o.city === state.name;
-  const canAccept = o => !mine(o) && state.resources[o.want] >= o.want_qty;
+  const canAccept = o => !mine(o) && state.resources[o.want] >= lotOf(o).want;   // at least one lot
   const myBills = market.bills.filter(b => b.from === state.name || b.to === state.name);
   const asked = myBills.filter(b => b.status === 'proposed' && b.to === state.name).length;
   setHTML($('mktSummary'),
@@ -978,18 +993,22 @@ function renderMarket() {
   // Newest first, unless one material is being compared for another: then the best price first.
   const offers = narrowed.filter(filters[mktFilter][1]).sort((a, b) => gives && wants ? price(a) - price(b) : b.posted - a.posted);
   $('offersCount').textContent = `(${offers.length}${offers.length === market.offers.length ? '' : ' of ' + market.offers.length})`;
-  setHTML($('offers'), offers.length ? `<table><tr><th>City</th><th>Gives</th><th>Wants</th><th>Price</th><th>Posted</th><th></th></tr>` +
+  setHTML($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Sold in lots of</th><th>Posted</th><th></th></tr>` +
     offers.map(o => {
-      const can = state.resources[o.want] >= o.want_qty;
+      const l = lotOf(o), max = Math.min(l.lots, Math.floor(state.resources[o.want] / l.want));
       return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
         `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
-        `<td class="${mine(o) || can ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
-        `<td class="dim">${num(Math.round(price(o) * 100) / 100)} ${esc(R[o.want])} per ${esc(R[o.give])}</td>` +
+        `<td class="${mine(o) || max ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
+        `<td class="dim">${l.give} ${esc(R[o.give])} for ${l.want} ${esc(R[o.want])}` +
+        (l.lots > 1 ? ` <span class="hi">(${l.lots} lots left)</span>` : ' (all at once)') + `</td>` +
         `<td class="dim">${clock(o.posted)}</td><td>` +
         (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
-                 : `<button data-accept="${o.id}" ${can ? '' : 'disabled'}>Accept</button>`) + `</td></tr>`;
+          : (l.lots > 1 ? `<input data-lots="${o.id}" type="number" min="1" max="${l.lots}" step="1" value="${esc(lotInput.get(o.id) || '')}" ` +
+              `placeholder="${max} lots" title="How many lots to buy. Leave empty to buy as many as you can afford." style="width:96px"> ` : '') +
+            `<button data-accept="${o.id}" ${max ? '' : 'disabled'}>${l.lots > 1 ? 'Buy' : 'Accept'}</button>`) + `</td></tr>`;
     }).join('') + `</table>` + (gives && wants ? `<p class="dim small">Best price first.</p>` : '')
     : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`);
+  lotPreview();
 
   setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
   // Proposals waiting for this city's answer come first.
@@ -1208,6 +1227,10 @@ $('slaughterForm').onsubmit = e => {
 };
 $('resSearch').oninput = () => renderResearch();
 for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { if (view && !visiting) renderMarket(); };
+$('offers').addEventListener('input', e => {
+  if (e.target.dataset.lots) lotInput.set(+e.target.dataset.lots, e.target.value);
+});
+$('offerForm').addEventListener('input', lotPreview);
 $('mktFilters').onclick = e => {
   if (e.target.dataset.filter) { mktFilter = e.target.dataset.filter; renderMarket(); }
 };
@@ -1215,7 +1238,15 @@ $('resFilters').onclick = e => {
   if (e.target.dataset.filter) { resFilter = e.target.dataset.filter; renderResearch(); }
 };
 $('offers').onclick = e => {
-  if (e.target.dataset.accept) act('offer_accept', { offer: +e.target.dataset.accept });
+  if (e.target.dataset.accept) {
+    // Buy the number of lots typed, or as many as can be afforded if the box is empty.
+    const id = +e.target.dataset.accept, o = view.market.offers.find(x => x.id === id);
+    if (!o) return;
+    const l = lotOf(o), typed = Math.floor(+lotInput.get(id));
+    const lots = typed >= 1 ? typed : Math.min(l.lots, Math.floor(view.state.resources[o.want] / l.want));
+    lotInput.delete(id);
+    act('offer_accept', { offer: id, lots });
+  }
   else if (e.target.dataset.cancel) act('offer_cancel', { offer: +e.target.dataset.cancel });
 };
 $('offerForm').onsubmit = e => {

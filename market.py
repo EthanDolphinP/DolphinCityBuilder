@@ -7,11 +7,18 @@ and receives the held goods. Cancelling returns the held goods.
 
 A "buy order" is just an offer the other way round: give Gold, want Wood.
 
+An offer can be taken a part at a time. Its price is the ratio between the two
+amounts, and the smallest piece that keeps both sides in whole numbers is a
+"lot": 1000 Food for 250 Wood sells in lots of 4 Food for 1 Wood. Anyone can
+buy any number of lots while there are some left.
+
 A bill is a repeating trade between two named cities ("every 24 hours I send
 you 10 Stone and you send me 20 Gold"). One city proposes it, the other has to
 accept it, and either can cancel it at any time. When a payment comes due and
 either side can't pay, nothing changes hands that time.
 """
+
+import math
 
 import game
 
@@ -73,8 +80,17 @@ def cancel(market, state, now, offer_id):
     return None
 
 
-def accept(market, buyer, now, offer_id, get_city):
-    """`get_city(name)` must return the seller's up-to-date state (or None)."""
+def lot(offer):
+    """(amount given, amount wanted, lots left) for the smallest piece of an offer."""
+    lots = math.gcd(offer["give_qty"], offer["want_qty"])
+    return offer["give_qty"] // lots, offer["want_qty"] // lots, lots
+
+
+def accept(market, buyer, now, offer_id, get_city, lots=None):
+    """Take `lots` lots of an offer (all that is left if None).
+
+    `get_city(name)` must return the seller's up-to-date state (or None).
+    """
     offer = _find(market, offer_id)
     if not offer:
         return "That offer is no longer open."
@@ -82,22 +98,34 @@ def accept(market, buyer, now, offer_id, get_city):
         return "That is your own offer."
     if offer["give"] in game.UNTRADEABLE or offer["want"] in game.UNTRADEABLE:
         return "That offer is for something that can no longer be traded. Its owner can cancel it."
-    if buyer["resources"][offer["want"]] < offer["want_qty"]:
-        return f"You don't have {offer['want_qty']} {game.RESOURCES[offer['want']]} to pay."
+    lot_give, lot_want, left = lot(offer)
+    if lots is None:
+        lots = left
+    if not _valid_qty(lots):
+        return "Choose how many lots to take."
+    if lots > left:
+        return f"Only {left} lot{'s are' if left != 1 else ' is'} left in that offer."
+    give_qty, want_qty = lots * lot_give, lots * lot_want
+    if buyer["resources"][offer["want"]] < want_qty:
+        return f"You don't have {want_qty} {game.RESOURCES[offer['want']]} to pay."
 
-    got = f"{offer['give_qty']} {game.RESOURCES[offer['give']]}"
-    paid = f"{offer['want_qty']} {game.RESOURCES[offer['want']]}"
-    market["offers"].remove(offer)
-    buyer["resources"][offer["want"]] -= offer["want_qty"]
-    buyer["resources"][offer["give"]] += offer["give_qty"]
+    got = f"{give_qty} {game.RESOURCES[offer['give']]}"
+    paid = f"{want_qty} {game.RESOURCES[offer['want']]}"
+    offer["give_qty"] -= give_qty
+    offer["want_qty"] -= want_qty
+    if not offer["give_qty"]:
+        market["offers"].remove(offer)
+    buyer["resources"][offer["want"]] -= want_qty
+    buyer["resources"][offer["give"]] += give_qty
     game.log(buyer, now, f"Traded with {offer['city']}: paid {paid}, received {got}.")
     seller = get_city(offer["city"])
     if seller:
-        seller["resources"][offer["want"]] += offer["want_qty"]
-        game.log(seller, now, f"{buyer['name']} accepted your offer: gave {got}, received {paid}.")
+        seller["resources"][offer["want"]] += want_qty
+        left_text = (f" {offer['give_qty']} {game.RESOURCES[offer['give']]} still on offer."
+                     if offer["give_qty"] else " That offer is now sold out.")
+        game.log(seller, now, f"{buyer['name']} bought from your offer: gave {got}, received {paid}.{left_text}")
 
-    _record(market, now, offer["city"], buyer["name"], offer["give"], offer["give_qty"],
-            offer["want"], offer["want_qty"])
+    _record(market, now, offer["city"], buyer["name"], offer["give"], give_qty, offer["want"], want_qty)
     return None
 
 
