@@ -12,9 +12,9 @@ amounts, and the smallest piece that keeps both sides in whole numbers is a
 "lot": 1000 Food for 250 Wood sells in lots of 4 Food for 1 Wood. Anyone can
 buy any number of lots while there are some left.
 
-An offer can be set to restock: while its owner is online it is topped back up
-to the amounts it was posted with, out of the owner's stock, whenever some of
-it sells. Once the owner goes offline it sells down and ends like any other.
+An offer never refills by itself. When it sells out it is moved to its owner's
+"finished" list, from where the owner can post it again with the same amounts
+(paying for it out of stock again) or throw it away.
 
 Every sale from a city's offers is also noted in that city's "sales" list, so
 the Market screen can show what sold since the owner last looked.
@@ -32,7 +32,7 @@ import game
 MAX_OFFERS_PER_CITY = 10
 MAX_QUANTITY = 1_000_000
 HISTORY_LENGTH = 20
-ONLINE_SECONDS = 45     # a city whose player was last heard from longer ago than this is offline
+FINISHED_KEPT = 20      # sold-out offers remembered per city, for posting again
 SALES_KEPT = 50         # unseen sales remembered per city
 MAX_BILLS_PER_CITY = 10
 MIN_BILL_HOURS, MAX_BILL_HOURS = 1, 168
@@ -71,8 +71,8 @@ def post(market, state, now, data):
     market["offers"].append({
         "id": market["next_id"], "city": state["name"], "posted": now,
         "give": give, "give_qty": give_qty, "want": want, "want_qty": want_qty,
-        # the amounts it was posted with: they fix the lot size and the level it restocks to
-        "full_give": give_qty, "full_want": want_qty, "restock": bool(data.get("restock")),
+        # the amounts it was posted with: they fix the lot size, and are what it is re-posted with
+        "full_give": give_qty, "full_want": want_qty,
     })
     market["next_id"] += 1
     game.log(state, now, f"Offered {give_qty} {game.RESOURCES[give]} "
@@ -99,37 +99,38 @@ def lot(offer):
     return lot_give, full_want // lots, offer["give_qty"] // lot_give
 
 
-def is_online(state, now):
-    """True if the city's own player has been heard from in the last little while."""
-    return bool(state) and now - state.get("online", 0) <= ONLINE_SECONDS
+def _finish(offer, seller, now):
+    """Note a sold-out offer in its owner's finished list."""
+    if not seller:
+        return
+    seller.setdefault("finished", []).append({
+        "id": offer["id"], "finished": now, "give": offer["give"], "want": offer["want"],
+        "give_qty": offer.get("full_give", offer["give_qty"]), "want_qty": offer.get("full_want", offer["want_qty"])})
+    del seller["finished"][:-FINISHED_KEPT]
 
 
-def set_restock(market, state, now, offer_id, on):
-    offer = _find(market, offer_id)
-    if not offer or offer["city"] != state["name"]:
-        return "That offer is no longer open."
-    if on and "full_give" not in offer:      # an offer from before restocking existed
-        offer["full_give"], offer["full_want"] = offer["give_qty"], offer["want_qty"]
-    offer["restock"] = bool(on)
+def tidy(market, now, get_city):
+    """Clear away offers with nothing left to sell (left over from when offers could restock)."""
+    for offer in [o for o in market["offers"] if not o["give_qty"]]:
+        market["offers"].remove(offer)
+        _finish(offer, get_city(offer["city"]), now)
+
+
+def reactivate(market, state, now, finished_id):
+    """Post a finished offer again with the amounts it first had. The goods come out of stock again."""
+    old = next((f for f in state.get("finished", []) if f["id"] == finished_id), None)
+    if not old:
+        return "That finished order is no longer in your list."
+    error = post(market, state, now, {k: old[k] for k in ("give", "give_qty", "want", "want_qty")})
+    if not error:
+        state["finished"].remove(old)
+    return error
+
+
+def forget(state, finished_id):
+    """Throw a finished offer away."""
+    state["finished"] = [f for f in state.get("finished", []) if f["id"] != finished_id]
     return None
-
-
-def restock(market, now, get_city):
-    """Top restocking offers back up from their owners' stock while the owners are online.
-    A restocking offer that has sold out is dropped once its owner is offline."""
-    for offer in [o for o in market["offers"] if o.get("restock") and o["give_qty"] < o["full_give"]]:
-        owner = get_city(offer["city"])
-        if not is_online(owner, now):
-            if not offer["give_qty"]:
-                market["offers"].remove(offer)
-            continue
-        lot_give, lot_want, left = lot(offer)
-        lots = min((offer["full_give"] - offer["give_qty"]) // lot_give,
-                   int(owner["resources"][offer["give"]] // lot_give))
-        if lots > 0:
-            owner["resources"][offer["give"]] -= lots * lot_give
-            offer["give_qty"] += lots * lot_give
-            offer["want_qty"] += lots * lot_want
 
 
 def accept(market, buyer, now, offer_id, get_city, lots=None):
@@ -146,7 +147,7 @@ def accept(market, buyer, now, offer_id, get_city, lots=None):
         return "That offer is for something that can no longer be traded. Its owner can cancel it."
     lot_give, lot_want, left = lot(offer)
     if not left:
-        return "That offer is sold out for the moment; its owner restocks it while they are online."
+        return "That offer is sold out."
     if lots is None:
         lots = left
     if not _valid_qty(lots):
@@ -162,9 +163,9 @@ def accept(market, buyer, now, offer_id, get_city, lots=None):
     seller = get_city(offer["city"])
     offer["give_qty"] -= give_qty
     offer["want_qty"] -= want_qty
-    # A sold-out offer ends, unless it restocks and its owner is here to refill it.
-    if not offer["give_qty"] and not (offer.get("restock") and is_online(seller, now)):
+    if not offer["give_qty"]:      # sold out: it ends, and waits in the owner's finished list
         market["offers"].remove(offer)
+        _finish(offer, seller, now)
     buyer["resources"][offer["want"]] -= want_qty
     buyer["resources"][offer["give"]] += give_qty
     game.log(buyer, now, f"Traded with {offer['city']}: paid {paid}, received {got}.")

@@ -298,14 +298,19 @@
         <form id="offerForm" class="bar" style="margin-top:0">
           I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select>
           and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select>
-          <label title="While you are online, whatever sells is refilled from your stock up to these amounts. When you go offline it sells down and ends.">
-            <input id="offerRestock" type="checkbox"> keep it stocked while I'm online</label>
           <button>Post offer</button>
         </form>
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
         <p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
           until it is sold or you cancel. The two amounts set the price, and other cities can buy any part
           of the offer at that price, a lot at a time. To buy something, offer what you will pay for it.</p>
+      </details>
+
+      <details class="panel" id="finishedPanel" open>
+        <summary class="cat">Finished orders <span id="finishedCount" class="count"></span></summary>
+        <p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Reactivate posts
+          one again with the same amounts, taking the goods from your stock again.</p>
+        <div id="finished" class="scroll"></div>
       </details>
 
       <details class="panel" open>
@@ -373,7 +378,7 @@
           <label class="check"><input data-setting="mapKey" type="checkbox"> Show the colour key under the map</label>
         </div>
         <p class="dim small" style="margin-bottom:0">These settings are saved in this browser only, so each player and each
-          device can have their own. Offers set to keep stocked need the server checked at least every 20 seconds.</p>
+          device can have their own.</p>
         <div class="bar"><button id="resetSettings">Put every setting back to normal</button></div>
       </div>
       <div class="panel own">
@@ -1283,21 +1288,30 @@ function renderMarket() {
     offers.map(o => {
       const l = lotOf(o), max = Math.min(l.lots, Math.floor(state.resources[o.want] / l.want));
       return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
-        `<td>${o.give_qty}${o.restock ? ` <span class="dim">of ${o.full_give}</span>` : ''} ${esc(R[o.give])}` +
-        (o.restock ? ` <span class="good small" title="Refilled from the seller's stock while they are online">restocks</span>` : '') + `</td>` +
+        `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
         `<td class="${mine(o) || max ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
         `<td class="dim">${l.give} ${esc(R[o.give])} for ${l.want} ${esc(R[o.want])}` +
-        (!l.lots ? ' <span class="bad">(sold out, waiting to restock)</span>'
-          : l.lots > 1 || o.restock ? ` <span class="hi">(${l.lots} ${l.lots === 1 ? 'lot' : 'lots'} left)</span>` : ' (all at once)') + `</td>` +
+        (l.lots > 1 ? ` <span class="hi">(${l.lots} lots left)</span>` : l.give < o.give_qty || o.full_give > o.give_qty ? ' (last lot)' : ' (all at once)') + `</td>` +
         `<td class="dim">${clock(o.posted)}</td><td>` +
-        (mine(o) ? `<label class="small" title="While you are online, whatever sells is refilled from your stock up to the amounts you posted. When you go offline it sells down and ends.">` +
-            `<input type="checkbox" data-restock="${o.id}" ${o.restock ? 'checked' : ''}> keep stocked</label> <button data-cancel="${o.id}">Cancel</button>`
+        (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
           : (l.lots > 1 ? `<input data-lots="${o.id}" type="number" min="1" max="${l.lots}" step="1" value="${esc(lotInput.get(o.id) || '')}" ` +
               `placeholder="${max} lots" title="How many lots to buy. Leave empty to buy as many as you can afford." style="width:96px"> ` : '') +
             `<button data-accept="${o.id}" ${max ? '' : 'disabled'}>${l.lots > 1 ? 'Buy' : 'Accept'}</button>`) + `</td></tr>`;
     }).join('') + `</table>` + (gives && wants ? `<p class="dim small">Best price first.</p>` : '')
     : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`);
   lotPreview();
+
+  // ---- offers of this city's that sold out, ready to post again ----
+  const finished = (state.finished || []).slice().reverse();
+  $('finishedCount').textContent = `(${finished.length})`;
+  setHTML($('finished'), finished.length ? `<table><tr><th>Sold</th><th>For</th><th>Sold out</th><th></th></tr>` +
+    finished.map(f => {
+      const ok = state.resources[f.give] >= f.give_qty;
+      return `<tr><td class="${ok ? '' : 'bad'}">${f.give_qty} ${esc(R[f.give])}</td><td>${f.want_qty} ${esc(R[f.want])}</td>` +
+        `<td class="dim">${clock(f.finished)}</td><td>` +
+        `<button data-reactivate="${f.id}" ${ok ? '' : 'disabled'} title="${ok ? 'Post it again' : 'You do not have enough in stock to post it again'}">Reactivate</button> ` +
+        `<button data-forget="${f.id}">Remove</button></td></tr>`;
+    }).join('') + `</table>` : `<span class="dim">None of your offers have sold out yet.</span>`);
 
   // ---- what sold from this city's offers since the player last looked ----
   const sales = state.sales || [];
@@ -1540,9 +1554,10 @@ for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { 
 $('offers').addEventListener('input', e => {
   if (e.target.dataset.lots) lotInput.set(+e.target.dataset.lots, e.target.value);
 });
-$('offers').addEventListener('change', e => {
-  if (e.target.dataset.restock) act('offer_restock', { offer: +e.target.dataset.restock, on: e.target.checked });
-});
+$('finished').onclick = e => {
+  if (e.target.dataset.reactivate) act('offer_reactivate', { offer: +e.target.dataset.reactivate });
+  else if (e.target.dataset.forget) act('offer_forget', { offer: +e.target.dataset.forget });
+};
 $('salesSeen').onclick = () => act('market_seen');
 $('offerForm').addEventListener('input', lotPreview);
 $('mktFilters').onclick = e => {
@@ -1565,7 +1580,7 @@ $('offers').onclick = e => {
 };
 $('offerForm').onsubmit = e => {
   e.preventDefault();
-  act('offer_post', { restock: $('offerRestock').checked, give: $('giveRes').value, give_qty: Number($('giveQty').value),
+  act('offer_post', { give: $('giveRes').value, give_qty: Number($('giveQty').value),
                       want: $('wantRes').value, want_qty: Number($('wantQty').value) });
 };
 $('billForm').onsubmit = e => {
