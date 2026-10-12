@@ -496,6 +496,9 @@ function buildingRows(b, cycle, produces, live) {
   if (b.attracts) rows.push(['Attracts', `${b.attracts} extra arrival per meal`]);
   if (b.generates) rows.push(['Generates', `<span class="good">${num(live ? live.power_out : b.generates)} power</span>`]);
   if (b.power) rows.push(['Needs', `${b.power} power`]);
+  if (b.explore_speed) rows.push(['Expeditions', `travel ${Math.round(b.explore_speed * 100)}% faster`]);
+  if (b.wildlife_speed) rows.push(['Wildlife', `appears ${Math.round(b.wildlife_speed * 100)}% more often`]);
+  if (b.livestock_speed) rows.push(['Herd', `faster the more livestock you own (${Math.floor(view.state.resources.livestock)} now)`]);
   if (b.fertility_aura) rows.push(['Nearby', `+${b.fertility_aura} fertility on the 8 tiles around it`]);
   if (b.speed_aura) rows.push(['Nearby', `${b.speed_aura.for.map(f => esc(view.defs.buildings[f].name)).join(', ')} ${Math.round(b.speed_aura.bonus * 100)}% faster`]);
   if (cycle && !b.generates) {
@@ -525,7 +528,8 @@ function renderTile() {
     kv([['Height', t.height], ['Temperature', `${t.temp}C`],
         water ? ['Fish', `${t.fish}%`]
               : ['Fertility', `${info.fertility}%` + (info.fertility !== t.fertility ? ` <span class="good">(${t.fertility}% before nearby buildings)</span>` : '')]]) +
-    (terr.desc ? `<div class="dim small">${esc(terr.desc)}</div>` : '');
+    (terr.desc ? `<div class="dim small">${esc(terr.desc)}</div>` : '') +
+    (info.locked ? `<div class="bad small">Nothing can be built here until you research ${esc(info.locked)}.</div>` : '');
 
   // ---- wildlife ----
   if (t.animal) {

@@ -48,6 +48,10 @@ MIN = 60  # seconds
 #   from / chance   rare terrain: replaces `from` tiles. The chance grows the
 #             further the area is from home (see RARE_* below)
 #   boost     {building id: speed multiplier} for buildings standing on it
+#   spread_from / near / need / chance   terrain that forms beside its own
+#             kind: a `spread_from` tile with at least `need` neighbours that
+#             are (or count as) one of `near` becomes this, with that chance
+#   research  nothing can be built on it until this has been researched
 TERRAINS = {
     # ---- ordinary land ----
     "plains": {"name": "Plains", "glyph": ".", "color": "#9bc46b", "weight": 38,
@@ -91,6 +95,48 @@ TERRAINS = {
                  "height": (1, 2), "fertility": (90, 100), "temp": 6,
                  "boost": {"farm": 1.25},
                  "desc": "Warm black soil, the richest farmland there is."},
+    # ---- land that forms beside its own kind (see _spread_terrain) ----
+    "sand_dunes": {"name": "Sand Dunes", "glyph": ")", "color": "#f0d890",
+                   "spread_from": ["desert"], "near": ["desert"], "need": 2, "chance": 0.45,
+                   "groups": ["desert"], "research": "desert_lore",
+                   "height": (2, 4), "fertility": (0, 5), "temp": 12,
+                   "boost": {"glassworks": 1.3, "caravanserai": 1.2, "wind_turbine": 1.2},
+                   "desc": "Shifting sand in the heart of a desert. Fine sand makes glassworks faster, and caravans prefer it."},
+    "salt_flat": {"name": "Salt Flat", "glyph": "_", "color": "#e8e8e0",
+                  "spread_from": ["desert"], "near": ["sand_dunes", "ocean"], "need": 1, "chance": 0.3,
+                  "height": (1, 1), "fertility": (0, 0), "temp": 12,
+                  "desc": "A dried-up lake bed crusted with salt. Only a Salt Works can use it."},
+    "swamp": {"name": "Swamp", "glyph": ";", "color": "#6f8f4a",
+              "spread_from": ["plains", "forest"], "near": ["marsh", "lake"], "need": 1, "chance": 0.3,
+              "groups": ["fresh"],
+              "height": (1, 1), "fertility": (60, 90), "temp": 1,
+              "desc": "Dark, drowned woodland beside marshes and lakes. It waters the land around it; rice paddies and peat cutters can work it."},
+    "foothills": {"name": "Foothills", "glyph": "/", "color": "#c9b48a",
+                  "spread_from": ["plains", "forest"], "near": ["hill"], "need": 2, "chance": 0.3,
+                  "groups": ["hill"],
+                  "height": (3, 4), "fertility": (30, 60), "temp": -1,
+                  "desc": "Rolling ground at the feet of the hills: too low for a mine, but good for terrace farms."},
+    "glacier": {"name": "Glacier", "glyph": "*", "color": "#bfe6f2",
+                "spread_from": ["hill", "mountain"], "near": ["mountain"], "need": 1, "chance": 0.35,
+                "groups": ["hill", "fresh"], "research": "mountaineering",
+                "height": (10, 13), "fertility": (0, 0), "temp": -8,
+                "desc": "A river of ice among the mountains. Its meltwater waters the land around it, and it is the highest ground there is."},
+    "hot_springs": {"name": "Hot Springs", "glyph": "\u00a7", "color": "#f09a6a",
+                    "spread_from": ["hill"], "near": ["mountain", "volcanic"], "need": 1, "chance": 0.3,
+                    "height": (4, 7), "fertility": (20, 40), "temp": 12,
+                    "desc": "Steaming pools heated from below. A Bath House draws visitors here, and later a Geothermal Plant draws power."},
+    "ancient_grove": {"name": "Ancient Grove", "glyph": "\u2663", "color": "#57c27a",
+                      "spread_from": ["forest", "dense_forest"], "near": ["dense_forest"], "need": 1, "chance": 0.3,
+                      "groups": ["forest"],
+                      "height": (1, 3), "fertility": (70, 95), "temp": -3,
+                      "boost": {"shaman_hut": 1.6, "hunting_lodge": 1.3, "lumber_camp": 0.8, "sawmill": 0.8},
+                      "desc": "The oldest trees, deep in the dense forest. Shamans and hunters thrive here; the huge trunks are slow to fell."},
+    "meadow": {"name": "Meadow", "glyph": "\"", "color": "#c6e07a",
+               "spread_from": ["plains"], "near": ["plains"], "need": 3, "chance": 0.3,
+               "groups": ["plains"],
+               "height": (1, 2), "fertility": (60, 90), "temp": 0,
+               "boost": {"pasture": 1.4, "dairy": 1.3},
+               "desc": "Open flowering grassland. The best grazing there is: pastures and dairies work faster here."},
 }
 GROUP_NAMES = {"water": "water", "fresh": "fresh water"}
 
@@ -127,6 +173,8 @@ HUNGRY_SPEED = 0.5          # work speed of non-food buildings while the city is
 SIM_STEP = 60               # seconds of game time simulated per step when catching up
 
 EXPEDITION_TIME = 20 * MIN  # travel time per step of distance from home
+MAX_EXPLORE_SPEED = 1.0     # most that buildings can add to expedition speed (1.0 = twice as fast)
+LIVESTOCK_FOR_FULL_SPEED = 10   # herd size at which "livestock_speed" buildings run at normal speed
 WILDLIFE_TIME = 45 * MIN    # how often a new animal wanders into each area
 MAX_WILDLIFE = 4            # wild animals an area holds at once
 TAME_FOOD_PER_HEAD = 3      # food used as bait, per livestock the animal is worth
@@ -171,6 +219,9 @@ CATEGORIES = {
 #   consumes       resources used each time a cycle finishes
 #   housing        people it can house
 #   attracts       extra people who may arrive at each meal (see _arrivals)
+#   explore_speed  0.25 = expeditions travel 25% faster (city-wide, capped)
+#   wildlife_speed 0.5 = wild animals appear 50% more often (city-wide)
+#   livestock_speed  True - works faster the more livestock the city owns
 #   modifiers      names from MODIFIERS that speed up / slow down its cycle here
 #   min_height / max_height / min_fertility / min_temp / max_temp   tile limits
 #   adjacent       terrain that must be next to the tile
@@ -234,6 +285,12 @@ BUILDINGS = {
         "modifiers": ["fertility"],
         "desc": "Keeps up to 10 of your livestock and farms them for food. Faster on fertile grass.",
     },
+    "salt_lick": {
+        "name": "Salt Lick", "glyph": "l", "tech": 0, "category": "support",
+        "terrain": ["plains", "forest"],
+        "cost": {"wood": 5, "food": 20}, "wildlife_speed": 0.5,
+        "desc": "Draws animals in from the wild: wildlife appears 50% more often in all your areas.",
+    },
     "hunting_lodge": {
         "name": "Hunting Lodge", "glyph": "N", "tech": 0, "category": "food",
         "terrain": ["forest"],
@@ -288,6 +345,60 @@ BUILDINGS = {
         "cost": {"wood": 40, "stone": 20},
         "speed_aura": {"for": ["farm", "irrigated_farm"], "bonus": 0.2},
         "desc": "Mills grain for the farms on the 8 surrounding tiles, making them 20% faster.",
+    },
+    "stable": {
+        "name": "Stable", "glyph": "q", "tech": 1, "category": "support", "research": "draft_animals",
+        "terrain": ["plains", "desert"],
+        "cost": {"wood": 40, "livestock": 3}, "explore_speed": 0.25,
+        "speed_aura": {"for": ["farm", "orchard", "terrace_farm", "rice_paddy", "lumber_camp", "quarry"], "bonus": 0.1},
+        "desc": "Pack and plough animals. Expeditions travel 25% faster, and farms, lumber camps and quarries on the 8 surrounding tiles work 10% faster. Costs 3 livestock to set up.",
+    },
+    "dairy": {
+        "name": "Dairy", "glyph": "m", "tech": 1, "category": "food", "research": "dairying",
+        "terrain": ["plains"],
+        "cost": {"wood": 30, "stone": 10}, "workers": 2, "time": 15 * MIN, "produces": {"food": 7},
+        "livestock_speed": True,
+        "desc": "Milk, butter and cheese from your herd without slaughtering it. Works faster the more livestock the city owns: normal speed at 10.",
+    },
+    "weaver": {
+        "name": "Weaver", "glyph": "x", "tech": 1, "category": "trade", "research": "weaving",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"wood": 35}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 6},
+        "livestock_speed": True,
+        "desc": "Spins wool from your herd into cloth to sell. Works faster the more livestock the city owns: normal speed at 10.",
+    },
+    "rice_paddy": {
+        "name": "Rice Paddy", "glyph": "p", "tech": 1, "category": "food", "research": "wet_farming",
+        "terrain": ["marsh", "swamp"],
+        "cost": {"wood": 25}, "workers": 2, "time": 12 * MIN, "produces": {"food": 9},
+        "modifiers": ["crop_temperature"],
+        "desc": "Flooded fields on marsh or swamp. A big harvest from land little else can use.",
+    },
+    "peat_cutter": {
+        "name": "Peat Cutter", "glyph": "j", "tech": 1, "category": "materials", "research": "drainage",
+        "terrain": ["swamp"],
+        "cost": {"wood": 20}, "workers": 2, "time": 12 * MIN, "produces": {"wood": 6},
+        "desc": "Cuts and dries peat from a swamp. It burns like wood and is counted as wood.",
+    },
+    "terrace_farm": {
+        "name": "Terrace Farm", "glyph": "z", "tech": 1, "category": "food", "research": "terracing",
+        "terrain": ["hill"], "max_height": 7,
+        "cost": {"wood": 20, "stone": 20}, "workers": 2, "time": 12 * MIN, "produces": {"food": 6},
+        "modifiers": ["crop_temperature", "adjacent_water"],
+        "desc": "Stepped fields cut into a slope: food from hills and foothills, though not from mountains. Faster near fresh water and in mild temperatures.",
+    },
+    "salt_works": {
+        "name": "Salt Works", "glyph": "+", "tech": 1, "category": "trade", "research": "salt_harvesting",
+        "terrain": ["salt_flat"],
+        "cost": {"wood": 30}, "workers": 2, "time": 15 * MIN, "produces": {"gold": 7},
+        "desc": "Rakes salt from a salt flat to sell.",
+    },
+    "bath_house": {
+        "name": "Bath House", "glyph": "6", "tech": 1, "category": "trade", "research": "masonry",
+        "terrain": ["hot_springs"],
+        "cost": {"wood": 20, "stone": 50}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 8},
+        "housing": 2, "attracts": 1,
+        "desc": "Stone pools over hot springs. Earns gold, has rooms for 2, and its fame brings one extra arrival per meal like a tavern.",
     },
     "tavern": {
         "name": "Tavern", "glyph": "v", "tech": 1, "category": "housing",
@@ -416,6 +527,12 @@ BUILDINGS = {
         "modifiers": ["height"],
         "desc": "Deep shafts for ore and stone. Faster on higher hills.",
     },
+    "geothermal_plant": {
+        "name": "Geothermal Plant", "glyph": "0", "tech": 3, "category": "power", "research": "electricity",
+        "terrain": ["hot_springs", "volcanic"],
+        "cost": {"stone": 120, "tools": 25}, "workers": 2, "generates": 14,
+        "desc": "Power from the heat underground, with no fuel. Only on hot springs or a volcanic plain.",
+    },
     "wind_turbine": {
         "name": "Wind Turbine", "glyph": "y", "tech": 3, "category": "power", "research": "electricity",
         "terrain": ["plains", "hill", "desert"],
@@ -498,6 +615,15 @@ RESEARCH = {
         "explore_range": 2, "effect": "expeditions can explore up to 2 areas away from home",
         "desc": "Reading stars, rivers and animal trails.",
     },
+    "desert_lore": {
+        "name": "Desert Lore", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 14},
+        "effect": "sand dunes can be built on",
+        "desc": "Where the sand holds, where the water hides.",
+    },
+    "dairying": {
+        "name": "Dairying", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 15},
+        "desc": "Milking, churning and keeping.",
+    },
     "smoking": {
         "name": "Smoking and Curing", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 12},
         "desc": "Fish and meat that keep.",
@@ -531,6 +657,35 @@ RESEARCH = {
         "explore_range": 99, "explore_discount": 0.75,
         "effect": "expeditions can go any distance and cost 25% less",
         "desc": "Maps that outlive the people who drew them.",
+    },
+    "draft_animals": {
+        "name": "Draft Animals", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "Yokes, harness and pack saddles.",
+    },
+    "weaving": {
+        "name": "Weaving", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "Wool into thread, thread into cloth.",
+    },
+    "terracing": {
+        "name": "Terracing", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "Walls that turn a slope into fields.",
+    },
+    "wet_farming": {
+        "name": "Wet Farming", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "Crops that like their feet in water.",
+    },
+    "drainage": {
+        "name": "Drainage", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "Ditches and dykes to work sodden ground.",
+    },
+    "salt_harvesting": {
+        "name": "Salt Harvesting", "tech": 1, "building": "school", "cost": {"knowledge": 20},
+        "desc": "White gold, raked from the ground.",
+    },
+    "mountaineering": {
+        "name": "Mountaineering", "tech": 1, "building": "school", "cost": {"knowledge": 30},
+        "effect": "glaciers can be built on",
+        "desc": "Ropes, spikes and a head for heights.",
     },
     "grafting": {
         "name": "Grafting", "tech": 1, "building": "school", "cost": {"knowledge": 25},
@@ -610,6 +765,7 @@ RESEARCH = {
 #   generates extra power the building supplies
 #   fertility_aura   extra fertility the building gives its neighbours
 #   aura_bonus       added to the building's speed_aura bonus
+#   explore_speed / wildlife_speed   added to the building's own
 ADDITIONS = {
     "fish_traps": {
         "name": "Fish Traps", "for": ["fishing_dock"], "research": "fish_traps",
@@ -617,12 +773,12 @@ ADDITIONS = {
         "desc": "+2 Food per cycle.",
     },
     "scarecrow": {
-        "name": "Scarecrow", "for": ["farm", "irrigated_farm", "orchard"], "research": "seed_selection",
+        "name": "Scarecrow", "for": ["farm", "irrigated_farm", "orchard", "terrace_farm", "rice_paddy"], "research": "seed_selection",
         "cost": {"wood": 10, "food": 5}, "speed": 1.2,
         "desc": "20% faster.",
     },
     "tool_shed": {
-        "name": "Tool Shed", "for": ["lumber_camp", "quarry", "farm", "hunting_lodge", "reed_cutter"], "research": "stone_tools",
+        "name": "Tool Shed", "for": ["lumber_camp", "quarry", "farm", "hunting_lodge", "reed_cutter", "terrace_farm", "peat_cutter"], "research": "stone_tools",
         "cost": {"wood": 20, "stone": 5}, "speed": 1.15,
         "desc": "15% faster.",
     },
@@ -637,7 +793,7 @@ ADDITIONS = {
         "desc": "25% faster.",
     },
     "market_stalls": {
-        "name": "Market Stalls", "for": ["trading_post", "caravanserai"], "research": "bookkeeping",
+        "name": "Market Stalls", "for": ["trading_post", "caravanserai", "bath_house", "salt_works"], "research": "bookkeeping",
         "cost": {"wood": 40, "gold": 15}, "produces": {"gold": 2},
         "desc": "+2 Gold per cycle.",
     },
@@ -651,6 +807,26 @@ ADDITIONS = {
         "cost": {"stone": 30, "tools": 5}, "housing": 4,
         "desc": "Houses 4 more people.",
     },
+    "watering_trough": {
+        "name": "Watering Trough", "for": ["salt_lick"],
+        "cost": {"wood": 15}, "wildlife_speed": 0.25,
+        "desc": "Wildlife appears a further 25% more often.",
+    },
+    "wagon_shed": {
+        "name": "Wagon Shed", "for": ["stable"],
+        "cost": {"wood": 40, "livestock": 2}, "explore_speed": 0.15,
+        "desc": "Expeditions travel a further 15% faster. Costs 2 livestock.",
+    },
+    "cheese_cellar": {
+        "name": "Cheese Cellar", "for": ["dairy"], "research": "masonry",
+        "cost": {"stone": 30}, "produces": {"food": 2},
+        "desc": "+2 Food per cycle.",
+    },
+    "dye_vats": {
+        "name": "Dye Vats", "for": ["weaver"],
+        "cost": {"wood": 20, "stone": 10}, "produces": {"gold": 2},
+        "desc": "+2 Gold per cycle.",
+    },
     "totem": {
         "name": "Totem", "for": ["shaman_hut"],
         "cost": {"wood": 20}, "produces": {"knowledge": 1},
@@ -662,7 +838,7 @@ ADDITIONS = {
         "desc": "+1 Food per cycle.",
     },
     "feeding_trough": {
-        "name": "Feeding Trough", "for": ["pasture"],
+        "name": "Feeding Trough", "for": ["pasture", "dairy"],
         "cost": {"wood": 15, "food": 10}, "speed": 1.2,
         "desc": "20% faster.",
     },
@@ -687,7 +863,7 @@ ADDITIONS = {
         "desc": "Surrounding water buildings get a further 10% faster.",
     },
     "drying_racks": {
-        "name": "Drying Racks", "for": ["tannery", "reed_cutter"],
+        "name": "Drying Racks", "for": ["tannery", "reed_cutter", "peat_cutter", "salt_works", "weaver"],
         "cost": {"wood": 20}, "speed": 1.2,
         "desc": "20% faster.",
     },
@@ -697,7 +873,7 @@ ADDITIONS = {
         "desc": "20% faster.",
     },
     "irrigation_pipes": {
-        "name": "Irrigation Pipes", "for": ["irrigated_farm", "orchard", "greenhouse"], "research": "water_wheels",
+        "name": "Irrigation Pipes", "for": ["irrigated_farm", "orchard", "greenhouse", "rice_paddy"], "research": "water_wheels",
         "cost": {"stone": 20, "ore": 15}, "speed": 1.2,
         "desc": "20% faster.",
     },
@@ -712,7 +888,7 @@ ADDITIONS = {
         "desc": "25% faster.",
     },
     "transformer": {
-        "name": "Transformer", "for": ["wind_turbine", "hydro_dam", "power_plant"], "research": "electricity",
+        "name": "Transformer", "for": ["wind_turbine", "hydro_dam", "power_plant", "geothermal_plant"], "research": "electricity",
         "cost": {"ore": 30, "tools": 10}, "generates": 4,
         "desc": "+4 power.",
     },
@@ -767,6 +943,9 @@ WILDLIFE = {
     "camel":   {"name": "Camels",         "glyph": "c", "terrain": ["desert"],           "livestock": 5, "weight": 2},
     "horse":   {"name": "Wild Horses",    "glyph": "o", "terrain": ["plains", "desert"], "livestock": 5, "weight": 1},
     "aurochs": {"name": "Aurochs",        "glyph": "a", "terrain": ["plains"],           "livestock": 6, "weight": 1},
+    "bison":   {"name": "Bison",          "glyph": "n", "terrain": ["meadow"],           "livestock": 5, "weight": 4},
+    "buffalo": {"name": "Water Buffalo",  "glyph": "f", "terrain": ["swamp", "marsh"],   "livestock": 5, "weight": 3},
+    "yak":     {"name": "Yaks",           "glyph": "y", "terrain": ["glacier", "mountain", "foothills"], "livestock": 4, "weight": 3},
 }
 
 
@@ -890,6 +1069,7 @@ def _new_area(rx, ry, env, climate, rng):
                   for _ in range(AREA_SIZE)],
     }
     _carve_water(area, rng)
+    _spread_terrain(area, rng)
     for _ in range(2):
         _spawn_animal(area, rng)
     return area
@@ -927,6 +1107,25 @@ def _carve_water(area, rng):
                     cells.append((x + dx, y + dy))
             for x, y in set(cells):
                 put(x, y, "lake")
+
+
+def _spread_terrain(area, rng, cells=None):
+    """Turn some tiles into the terrain that forms beside their neighbours
+    (dunes inside deserts, swamp by marshes, ...). `cells` limits it to those
+    (x, y) positions; tiles with buildings are never changed."""
+    n, tiles = area["size"], area["tiles"]
+    for terrain, t in TERRAINS.items():
+        if "near" not in t:
+            continue
+        alike = lambda other: any(terrain_is(other["terrain"], k) for k in t["near"])
+        for y in range(n):
+            for x in range(n):
+                tile = tiles[y][x]
+                if (cells is not None and (x, y) not in cells) or tile["building"]:
+                    continue
+                if (tile["terrain"] in t["spread_from"] and rng.random() < t["chance"]
+                        and _count_adjacent(area, x, y, alike) >= t.get("need", 1)):
+                    tiles[y][x] = _make_tile(terrain, area["climate"], rng)
 
 
 def _playable(tiles):
@@ -1024,6 +1223,9 @@ def _expand_area(area):
             if (ix, iy) != (x, y) and (inner == "ocean" or (inner == "river" and (ix == x or iy == y))):
                 tiles[y][x] = _make_tile(inner, area["climate"], rng)
     area["tiles"], area["size"] = tiles, size
+    ring = {(x, y) for y in range(size) for x in range(size)
+            if not (pad <= x < size - pad and pad <= y < size - pad)}
+    _spread_terrain(area, rng, ring)
 
 
 def neighbors(area, x, y):
@@ -1139,6 +1341,10 @@ def tile_cycle(state, area, x, y, bid):
     ground = TERRAINS[area["tiles"][y][x]["terrain"]]
     if bid in ground.get("boost", {}):
         factors.append((ground["boost"][bid], ground["name"]))
+    # The size of the city's herd.
+    if b.get("livestock_speed"):
+        herd = int(state["resources"]["livestock"])
+        factors.append((max(0.2, min(2.0, herd / LIVESTOCK_FOR_FULL_SPEED)), f"{herd} livestock owned"))
     # Researched techniques.
     for rid in state["research"]:
         if bid in RESEARCH[rid].get("boost", {}):
@@ -1185,6 +1391,9 @@ def placement_problem(state, area, x, y, bid):
         return f"requires research: {RESEARCH[b['research']]['name']}"
     if not any(terrain_is(tile["terrain"], t) for t in b["terrain"]):
         return "needs " + " or ".join(terrain_label(t) for t in b["terrain"])
+    lock = TERRAINS[tile["terrain"]].get("research")
+    if lock and lock not in state["research"]:
+        return f"this land can't be used until you research {RESEARCH[lock]['name']}"
     if "max_height" in b and tile["height"] > b["max_height"]:
         return f"too steep (height {tile['height']}, max {b['max_height']})"
     if "min_height" in b and tile["height"] < b["min_height"]:
@@ -1308,9 +1517,14 @@ def _meal(state, housing, when):
     return arrivals > 0
 
 
+def city_stat(state, field):
+    """`field` added up over every building (and its additions) in the city."""
+    return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
+
+
 def city_attracts(state):
     """Extra people who may arrive at each meal, from taverns and the like."""
-    return sum(tile_stat(t, "attracts") for t in all_tiles(state) if t["building"])
+    return city_stat(state, "attracts")
 
 
 def _arrivals(pop, food_left, housing, tries):
@@ -1342,6 +1556,7 @@ def advance_time(state, now):
     state["updated"] = now
     res = state["resources"]
     jobs, housing, _ = work_plan(state)
+    wildlife_speed = city_stat(state, "wildlife_speed")
     rng = random.Random()
 
     while remaining > 0:
@@ -1367,7 +1582,7 @@ def advance_time(state, now):
             state["meal"] -= MEAL_TIME
             if _meal(state, housing, now - remaining):
                 jobs, housing, _ = work_plan(state)
-        state["wild"] += dt
+        state["wild"] += dt * (1 + wildlife_speed)
         while state["wild"] >= WILDLIFE_TIME:
             state["wild"] -= WILDLIFE_TIME
             for area in state["areas"]:
@@ -1619,8 +1834,10 @@ def expedition_cost(state, rx, ry):
     return {k: math.ceil(v * distance * discount) for k, v in base.items()}
 
 
-def expedition_time(rx, ry):
-    return EXPEDITION_TIME * (abs(rx) + abs(ry))
+def expedition_time(state, rx, ry):
+    """Seconds the journey takes. Stables and the like shorten it."""
+    speed = 1 + min(MAX_EXPLORE_SPEED, city_stat(state, "explore_speed"))
+    return round(EXPEDITION_TIME * (abs(rx) + abs(ry)) / speed)
 
 
 def expedition_problem(state, rx, ry):
@@ -1650,7 +1867,7 @@ def send_expedition(state, now, rx, ry):
     if missing:
         return f"Not enough supplies for the expedition (need {fmt_goods(missing)})."
     _pay(state, cost)
-    state["expedition"] = {"rx": rx, "ry": ry, "left": now, "arrive": now + expedition_time(rx, ry)}
+    state["expedition"] = {"rx": rx, "ry": ry, "left": now, "arrive": now + expedition_time(state, rx, ry)}
     log(state, now, f"An expedition set out {where(rx, ry)} of home with {fmt_goods(cost)}.")
     return None
 
@@ -1731,6 +1948,9 @@ def view(state, ai=0):
         row = []
         for x in range(area["size"]):
             tile, cell = area["tiles"][y][x], {"fertility": effective_fertility(area, x, y)}
+            lock = TERRAINS[tile["terrain"]].get("research")
+            if lock and lock not in state["research"]:
+                cell["locked"] = RESEARCH[lock]["name"]
             job = here.get((x, y))
             if job:
                 cell.update(cycle=job["cycle"], notes=job["notes"], speed=job["speed"],
@@ -1772,7 +1992,7 @@ def view(state, ai=0):
         cost = expedition_cost(state, rx, ry)
         explore.append({
             "rx": rx, "ry": ry, "where": where(rx, ry), "env": region_env(state, rx, ry),
-            "distance": abs(rx) + abs(ry), "cost": cost, "time": expedition_time(rx, ry),
+            "distance": abs(rx) + abs(ry), "cost": cost, "time": expedition_time(state, rx, ry),
             "problem": expedition_problem(state, rx, ry),
             "affordable": not _missing(state, cost),
         })
