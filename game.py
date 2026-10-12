@@ -29,6 +29,7 @@ without touching index.html. Player-to-player trading lives in market.py.
 
 import math
 import random
+import re
 
 MIN = 60  # seconds
 
@@ -1287,10 +1288,31 @@ def where(rx, ry):
     return ", ".join(parts)
 
 
-def area_name(area):
+def default_area_name(area):
     if not (area["rx"] or area["ry"]):
         return "Home"
     return f"{ENVIRONMENTS[area['env']]['name']} ({where(area['rx'], area['ry'])})"
+
+
+def area_name(area):
+    """What the player calls the area: the name they gave it, or the default."""
+    return area.get("label") or default_area_name(area)
+
+
+AREA_NAME = re.compile(r"^[\w '.,!&()\-]{1,24}$")
+
+
+def rename_area(state, now, area, name):
+    """Give an area a name of the player's choosing; an empty name puts the default back.
+    Only the label changes: nothing about how the area works depends on it."""
+    name = " ".join(name.split()) if isinstance(name, str) else None
+    if name is None or (name and not AREA_NAME.match(name)):
+        return "Area names are up to 24 letters, digits, spaces and simple punctuation."
+    old = area_name(area)
+    area["label"] = name
+    if area_name(area) != old:
+        log(state, now, f"{old} is now called {area_name(area)}.")
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -1900,6 +1922,11 @@ def apply_action(state, now, action, data):
         return research(state, now, data.get("research"))
     if action == "explore":
         return send_expedition(state, now, data.get("rx"), data.get("ry"))
+    if action == "rename_area":
+        target = data.get("target")
+        if not (isinstance(target, int) and 0 <= target < len(state["areas"])):
+            return "Unknown area."
+        return rename_area(state, now, state["areas"][target], data.get("name"))
     if action in ("build", "demolish", "add", "tame", "priority"):
         ai, x, y = data.get("area", 0), data.get("x"), data.get("y")
         if not (isinstance(ai, int) and 0 <= ai < len(state["areas"])):
@@ -2010,6 +2037,8 @@ def view(state, ai=0):
         "state": state,
         "area": ai,
         "areas": [{"name": area_name(a), "env": a["env"], "size": a["size"],
+                   "renamed": bool(a.get("label")), "default_name": default_area_name(a),
+                   "where": where(a["rx"], a["ry"]),
                    "buildings": sum(1 for row in a["tiles"] for t in row if t["building"]),
                    "animals": sum(1 for row in a["tiles"] for t in row if t["animal"]),
                    # buildings that are not working properly

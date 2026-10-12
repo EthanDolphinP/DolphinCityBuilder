@@ -87,7 +87,16 @@
   .big { font-size: 17px; }
   #visitBar { border-color: var(--accent); }
   /* Looking at someone else's city: nothing that changes it is offered. */
-  .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
+  .areaCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .areaCard { border: 1px solid var(--line); background: #101614; padding: 10px; display: flex; gap: 12px; }
+  .areaCard.on { border-color: var(--accent); }
+  .areaCard .info { flex: 1; min-width: 0; }
+  .areaCard .name { color: #fff; font-size: 16px; overflow-wrap: anywhere; }
+  .mini { display: grid; gap: 1px; align-self: flex-start; cursor: pointer; flex: none; }
+  .mini i { width: 9px; height: 9px; display: block; opacity: .75; }
+  .mini i.b { opacity: 1; box-shadow: inset 0 0 0 2px #fff; }
+  .mini i.a { opacity: 1; box-shadow: inset 0 0 0 2px #e58fd0; }
+  .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
   .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
   #away { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
@@ -661,10 +670,21 @@ function renderResearch() {
 
 function renderExplore() {
   const { defs, explore } = view, E = defs.environments;
-  setHTML($('known'), `<table><tr><th>Area</th><th>Land</th><th class="n">Size</th><th class="n">Buildings</th><th class="n">Wildlife</th><th></th></tr>` +
-    view.areas.map((a, i) => `<tr class="${i === view.area ? 'me' : ''}"><td>${esc(a.name)}</td><td>${esc(E[a.env].name)}</td>` +
-      `<td class="n">${a.size}x${a.size}</td><td class="n">${a.buildings}</td><td class="n">${a.animals}</td>` +
-      `<td><button data-view="${i}">View</button></td></tr>`).join('') + `</table>`);
+  // One card per area: a small picture of the land, then the facts.
+  const T = defs.terrains;
+  setHTML($('known'), `<div class="areaCards">` + view.areas.map((a, i) => {
+    const tiles = view.state.areas[i].tiles;
+    const mini = `<div class="mini" data-view="${i}" title="Open this area" style="grid-template-columns:repeat(${a.size}, 9px)">` +
+      tiles.map(row => row.map(t => `<i class="${t.building ? 'b' : t.animal ? 'a' : ''}" style="background:${esc(T[t.terrain].color)}"></i>`).join('')).join('') + `</div>`;
+    return `<div class="areaCard ${i === view.area ? 'on' : ''}">${mini}<div class="info">` +
+      `<div class="name">${esc(a.name)}</div>` +
+      `<div class="dim small">${a.renamed ? esc(a.default_name) : esc(E[a.env].name) + (a.where === 'Home' ? '' : ', ' + esc(a.where) + ' of home')}</div>` +
+      kv([['Size', `${a.size} x ${a.size}`], ['Buildings', a.buildings + (a.problems ? ` <span class="bad">(${a.problems} not working)</span>` : '')],
+          ['Wildlife', a.animals]]) +
+      `<div class="bar" style="margin-top:6px"><button data-view="${i}">${i === view.area ? 'Viewing' : 'View'}</button>` +
+      `<button data-rename="${i}">Rename</button></div></div></div>`;
+  }).join('') + `</div><p class="dim small">In the small maps a white outline is a building and a pink one is wildlife. ` +
+    `Renaming only changes what an area is called.</p>`);
 
   const trip = explore.expedition;
   setHTML($('trip'), trip ? `<p class="hi">An expedition is on its way to the ${esc(E[trip.env].name.toLowerCase())} ` +
@@ -957,7 +977,13 @@ $('findOut').onclick = e => {
 };
 $('areas').onclick = e => { if (e.target.dataset.area) showArea(+e.target.dataset.area); };
 $('known').onclick = e => {
-  if (e.target.dataset.view) { tab = 'city'; showArea(+e.target.dataset.view); }
+  const d = (e.target.closest('[data-view], [data-rename]') || e.target).dataset;
+  if (d.view) { tab = 'city'; showArea(+d.view); }
+  else if (d.rename) {
+    const a = view.areas[+d.rename];
+    const name = prompt(`Name for this area (leave empty to go back to "${a.default_name}")`, a.renamed ? a.name : '');
+    if (name !== null) act('rename_area', { target: +d.rename, name });
+  }
 };
 $('explore').onclick = e => {
   if (!e.target.dataset.send) return;
