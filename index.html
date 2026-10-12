@@ -300,23 +300,52 @@
     <!-- Guide -->
     <div id="tab-guide" hidden>
       <div class="panel">
-        <h2>Reading the map</h2>
-        <p class="dim">Each tile shows its terrain symbol. If something is on it, the second character
-          is the building (white) or the wild animal (pink). The bar under a building shows how far
-          through its cycle it is, and a + in the corner is an addition. Click any tile for its details.</p>
+        <h2>Guide</h2>
+        <div class="bar" style="margin-top:0">
+          <input id="guideSearch" type="search" placeholder="Search the guide, e.g. farm, water, gold, power" style="flex:1 1 240px">
+          <select id="guideTech"></select>
+          <select id="guideCat"></select>
+        </div>
+        <p id="guideNote" class="dim small" style="margin-bottom:0"></p>
       </div>
-      <div class="panel"><h2>Terrain</h2><div id="guideTerrain" class="scroll"></div></div>
-      <div class="panel"><h2>Buildings</h2><div id="guideBuildings" class="scroll"></div></div>
-      <div class="panel"><h2>Wildlife</h2><div id="guideWildlife" class="scroll"></div></div>
+      <details class="panel" open>
+        <summary class="cat">Reading the map</summary>
+        <p class="dim" style="margin:0">Each tile shows its terrain symbol. If something is on it, the second character
+          is the building (white when working, red when something is wrong, grey when switched off) or the
+          wild animal (pink). The bar under a building shows how far through its cycle it is, and a + in the
+          corner is an addition. Click any tile for its details.</p>
+      </details>
+      <details class="panel" id="gSecTerrain">
+        <summary class="cat">Terrain <span id="gCountTerrain" class="count"></span></summary>
+        <div id="guideTerrain" class="scroll"></div>
+      </details>
+      <details class="panel" id="gSecBuildings">
+        <summary class="cat">Buildings <span id="gCountBuildings" class="count"></span></summary>
+        <div id="guideBuildings" class="scroll"></div>
+      </details>
+      <details class="panel" id="gSecAdditions">
+        <summary class="cat">Additions <span id="gCountAdditions" class="count"></span></summary>
+        <div id="guideAdditions" class="scroll"></div>
+      </details>
+      <details class="panel" id="gSecWildlife">
+        <summary class="cat">Wildlife <span id="gCountWildlife" class="count"></span></summary>
+        <div id="guideWildlife" class="scroll"></div>
+      </details>
     </div>
 
     <!-- Leaderboard -->
     <div id="tab-board" hidden>
       <div class="panel">
         <h2>Leaderboard</h2>
-        <div id="board" class="scroll dim">Loading...</div>
-        <p class="dim">Click a column to rank by it. View opens another city read-only. Ban stops a city
-          from viewing yours and from proposing bills to you.</p>
+        <div id="boardSummary" class="stats" style="margin-bottom:10px"></div>
+        <div class="bar" style="margin-top:0">
+          <input id="boardSearch" type="search" placeholder="Search for a city" style="flex:1 1 180px">
+          <select id="boardRank"></select>
+        </div>
+        <div id="boardViews" class="bar"></div>
+        <div id="board" class="scroll" style="margin-top:10px"><span class="dim">Loading...</span></div>
+        <p class="dim small">Click a column heading, or use the menu, to rank by it. View opens another city
+          read-only. Ban stops a city from viewing yours and from proposing bills to you.</p>
       </div>
     </div>
   </div>
@@ -343,6 +372,7 @@ let awayShown = null;  // the away report already on screen or dismissed
 let finder = { kind: '', what: '' };   // what the Find box is searching for
 let resFilter = 'all';  // which research the Research tab lists
 let mktFilter = 'all';  // which offers the Market tab lists
+let boardView = 'overview', boardBanned = false;   // which columns and cities the Leaderboard shows
 let jump = null;       // a tile to select once its area has loaded
 const findParam = () => finder.kind && !visiting ? `${finder.kind}:${finder.what}` : '';
 let fetchedAt = 0, lastFetch = 0, timers = {};
@@ -835,21 +865,67 @@ function renderPeople() {
       : 'Everyone has a job and every job is filled.') + `</p>`);
 }
 
-function renderGuide() {
-  const { defs } = view, T = defs.terrains;
+// The Guide. `opening` is true when the search or menus just changed: sections
+// with something to show are then opened, otherwise they are left as the player has them.
+function renderGuide(opening) {
+  const { state, defs } = view, T = defs.terrains, B = defs.buildings;
+  for (const [id, first, options] of [
+      ['guideTech', 'Any tech level', [['mine', 'What I can build now'], ...defs.tech.map((t, i) => [String(i), t.name + ' buildings'])]],
+      ['guideCat', 'Any kind of building', Object.entries(defs.categories)]]) {
+    if (!$(id).options.length) $(id).innerHTML = `<option value="">${first}</option>` +
+      options.map(([k, name]) => `<option value="${esc(k)}">${esc(name)}</option>`).join('');
+  }
   const label = k => T[k] ? T[k].name : ({ water: 'any water', fresh: 'fresh water' }[k] || k);
   const range = r => r[0] === r[1] ? r[0] : `${r[0]}-${r[1]}`;
-  setHTML($('guideTerrain'), `<table><tr><th>Tile</th><th>Height</th><th>Fertility</th><th>Fish</th><th>Notes</th></tr>` +
-    Object.values(T).map(t => `<tr><td><span class="glyph" style="color:${esc(t.color)}">${esc(t.glyph + t.glyph)}</span> ${esc(t.name)}</td>` +
-      `<td>${range(t.height)}</td><td>${range(t.fertility)}%</td><td>${t.fish ? range(t.fish) + '%' : '-'}</td>` +
-      `<td class="dim" style="white-space:normal">${esc(t.desc || '')}${t.from ? ' Rare; found more often far from home.' : ''}</td></tr>`).join('') + `</table>`);
-  setHTML($('guideBuildings'), `<table><tr><th>Building</th><th>Tech</th><th>Built on</th><th>Notes</th></tr>` +
-    Object.values(defs.buildings).map(b => `<tr><td><span class="glyph hi">${esc(b.glyph)}</span> ${esc(b.name)}</td>` +
-      `<td>${esc(defs.tech[b.tech].name)}</td><td>${b.terrain.map(k => esc(label(k))).join(', ')}</td>` +
-      `<td class="dim" style="white-space:normal">${esc(b.desc)}${b.generates ? ` Generates ${b.generates} power.` : ''}${b.power ? ` Needs ${b.power} power.` : ''}${b.research ? ` Needs research: ${esc(defs.research[b.research].name)}.` : ''}</td></tr>`).join('') + `</table>`);
-  setHTML($('guideWildlife'), `<table><tr><th>Animal</th><th>Found on</th><th class="n">Livestock when tamed</th></tr>` +
-    Object.values(defs.wildlife).map(w => `<tr><td><span class="glyph animal">${esc(w.glyph)}</span> ${esc(w.name)}</td>` +
-      `<td>${w.terrain.map(k => esc(label(k))).join(', ')}</td><td class="n">${w.livestock}</td></tr>`).join('') + `</table>`);
+  const words = $('guideSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tech = $('guideTech').value, cat = $('guideCat').value;
+  const has = text => words.every(w => text.toLowerCase().includes(w));
+  const known = b => b.tech <= state.tech && (!b.research || state.research.includes(b.research));
+  const land = list => list.map(k => label(k)).join(', ');
+  const wrap = 'class="dim" style="white-space:normal"';
+  const table = (head, rows) => rows.length ? `<table><tr>${head.map(c => `<th>${c}</th>`).join('')}</tr>${rows.join('')}</table>` : '';
+  // Fill one section; hide it when nothing in it matches.
+  const fill = (name, total, head, rows) => {
+    setHTML($('guide' + name), table(head, rows));
+    $('gCount' + name).textContent = rows.length === total ? `(${total})` : `(${rows.length} of ${total})`;
+    $('gSec' + name).hidden = !rows.length;
+    if (opening && rows.length && (words.length || tech || cat)) $('gSec' + name).open = true;
+    return rows.length;
+  };
+  const buildingOnly = tech || cat;   // the two menus are about buildings
+
+  const terrains = Object.values(T).filter(t => !buildingOnly && has(`${t.name} ${t.desc || ''} ${(t.groups || []).join(' ')}`));
+  let shown = fill('Terrain', Object.keys(T).length, ['Tile', 'Height', 'Fertility', 'Fish', 'Notes'], terrains.map(t =>
+    `<tr><td><span class="glyph" style="color:${esc(t.color)}">${esc(t.glyph + t.glyph)}</span> ${esc(t.name)}</td>` +
+    `<td>${range(t.height)}</td><td>${range(t.fertility)}%</td><td>${t.fish ? range(t.fish) + '%' : '-'}</td>` +
+    `<td ${wrap}>${esc(t.desc || '')}${t.from ? ' Rare; found more often far from home.' : ''}` +
+    (t.research ? ` Needs research before building on it: ${esc(defs.research[t.research].name)}.` : '') + `</td></tr>`));
+
+  const facts = b => (b.generates ? ` Generates ${b.generates} power.` : '') + (b.power ? ` Needs ${b.power} power.` : '') +
+    (b.research ? ` Needs research: ${defs.research[b.research].name}.` : '');
+  const buildings = Object.values(B).filter(b =>
+    (!cat || b.category === cat) && (!tech || (tech === 'mine' ? known(b) : b.tech === +tech)) &&
+    has(`${b.name} ${b.desc} ${defs.categories[b.category]} ${defs.tech[b.tech].name} ${land(b.terrain)} ${plain(b.cost)} ${facts(b)}`));
+  shown += fill('Buildings', Object.keys(B).length, ['Building', 'Kind', 'Tech', 'Built on', 'Cost', 'Notes'], buildings.map(b =>
+    `<tr><td><span class="glyph hi">${esc(b.glyph)}</span> ${esc(b.name)}</td><td>${esc(defs.categories[b.category])}</td>` +
+    `<td>${esc(defs.tech[b.tech].name)}</td><td style="white-space:normal">${esc(land(b.terrain))}</td>` +
+    `<td style="white-space:normal">${plain(b.cost)}</td><td ${wrap}>${esc(b.desc + facts(b))}</td></tr>`));
+
+  const fits = a => a.for.map(f => B[f].name).join(', ');
+  const additions = Object.values(defs.additions).filter(a => !buildingOnly &&
+    has(`${a.name} ${a.desc} ${fits(a)} ${plain(a.cost)} ${a.research ? defs.research[a.research].name : ''}`));
+  shown += fill('Additions', Object.keys(defs.additions).length, ['Addition', 'Fits on', 'Cost', 'Effect', 'Needs research'], additions.map(a =>
+    `<tr><td class="hi">${esc(a.name)}</td><td style="white-space:normal">${esc(fits(a))}</td><td style="white-space:normal">${plain(a.cost)}</td>` +
+    `<td ${wrap}>${esc(a.desc)}</td><td class="dim">${a.research ? esc(defs.research[a.research].name) : '-'}</td></tr>`));
+
+  const animals = Object.values(defs.wildlife).filter(w => !buildingOnly && has(`${w.name} ${land(w.terrain)} livestock`));
+  shown += fill('Wildlife', Object.keys(defs.wildlife).length, ['Animal', 'Found on', 'Livestock when tamed'], animals.map(w =>
+    `<tr><td><span class="glyph animal">${esc(w.glyph)}</span> ${esc(w.name)}</td>` +
+    `<td>${esc(land(w.terrain))}</td><td>${w.livestock}</td></tr>`));
+
+  $('guideNote').textContent = shown ? (words.length || buildingOnly ? `${shown} entries match. ` : '') +
+      'Click a heading to open or close it. The two menus narrow the Buildings list.'
+    : 'Nothing in the guide matches.';
 }
 
 function renderMarket() {
@@ -939,19 +1015,48 @@ async function loadBoard() {
 function renderBoard() {
   if (!board || !view) return;
   const R = view.defs.resources;
-  const cols = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas'],
-                ...Object.entries(R)];
+  const general = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas']];
+  const all = [...general, ...Object.entries(R)];
+  const views = { overview: ['Overview', general], materials: ['Materials', Object.entries(R)], all: ['Everything', all] };
   const val = (c, k) => k in R ? c.resources[k] : c[k];
-  const rows = board.slice().sort((a, b) =>
+  const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : val(c, k);
+  const sortLabel = all.find(([k]) => k === boardSort)[1];
+
+  if (!$('boardRank').options.length) $('boardRank').innerHTML =
+    all.map(([k, label]) => `<option value="${esc(k)}">Rank by ${esc(label)}</option>`).join('');
+  $('boardRank').value = boardSort;
+
+  // Ranks come from the whole list, so searching doesn't renumber anyone.
+  const ranked = board.slice().sort((a, b) =>
     val(b, boardSort) - val(a, boardSort) || b.tech - a.tech || b.population - a.population || a.name.localeCompare(b.name));
-  setHTML($('board'), `<table><tr><th class="n">#</th><th>City</th>` +
+  const rank = new Map(ranked.map((c, i) => [c.name, i + 1]));
+  const banned = c => myBanned.includes(c.name);
+  const words = $('boardSearch').value.trim().toLowerCase();
+  const rows = ranked.filter(c => c.name.toLowerCase().includes(words) && (!boardBanned || banned(c)));
+
+  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
+  const leader = ranked[0], me = ranked.find(c => c.name === city);
+  setHTML($('boardSummary'),
+    stat('Cities', board.length, '') +
+    (me ? stat('Your rank', `#${rank.get(city)} of ${board.length}`, `by ${esc(sortLabel.toLowerCase())}`) : '') +
+    (leader ? stat('In the lead', esc(leader.name), `${show(leader, boardSort)} ${boardSort === 'tech' ? '' : esc(sortLabel.toLowerCase())}`) : '') +
+    stat('Banned by you', myBanned.length, myBanned.length ? esc(myBanned.join(', ')) : 'nobody'));
+  setHTML($('boardViews'), `<span class="dim">Show</span>` + Object.entries(views).map(([k, [label]]) =>
+    `<button data-board-view="${k}" class="${k === boardView ? 'on' : ''}">${label}</button>`).join('') +
+    `<button data-board-banned class="${boardBanned ? 'on' : ''}">Banned only (${board.filter(banned).length})</button>`);
+
+  // The column being ranked by is always shown, even if it is not part of the chosen view.
+  let cols = views[boardView][1];
+  if (!cols.some(([k]) => k === boardSort)) cols = [all.find(([k]) => k === boardSort), ...cols];
+  setHTML($('board'), rows.length ? `<table><tr><th class="n">#</th><th>City</th>` +
     cols.map(([k, label]) => `<th class="n sortable${k === boardSort ? ' sorted' : ''}" data-sort="${esc(k)}">${esc(label)}${k === boardSort ? ' v' : ''}</th>`).join('') + `<th></th></tr>` +
-    rows.map((c, i) => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${i + 1}</td><td>${esc(c.name)}</td>` +
-      cols.map(([k]) => `<td class="n">${k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : val(c, k)}</td>`).join('') +
+    rows.map(c => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${rank.get(c.name)}</td>` +
+      `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${banned(c) ? ' <span class="bad">banned</span>' : ''}</td>` +
+      cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
       `<td>` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
-        (visiting ? '' : myBanned.includes(c.name) ? `<button data-unban="${esc(c.name)}">Unban</button>`
-                                                   : `<button data-ban="${esc(c.name)}">Ban</button>`)) +
-      `</td></tr>`).join('') + `</table>`);
+        (visiting ? '' : banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
+                                   : `<button data-ban="${esc(c.name)}">Ban</button>`)) +
+      `</td></tr>`).join('') + `</table>` : `<span class="dim">No city matches.</span>`);
 }
 
 // ------------------------------------------------------------------ time --
@@ -1120,6 +1225,15 @@ $('board').addEventListener('click', e => {
 $('board').onclick = e => {
   if (e.target.dataset.sort) { boardSort = e.target.dataset.sort; renderBoard(); }
 };
+$('boardSearch').oninput = () => renderBoard();
+$('boardRank').onchange = () => { boardSort = $('boardRank').value; renderBoard(); };
+$('boardViews').onclick = e => {
+  if (e.target.dataset.boardView) boardView = e.target.dataset.boardView;
+  else if ('boardBanned' in e.target.dataset) boardBanned = !boardBanned;
+  else return;
+  renderBoard();
+};
+for (const id of ['guideSearch', 'guideTech', 'guideCat']) $(id).oninput = () => { if (view) renderGuide(true); };
 
 setInterval(tick, 1000);
 // Pick up trades and changes made by other players.
