@@ -12,6 +12,13 @@ amounts, and the smallest piece that keeps both sides in whole numbers is a
 "lot": 1000 Food for 250 Wood sells in lots of 4 Food for 1 Wood. Anyone can
 buy any number of lots while there are some left.
 
+An offer can be set to restock: while its owner is online it is topped back up
+to the amounts it was posted with, out of the owner's stock, whenever some of
+it sells. Once the owner goes offline it sells down and ends like any other.
+
+Every sale from a city's offers is also noted in that city's "sales" list, so
+the Market screen can show what sold since the owner last looked.
+
 A bill is a repeating trade between two named cities ("every 24 hours I send
 you 10 Stone and you send me 20 Gold"). One city proposes it, the other has to
 accept it, and either can cancel it at any time. When a payment comes due and
@@ -25,6 +32,8 @@ import game
 MAX_OFFERS_PER_CITY = 10
 MAX_QUANTITY = 1_000_000
 HISTORY_LENGTH = 20
+ONLINE_SECONDS = 45     # a city whose player was last heard from longer ago than this is offline
+SALES_KEPT = 50         # unseen sales remembered per city
 MAX_BILLS_PER_CITY = 10
 MIN_BILL_HOURS, MAX_BILL_HOURS = 1, 168
 MISSES_ALLOWED = 3      # payments in a row that may fail before a bill is cancelled
@@ -62,6 +71,8 @@ def post(market, state, now, data):
     market["offers"].append({
         "id": market["next_id"], "city": state["name"], "posted": now,
         "give": give, "give_qty": give_qty, "want": want, "want_qty": want_qty,
+        # the amounts it was posted with: they fix the lot size and the level it restocks to
+        "full_give": give_qty, "full_want": want_qty, "restock": bool(data.get("restock")),
     })
     market["next_id"] += 1
     game.log(state, now, f"Offered {give_qty} {game.RESOURCES[give]} "
@@ -82,8 +93,43 @@ def cancel(market, state, now, offer_id):
 
 def lot(offer):
     """(amount given, amount wanted, lots left) for the smallest piece of an offer."""
-    lots = math.gcd(offer["give_qty"], offer["want_qty"])
-    return offer["give_qty"] // lots, offer["want_qty"] // lots, lots
+    full_give, full_want = offer.get("full_give", offer["give_qty"]), offer.get("full_want", offer["want_qty"])
+    lots = math.gcd(full_give, full_want)
+    lot_give = full_give // lots
+    return lot_give, full_want // lots, offer["give_qty"] // lot_give
+
+
+def is_online(state, now):
+    """True if the city's own player has been heard from in the last little while."""
+    return bool(state) and now - state.get("online", 0) <= ONLINE_SECONDS
+
+
+def set_restock(market, state, now, offer_id, on):
+    offer = _find(market, offer_id)
+    if not offer or offer["city"] != state["name"]:
+        return "That offer is no longer open."
+    if on and "full_give" not in offer:      # an offer from before restocking existed
+        offer["full_give"], offer["full_want"] = offer["give_qty"], offer["want_qty"]
+    offer["restock"] = bool(on)
+    return None
+
+
+def restock(market, now, get_city):
+    """Top restocking offers back up from their owners' stock while the owners are online.
+    A restocking offer that has sold out is dropped once its owner is offline."""
+    for offer in [o for o in market["offers"] if o.get("restock") and o["give_qty"] < o["full_give"]]:
+        owner = get_city(offer["city"])
+        if not is_online(owner, now):
+            if not offer["give_qty"]:
+                market["offers"].remove(offer)
+            continue
+        lot_give, lot_want, left = lot(offer)
+        lots = min((offer["full_give"] - offer["give_qty"]) // lot_give,
+                   int(owner["resources"][offer["give"]] // lot_give))
+        if lots > 0:
+            owner["resources"][offer["give"]] -= lots * lot_give
+            offer["give_qty"] += lots * lot_give
+            offer["want_qty"] += lots * lot_want
 
 
 def accept(market, buyer, now, offer_id, get_city, lots=None):
@@ -99,6 +145,8 @@ def accept(market, buyer, now, offer_id, get_city, lots=None):
     if offer["give"] in game.UNTRADEABLE or offer["want"] in game.UNTRADEABLE:
         return "That offer is for something that can no longer be traded. Its owner can cancel it."
     lot_give, lot_want, left = lot(offer)
+    if not left:
+        return "That offer is sold out for the moment; its owner restocks it while they are online."
     if lots is None:
         lots = left
     if not _valid_qty(lots):
@@ -111,19 +159,24 @@ def accept(market, buyer, now, offer_id, get_city, lots=None):
 
     got = f"{give_qty} {game.RESOURCES[offer['give']]}"
     paid = f"{want_qty} {game.RESOURCES[offer['want']]}"
+    seller = get_city(offer["city"])
     offer["give_qty"] -= give_qty
     offer["want_qty"] -= want_qty
-    if not offer["give_qty"]:
+    # A sold-out offer ends, unless it restocks and its owner is here to refill it.
+    if not offer["give_qty"] and not (offer.get("restock") and is_online(seller, now)):
         market["offers"].remove(offer)
     buyer["resources"][offer["want"]] -= want_qty
     buyer["resources"][offer["give"]] += give_qty
     game.log(buyer, now, f"Traded with {offer['city']}: paid {paid}, received {got}.")
-    seller = get_city(offer["city"])
     if seller:
         seller["resources"][offer["want"]] += want_qty
         left_text = (f" {offer['give_qty']} {game.RESOURCES[offer['give']]} still on offer."
                      if offer["give_qty"] else " That offer is now sold out.")
         game.log(seller, now, f"{buyer['name']} bought from your offer: gave {got}, received {paid}.{left_text}")
+        seller.setdefault("sales", []).append({
+            "t": now, "buyer": buyer["name"], "give": offer["give"], "give_qty": give_qty,
+            "want": offer["want"], "want_qty": want_qty, "left": offer["give_qty"]})
+        del seller["sales"][:-SALES_KEPT]
 
     _record(market, now, offer["city"], buyer["name"], offer["give"], give_qty, offer["want"], want_qty)
     return None

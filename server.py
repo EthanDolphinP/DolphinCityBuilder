@@ -170,7 +170,9 @@ def startup():
 
 
 def run_bills(now):
+    """Market upkeep done before every request: bills that are due, offers to restock."""
     market.run_bills(MARKET, now, lambda name: find_city(name, now))
+    market.restock(MARKET, now, lambda name: find_city(name, now))
 
 
 def city_view(state, now, area=0, find=None):
@@ -204,6 +206,7 @@ def handle_get(path, query, token, now):
         state = get_city(name, now)
         if not signed_in(state, token):
             return 401, SIGN_IN
+        state["online"] = now
         out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0])
         out["away"] = game.check_in(state, now)
         return 200, out
@@ -214,6 +217,7 @@ def handle_get(path, query, token, now):
             return 400, {"error": BAD_NAME}
         if not signed_in(get_city(viewer, now), token):
             return 401, SIGN_IN
+        CITIES[viewer]["online"] = now     # looking at someone else's city still counts as being here
         state = get_city(name, now)
         if state is None:
             return 404, {"error": f"There is no city called {name}."}
@@ -238,6 +242,7 @@ def handle_post(path, data, token, now):
     state = get_city(name, now)
     if not signed_in(state, token):
         return 401, SIGN_IN
+    state["online"] = now
 
     if action == "restart":
         market.drop_city(MARKET, name)
@@ -259,6 +264,11 @@ def handle_post(path, data, token, now):
         return 200, {"error": None}
     elif action == "offer_post":
         error = market.post(MARKET, state, now, data)
+    elif action == "offer_restock":
+        error = market.set_restock(MARKET, state, now, data.get("offer"), data.get("on"))
+    elif action == "market_seen":      # the player has read what sold while they were away
+        state["sales"] = []
+        error = None
     elif action == "offer_cancel":
         error = market.cancel(MARKET, state, now, data.get("offer"))
     elif action == "offer_accept":

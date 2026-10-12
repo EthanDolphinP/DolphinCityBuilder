@@ -253,6 +253,10 @@
 
     <!-- Market -->
     <div id="tab-market" hidden>
+      <div id="mktSales" class="panel" style="border-color:var(--accent)" hidden>
+        <div class="head"><h2 style="margin:0">Sold since you last looked at the market</h2><button id="salesSeen">Got it</button></div>
+        <div id="salesBody" style="margin-top:10px"></div>
+      </div>
       <div class="panel">
         <h2>Market</h2>
         <div id="mktSummary" class="stats"></div>
@@ -274,6 +278,8 @@
         <form id="offerForm" class="bar" style="margin-top:0">
           I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select>
           and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select>
+          <label title="While you are online, whatever sells is refilled from your stock up to these amounts. When you go offline it sells down and ends.">
+            <input id="offerRestock" type="checkbox"> keep it stocked while I'm online</label>
           <button>Post offer</button>
         </form>
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
@@ -384,7 +390,11 @@ let mktFilter = 'all';  // which offers the Market tab lists
 const lotInput = new Map();   // how many lots the player has typed for each offer
 const gcd = (a, b) => b ? gcd(b, a % b) : a;
 // The smallest piece of an offer that keeps both sides whole, and how many are left.
-const lotOf = o => { const lots = gcd(o.give_qty, o.want_qty) || 1; return { give: o.give_qty / lots, want: o.want_qty / lots, lots }; };
+// The lot size comes from the amounts the offer was posted with, so it stays the same as the offer sells.
+const lotOf = o => {
+  const fullGive = o.full_give || o.give_qty, fullWant = o.full_want || o.want_qty, n = gcd(fullGive, fullWant) || 1;
+  return { give: fullGive / n, want: fullWant / n, lots: Math.floor(o.give_qty / (fullGive / n)) };
+};
 function lotPreview() {
   if (!view) return;
   const R = view.defs.resources, give = Math.floor(+$('giveQty').value), want = Math.floor(+$('wantQty').value);
@@ -550,6 +560,8 @@ function render() {
       state.hungry ? '<span class="bad">HUNGRY: half speed</span>' : `eats ${pop} food`));
 
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
+  setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
   for (const t of ['city', 'people', 'explore', 'research', 'market', 'board', 'guide']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
@@ -997,18 +1009,33 @@ function renderMarket() {
     offers.map(o => {
       const l = lotOf(o), max = Math.min(l.lots, Math.floor(state.resources[o.want] / l.want));
       return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
-        `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
+        `<td>${o.give_qty}${o.restock ? ` <span class="dim">of ${o.full_give}</span>` : ''} ${esc(R[o.give])}` +
+        (o.restock ? ` <span class="good small" title="Refilled from the seller's stock while they are online">restocks</span>` : '') + `</td>` +
         `<td class="${mine(o) || max ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
         `<td class="dim">${l.give} ${esc(R[o.give])} for ${l.want} ${esc(R[o.want])}` +
-        (l.lots > 1 ? ` <span class="hi">(${l.lots} lots left)</span>` : ' (all at once)') + `</td>` +
+        (!l.lots ? ' <span class="bad">(sold out, waiting to restock)</span>'
+          : l.lots > 1 || o.restock ? ` <span class="hi">(${l.lots} ${l.lots === 1 ? 'lot' : 'lots'} left)</span>` : ' (all at once)') + `</td>` +
         `<td class="dim">${clock(o.posted)}</td><td>` +
-        (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
+        (mine(o) ? `<label class="small" title="While you are online, whatever sells is refilled from your stock up to the amounts you posted. When you go offline it sells down and ends.">` +
+            `<input type="checkbox" data-restock="${o.id}" ${o.restock ? 'checked' : ''}> keep stocked</label> <button data-cancel="${o.id}">Cancel</button>`
           : (l.lots > 1 ? `<input data-lots="${o.id}" type="number" min="1" max="${l.lots}" step="1" value="${esc(lotInput.get(o.id) || '')}" ` +
               `placeholder="${max} lots" title="How many lots to buy. Leave empty to buy as many as you can afford." style="width:96px"> ` : '') +
             `<button data-accept="${o.id}" ${max ? '' : 'disabled'}>${l.lots > 1 ? 'Buy' : 'Accept'}</button>`) + `</td></tr>`;
     }).join('') + `</table>` + (gives && wants ? `<p class="dim small">Best price first.</p>` : '')
     : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`);
   lotPreview();
+
+  // ---- what sold from this city's offers since the player last looked ----
+  const sales = state.sales || [];
+  $('mktSales').hidden = !sales.length;
+  if (sales.length) {
+    const total = (key, qty) => Object.entries(sales.reduce((sum, s) => (sum[s[key]] = (sum[s[key]] || 0) + s[qty], sum), {}))
+      .map(([k, n]) => `${n} ${esc(R[k])}`).join(', ');
+    setHTML($('salesBody'),
+      kv([['Sales', sales.length], ['You received', `<span class="good">${total('want', 'want_qty')}</span>`], ['You sold', total('give', 'give_qty')]]) +
+      sales.slice().reverse().map(s => `<div class="opt small"><span class="dim">[${clock(s.t)}]</span> <span class="hi">${esc(s.buyer)}</span> bought ` +
+        `${s.give_qty} ${esc(R[s.give])} for ${s.want_qty} ${esc(R[s.want])} <span class="dim">(${s.left ? s.left + ' left on that offer then' : 'sold out'})</span></div>`).join(''));
+  }
 
   setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
   // Proposals waiting for this city's answer come first.
@@ -1165,8 +1192,9 @@ $('restart').onclick = () => {
 };
 
 document.querySelector('.tabs').onclick = e => {
-  if (!e.target.dataset.tab) return;
-  tab = e.target.dataset.tab;
+  const button = e.target.closest('[data-tab]');   // the click may land on a badge inside the button
+  if (!button) return;
+  tab = button.dataset.tab;
   $('msg').textContent = '';
   render();
   if (tab === 'board') loadBoard();
@@ -1230,6 +1258,10 @@ for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { 
 $('offers').addEventListener('input', e => {
   if (e.target.dataset.lots) lotInput.set(+e.target.dataset.lots, e.target.value);
 });
+$('offers').addEventListener('change', e => {
+  if (e.target.dataset.restock) act('offer_restock', { offer: +e.target.dataset.restock, on: e.target.checked });
+});
+$('salesSeen').onclick = () => act('market_seen');
 $('offerForm').addEventListener('input', lotPreview);
 $('mktFilters').onclick = e => {
   if (e.target.dataset.filter) { mktFilter = e.target.dataset.filter; renderMarket(); }
@@ -1251,7 +1283,7 @@ $('offers').onclick = e => {
 };
 $('offerForm').onsubmit = e => {
   e.preventDefault();
-  act('offer_post', { give: $('giveRes').value, give_qty: Number($('giveQty').value),
+  act('offer_post', { restock: $('offerRestock').checked, give: $('giveRes').value, give_qty: Number($('giveQty').value),
                       want: $('wantRes').value, want_qty: Number($('wantQty').value) });
 };
 $('billForm').onsubmit = e => {
