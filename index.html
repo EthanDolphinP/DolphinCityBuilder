@@ -87,6 +87,10 @@
   .big { font-size: 17px; }
   #visitBar { border-color: var(--accent); }
   /* Looking at someone else's city: nothing that changes it is offered. */
+  details.panel > summary.cat { margin: 0; padding: 0; border: 0; }
+  details.panel[open] > summary.cat { margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  details.panel > summary.cat:hover { color: #fff; }
+  details.panel > summary .count { color: var(--dim); }
   .areaCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
   .areaCard { border: 1px solid var(--line); background: #101614; padding: 10px; display: flex; gap: 12px; }
   .areaCard.on { border-color: var(--accent); }
@@ -243,22 +247,37 @@
     <!-- Market -->
     <div id="tab-market" hidden>
       <div class="panel">
-        <h2>Post an offer</h2>
+        <h2>Market</h2>
+        <div id="mktSummary" class="stats"></div>
+      </div>
+
+      <details class="panel" open>
+        <summary class="cat">Open offers <span id="offersCount" class="count"></span></summary>
+        <div class="bar" style="margin-top:0">
+          <input id="mktSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
+          <select id="mktGives"></select>
+          <select id="mktWants"></select>
+        </div>
+        <div id="mktFilters" class="bar"></div>
+        <div id="offers" class="scroll" style="margin-top:10px"></div>
+      </details>
+
+      <details class="panel" open>
+        <summary class="cat">Post an offer</summary>
         <form id="offerForm" class="bar" style="margin-top:0">
           I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select>
           and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select>
           <button>Post offer</button>
         </form>
-        <p class="dim">Every trade is between two cities. What you offer leaves your stock and is held
+        <p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
           until another city accepts or you cancel. To buy something, offer what you will pay for it.</p>
-      </div>
-      <div class="panel">
-        <h2>Open offers</h2>
-        <div id="offers" class="scroll"></div>
-      </div>
-      <div class="panel">
-        <h2>Bills</h2>
-        <form id="billForm" class="bar" style="margin-top:0">
+      </details>
+
+      <details class="panel" open>
+        <summary class="cat">Bills <span id="billsCount" class="count"></span></summary>
+        <div id="bills" class="scroll"></div>
+        <div class="cat">Propose a bill</div>
+        <form id="billForm" class="bar">
           Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours I send
           <input id="billGiveQty" type="number" min="1" step="1" value="10"> <select id="billGiveRes"></select>
           to <input id="billTo" list="cityList" maxlength="24" placeholder="city name">
@@ -266,16 +285,16 @@
           <button>Propose bill</button>
         </form>
         <datalist id="cityList"></datalist>
-        <p class="dim">A bill is a repeating trade with one other city. It starts once they accept, and
+        <p class="dim small">A bill is a repeating trade with one other city. It starts once they accept, and
           either of you can cancel it at any time. If either city can't pay when it comes due, nothing
           changes hands that time; three misses in a row cancel the bill. Active bills are counted in the
           per-hour figures at the top.</p>
-        <div id="bills" class="scroll"></div>
-      </div>
-      <div class="panel">
-        <h2>Recent trades</h2>
-        <div id="trades" class="dim"></div>
-      </div>
+      </details>
+
+      <details class="panel">
+        <summary class="cat">Recent trades <span id="tradesCount" class="count"></span></summary>
+        <div id="trades" class="small"></div>
+      </details>
     </div>
 
     <!-- Guide -->
@@ -323,6 +342,7 @@ let myBanned = [];     // cities this player's city has banned
 let awayShown = null;  // the away report already on screen or dismissed
 let finder = { kind: '', what: '' };   // what the Find box is searching for
 let resFilter = 'all';  // which research the Research tab lists
+let mktFilter = 'all';  // which offers the Market tab lists
 let jump = null;       // a tile to select once its area has loaded
 const findParam = () => finder.kind && !visiting ? `${finder.kind}:${finder.what}` : '';
 let fetchedAt = 0, lastFetch = 0, timers = {};
@@ -841,39 +861,74 @@ function renderMarket() {
     }
   }
 
-  const offers = market.offers.slice().reverse();
-  setHTML($('offers'), offers.length ? `<table><tr><th>City</th><th>Gives</th><th>Wants</th><th>Posted</th><th></th></tr>` +
+  for (const [id, any] of [['mktGives', 'Gives anything'], ['mktWants', 'Wants anything']]) {
+    if (!$(id).options.length) $(id).innerHTML = `<option value="">${any}</option>` +
+      defs.tradeable.map(k => `<option value="${esc(k)}">${id === 'mktGives' ? 'Gives' : 'Wants'} ${esc(R[k])}</option>`).join('');
+  }
+  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
+  const mine = o => o.city === state.name;
+  const canAccept = o => !mine(o) && state.resources[o.want] >= o.want_qty;
+  const myBills = market.bills.filter(b => b.from === state.name || b.to === state.name);
+  const asked = myBills.filter(b => b.status === 'proposed' && b.to === state.name).length;
+  setHTML($('mktSummary'),
+    stat('Open offers', market.offers.length, `${market.offers.filter(mine).length} posted by you`) +
+    stat('You can accept', market.offers.filter(canAccept).length, 'with what you have') +
+    stat('Your bills', myBills.filter(b => b.status === 'active').length + ' running',
+      asked ? `<span class="bad">${asked} waiting for your answer</span>` : `${myBills.filter(b => b.status === 'proposed').length} proposed`) +
+    stat('Trades made', market.history.length, 'recently, by anyone'));
+
+  // ---- open offers: search, material menus and filter buttons all apply together ----
+  const filters = { all: ['All', () => true], afford: ['I can accept', canAccept], mine: ['My offers', mine] };
+  const words = $('mktSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const gives = $('mktGives').value, wants = $('mktWants').value;
+  const narrowed = market.offers.filter(o => (!gives || o.give === gives) && (!wants || o.want === wants) &&
+    words.every(w => `${o.city} ${R[o.give]} ${R[o.want]}`.toLowerCase().includes(w)));
+  setHTML($('mktFilters'), Object.entries(filters).map(([k, [label, test]]) =>
+    `<button data-filter="${k}" class="${k === mktFilter ? 'on' : ''}">${label} (${narrowed.filter(test).length})</button>`).join(''));
+  const price = o => o.want_qty / o.give_qty;
+  // Newest first, unless one material is being compared for another: then the best price first.
+  const offers = narrowed.filter(filters[mktFilter][1]).sort((a, b) => gives && wants ? price(a) - price(b) : b.posted - a.posted);
+  $('offersCount').textContent = `(${offers.length}${offers.length === market.offers.length ? '' : ' of ' + market.offers.length})`;
+  setHTML($('offers'), offers.length ? `<table><tr><th>City</th><th>Gives</th><th>Wants</th><th>Price</th><th>Posted</th><th></th></tr>` +
     offers.map(o => {
-      const mine = o.city === state.name, can = state.resources[o.want] >= o.want_qty;
-      return `<tr class="${mine ? 'me' : ''}"><td>${esc(o.city)}</td>` +
+      const can = state.resources[o.want] >= o.want_qty;
+      return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
         `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
-        `<td class="${mine || can ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
+        `<td class="${mine(o) || can ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
+        `<td class="dim">${num(Math.round(price(o) * 100) / 100)} ${esc(R[o.want])} per ${esc(R[o.give])}</td>` +
         `<td class="dim">${clock(o.posted)}</td><td>` +
-        (mine ? `<button data-cancel="${o.id}">Cancel</button>`
-              : `<button data-accept="${o.id}" ${can ? '' : 'disabled'}>Accept</button>`) + `</td></tr>`;
-    }).join('') + `</table>` : `<span class="dim">Nobody is offering anything right now.</span>`);
+        (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
+                 : `<button data-accept="${o.id}" ${can ? '' : 'disabled'}>Accept</button>`) + `</td></tr>`;
+    }).join('') + `</table>` + (gives && wants ? `<p class="dim small">Best price first.</p>` : '')
+    : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`);
 
   setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
-  const bills = market.bills.filter(b => b.from === state.name || b.to === state.name);
+  // Proposals waiting for this city's answer come first.
+  const waiting = b => b.status === 'proposed' && b.to === state.name;
+  const bills = myBills.slice().sort((a, b) => waiting(b) - waiting(a));
+  $('billsCount').textContent = `(${bills.length})`;
   setHTML($('bills'), bills.length ? `<table><tr><th>With</th><th>You send</th><th>You receive</th><th>Every</th><th>Status</th><th></th></tr>` +
     bills.map(b => {
-      const mine = b.from === state.name, other = mine ? b.to : b.from;
-      const send = mine ? [b.give, b.give_qty] : [b.want, b.want_qty];
-      const get = mine ? [b.want, b.want_qty] : [b.give, b.give_qty];
+      const sent = b.from === state.name, other = sent ? b.to : b.from;
+      const send = sent ? [b.give, b.give_qty] : [b.want, b.want_qty];
+      const get = sent ? [b.want, b.want_qty] : [b.give, b.give_qty];
       const status = b.status === 'active'
         ? `next in <span class="hi" data-timer="bill${b.id}"></span>` + (b.missed ? ` <span class="bad">(${b.missed} missed)</span>` : '')
-        : mine ? `waiting for ${esc(other)} to accept` : `<span class="hi">${esc(other)} proposes this</span>`;
+        : sent ? `waiting for ${esc(other)} to accept` : `<span class="hi">${esc(other)} proposes this</span>`;
       const buttons = b.status === 'active' ? `<button data-bill-cancel="${b.id}">Cancel</button>`
-        : mine ? `<button data-bill-cancel="${b.id}">Withdraw</button>`
+        : sent ? `<button data-bill-cancel="${b.id}">Withdraw</button>`
         : `<button data-bill-accept="${b.id}">Accept</button> <button data-bill-cancel="${b.id}">Decline</button>`;
-      return `<tr><td>${esc(other)}</td>` +
+      return `<tr class="${waiting(b) ? 'me' : ''}"><td>${esc(other)}</td>` +
         `<td class="${state.resources[send[0]] >= send[1] ? '' : 'bad'}">${send[1]} ${esc(R[send[0]])}</td>` +
         `<td>${get[1]} ${esc(R[get[0]])}</td><td>${duration(b.every)}</td><td>${status}</td><td>${buttons}</td></tr>`;
     }).join('') + `</table>` : `<span class="dim">You have no bills.</span>`);
 
-  setHTML($('trades'), market.history.length ? market.history.slice().reverse().map(h =>
-    `[${clock(h.t)}] ${esc(h.seller)} gave ${h.give_qty} ${esc(R[h.give])} to ${esc(h.buyer)} for ${h.want_qty} ${esc(R[h.want])}`
-  ).join('<br>') : 'No trades yet.');
+  $('tradesCount').textContent = `(${market.history.length})`;
+  setHTML($('trades'), market.history.length ? market.history.slice().reverse().map(t => {
+    const involved = t.seller === state.name || t.buyer === state.name;
+    return `<div class="opt ${involved ? 'hi' : 'dim'}"><span class="dim">[${clock(t.t)}]</span> ${esc(t.seller)} gave ` +
+      `${t.give_qty} ${esc(R[t.give])} to ${esc(t.buyer)} for ${t.want_qty} ${esc(R[t.want])}</div>`;
+  }).join('') + `<p class="dim">Trades your city took part in are shown in white.</p>` : `<span class="dim">No trades yet.</span>`);
 }
 
 async function loadBoard() {
@@ -1030,6 +1085,10 @@ $('research').addEventListener('toggle', e => {
   if (key && key.startsWith('res:')) foldState.set(key, e.target.open);
 }, true);
 $('resSearch').oninput = () => renderResearch();
+for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { if (view && !visiting) renderMarket(); };
+$('mktFilters').onclick = e => {
+  if (e.target.dataset.filter) { mktFilter = e.target.dataset.filter; renderMarket(); }
+};
 $('resFilters').onclick = e => {
   if (e.target.dataset.filter) { resFilter = e.target.dataset.filter; renderResearch(); }
 };
