@@ -7,6 +7,7 @@ browser. It is plain Python (standard library only) plus one HTML page.
 |---|---|
 | `game.py` | All the rules and content: terrain, buildings, research, additions, wildlife, exploring, power. New content is normally one entry in a table at the top. |
 | `market.py` | Trades and bills between cities. |
+| `beasts.py` | Beasts: eggs, daily missions, levelling and the bonuses they give. |
 | `server.py` | The web server, sign-in and saving. Run this to host the game from your own computer. |
 | `wsgi.py` | Lets a web host (PythonAnywhere) run the same game. |
 | `index.html` | The page players see. |

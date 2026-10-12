@@ -24,12 +24,15 @@ add content you normally only need to add an entry to one of those tables:
     its name in a building's "modifiers"
 
 The browser UI reads these tables from the server, so new entries show up
-without touching index.html. Player-to-player trading lives in market.py.
+without touching index.html. Player-to-player trading lives in market.py, and
+beasts (eggs, missions and the bonuses they give) in beasts.py.
 """
 
 import math
 import random
 import re
+
+import beasts
 
 MIN = 60  # seconds
 
@@ -230,6 +233,10 @@ HUNGRY_SPEED = 0.5          # work speed of non-food buildings while the city is
 SIM_STEP = 60               # seconds of game time simulated per step when catching up
 
 EXPEDITION_TIME = 20 * MIN  # travel time per step of distance from home
+# What an expedition may bring back besides its map: (resource, least, most), per step of distance.
+EXPEDITION_LOOT = [("food", 15, 40), ("wood", 15, 40), ("stone", 10, 30), ("gold", 5, 15),
+                   ("livestock", 1, 3), ("knowledge", 3, 8)]
+EXPEDITION_LOOT_CHANCE = 0.7
 MAX_EXPLORE_SPEED = 1.0     # most that buildings can add to expedition speed (1.0 = twice as fast)
 LIVESTOCK_FOR_FULL_SPEED = 10   # herd size at which "livestock_speed" buildings run at normal speed
 WILDLIFE_TIME = 45 * MIN    # how often a new animal wanders into each area
@@ -284,6 +291,8 @@ CATEGORIES = {
 #   explore_speed  0.25 = expeditions travel 25% faster (city-wide, capped)
 #   wildlife_speed 0.5 = wild animals appear 50% more often (city-wide)
 #   livestock_speed  True - works faster the more livestock the city owns
+#   unique         True - a city can only have one
+#   beast_xp / beast_power / hatch_speed / egg_chance / mission_speed   see beasts.py
 #   modifiers      names from MODIFIERS that speed up / slow down its cycle here
 #   min_height / max_height / min_fertility / min_temp / max_temp   tile limits
 #   adjacent       terrain that must be next to the tile
@@ -359,6 +368,12 @@ BUILDINGS = {
         "cost": {"wood": 15}, "workers": 1, "time": 15 * MIN,
         "consumes": {"livestock": 1}, "produces": {"food": 14},
         "desc": "Turns livestock into meat: 14 food from each animal, more than twice what slaughtering by hand gives. Stops when the herd is gone.",
+    },
+    "beast_den": {
+        "name": "Beast Den", "glyph": "d", "tech": 0, "category": "support", "research": "beast_lore", "unique": True,
+        "terrain": ["plains", "forest", "hill", "desert"],
+        "cost": {"wood": 25, "food": 20}, "beast_xp": 0.5,
+        "desc": "A proper home for your beast. Missions give it 50% more experience. A city can have one.",
     },
     "hunting_lodge": {
         "name": "Hunting Lodge", "glyph": "N", "tech": 0, "category": "food",
@@ -477,6 +492,12 @@ BUILDINGS = {
         "modifiers": ["fertility"],
         "desc": "Raises new livestock on feed: 1 animal from 6 food. A steady supply that does not depend on finding wildlife. Faster on fertile grass.",
     },
+    "incubator": {
+        "name": "Incubator", "glyph": "o", "tech": 1, "category": "support", "research": "incubation", "unique": True,
+        "terrain": ["plains", "forest", "hill", "desert"],
+        "cost": {"wood": 30, "stone": 30}, "hatch_speed": 1.0, "egg_chance": 0.05,
+        "desc": "Warm, turned and watched: eggs hatch twice as fast, and expedition teams who know what to look for are 5 points likelier to bring one home. A city can have one.",
+    },
     "tavern": {
         "name": "Tavern", "glyph": "v", "tech": 1, "category": "housing",
         "terrain": ["plains", "forest", "desert", "hill"],
@@ -554,6 +575,12 @@ BUILDINGS = {
         "livestock_speed": True,
         "desc": "Shows, auctions and stud fees: gold from owning a fine herd, without selling it. Works faster the more livestock the city owns: normal speed at 10. Needs flat ground.",
     },
+    "training_ground": {
+        "name": "Training Ground", "glyph": "g", "tech": 2, "category": "support", "research": "beast_training", "unique": True,
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"wood": 80, "stone": 60, "gold": 40}, "beast_power": 0.25,
+        "desc": "Where a beast learns to work with the city: its bonus is 25% stronger. Needs flat ground. A city can have one.",
+    },
     "water_mill": {
         "name": "Water Mill", "glyph": "w", "tech": 2, "category": "power",
         "terrain": ["river"],
@@ -630,6 +657,12 @@ BUILDINGS = {
         "cost": {"wood": 80, "stone": 120, "gold": 100}, "workers": 4, "time": 20 * MIN, "produces": {"gold": 26},
         "housing": 4, "attracts": 1,
         "desc": "Hotels along a beach. Earns gold, has rooms for 4, and brings one extra arrival per meal.",
+    },
+    "beast_sanctuary": {
+        "name": "Beast Sanctuary", "glyph": "a", "tech": 3, "category": "support", "research": "beast_bonding", "unique": True,
+        "terrain": ["plains", "forest"],
+        "cost": {"stone": 150, "tools": 30, "gold": 150}, "mission_speed": 0.5, "beast_xp": 0.25,
+        "desc": "Quiet ground set aside for your beast. Missions come 50% more often and give 25% more experience. A city can have one.",
     },
     "wind_turbine": {
         "name": "Wind Turbine", "glyph": "y", "tech": 3, "category": "power", "research": "electricity",
@@ -866,6 +899,10 @@ RESEARCH = {
         "name": "Dairying", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 15},
         "desc": "Milking, churning and keeping.",
     },
+    "beast_lore": {
+        "name": "Beast Lore", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 10},
+        "desc": "What the old stories say about the great beasts, and what they like.",
+    },
     "smoking": {
         "name": "Smoking and Curing", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 12},
         "desc": "Fish and meat that keep.",
@@ -929,6 +966,10 @@ RESEARCH = {
         "effect": "glaciers can be built on",
         "desc": "Ropes, spikes and a head for heights.",
     },
+    "incubation": {
+        "name": "Incubation", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "How warm, how often to turn, and when to leave well alone.",
+    },
     "grafting": {
         "name": "Grafting", "tech": 1, "building": "school", "cost": {"knowledge": 25},
         "desc": "Fruit trees that breed true.",
@@ -955,6 +996,10 @@ RESEARCH = {
         "effect": "lava fields can be built on",
         "desc": "Knowing when the ground is safe to stand on.",
     },
+    "beast_training": {
+        "name": "Beast Training", "tech": 2, "building": "university", "cost": {"knowledge": 55},
+        "desc": "Patience, routine and a pocketful of treats.",
+    },
     "metallurgy": {
         "name": "Metallurgy", "tech": 2, "building": "university", "cost": {"knowledge": 70},
         "boost": {"smithy": 1.3, "mine": 1.15},
@@ -973,6 +1018,10 @@ RESEARCH = {
         "desc": "Charting the heavens.",
     },
     # ---- City ----
+    "beast_bonding": {
+        "name": "Beast Bonding", "tech": 3, "building": "university", "cost": {"knowledge": 110},
+        "desc": "A beast that trusts its city asks more of it, and gives more back.",
+    },
     "plumbing": {
         "name": "Plumbing", "tech": 3, "building": "university", "cost": {"knowledge": 100},
         "desc": "Piped water and drains.",
@@ -1544,6 +1593,42 @@ ADDITIONS = {
         "cost": {"wood": 15, "livestock": 2}, "speed": 1.2,
         "desc": "20% faster. Costs 2 livestock.",
     },
+    # ---- beasts ----
+    "warm_bedding": {
+        "name": "Warm Bedding", "for": ["beast_den"],
+        "cost": {"wood": 20, "food": 20}, "beast_xp": 0.25,
+        "desc": "Missions give a further 25% more experience.",
+    },
+    "trophy_wall": {
+        "name": "Trophy Wall", "for": ["beast_den", "training_ground"],
+        "cost": {"wood": 30, "gold": 10}, "beast_power": 0.05,
+        "desc": "Your beast's bonus is a further 5% stronger.",
+    },
+    "heat_stones": {
+        "name": "Heat Stones", "for": ["incubator"],
+        "cost": {"stone": 25}, "hatch_speed": 0.5,
+        "desc": "Eggs hatch faster still.",
+    },
+    "nest_boxes": {
+        "name": "Nest Boxes", "for": ["incubator", "beast_den"],
+        "cost": {"wood": 25}, "egg_chance": 0.03,
+        "desc": "Expeditions are 3 points likelier to find an egg.",
+    },
+    "obstacle_course": {
+        "name": "Obstacle Course", "for": ["training_ground"],
+        "cost": {"wood": 60, "stone": 40}, "beast_power": 0.1,
+        "desc": "Your beast's bonus is a further 10% stronger.",
+    },
+    "handlers_lodge": {
+        "name": "Handlers' Lodge", "for": ["training_ground", "beast_sanctuary"],
+        "cost": {"wood": 50, "stone": 30}, "beast_xp": 0.25,
+        "desc": "Missions give a further 25% more experience.",
+    },
+    "quiet_grove": {
+        "name": "Quiet Grove", "for": ["beast_sanctuary", "incubator"],
+        "cost": {"wood": 80, "gold": 60}, "mission_speed": 0.25,
+        "desc": "Missions come a further 25% more often.",
+    },
 }
 
 # Kinds of area an expedition can find. Fields:
@@ -1870,6 +1955,7 @@ def new_game(name, now, seed=None):
         "log": [],
     }
     state["banned"] = []     # cities that may not view this one or propose bills to it
+    beasts.setup(state, now, rng)
     _remember_seen(state, now)
     log(state, now, f"The tribe of {name} settles a new land.")
     return state
@@ -1907,6 +1993,7 @@ def migrate(state, now):
                 if tile["terrain"] == "water":      # from before rivers, lakes and oceans
                     tile.update(terrain="lake", fish=50)
                 tile.setdefault("fish", 0)
+    beasts.migrate(state, now)
     return state
 
 
@@ -2074,6 +2161,10 @@ def tile_cycle(state, area, x, y, bid):
     if b.get("livestock_speed"):
         herd = int(state["resources"]["livestock"])
         factors.append((max(0.2, min(2.0, herd / LIVESTOCK_FOR_FULL_SPEED)), f"{herd} livestock owned"))
+    # The city's active beast.
+    favour = beasts.speed_bonus(state, b.get("category"))
+    if favour:
+        factors.append(favour)
     # Researched techniques.
     for rid in state["research"]:
         if bid in RESEARCH[rid].get("boost", {}):
@@ -2118,6 +2209,8 @@ def placement_problem(state, area, x, y, bid):
         return f"requires {TECH_LEVELS[b['tech']]['name']} tech"
     if b.get("research") and b["research"] not in state["research"]:
         return f"requires research: {RESEARCH[b['research']]['name']}"
+    if b.get("unique") and has_building(state, bid):
+        return "a city can only have one"
     if not any(terrain_is(tile["terrain"], t) for t in b["terrain"]):
         return "needs " + " or ".join(terrain_label(t) for t in b["terrain"])
     lock = TERRAINS[tile["terrain"]].get("research")
@@ -2148,7 +2241,8 @@ def work_plan(state):
     Returns (jobs, housing, totals) where jobs is a list of working buildings.
     """
     free = state["population"]
-    housing, needed, herd_room, jobs = BASE_HOUSING, 0, 0, []
+    housing, needed, herd_room, jobs = BASE_HOUSING + int(beasts.bonus(state, "housing")), 0, 0, []
+    beast_power = 1 + beasts.bonus(state, "power")
     for ai, area in enumerate(state["areas"]):
         for y, row in enumerate(area["tiles"]):
             for x, tile in enumerate(row):
@@ -2164,6 +2258,7 @@ def work_plan(state):
                 power_out = tile_stat(tile, "generates")
                 for m in b.get("generates_modifiers", []):
                     power_out *= MODIFIERS[m](area, x, y)[0]
+                power_out *= beast_power
                 jobs.append({
                     "area": ai, "x": x, "y": y, "tile": tile, "b": b,
                     "cycle": cycle,             # None for a generator that needs no fuel
@@ -2254,7 +2349,7 @@ def city_stat(state, field):
 
 def city_attracts(state):
     """Extra people who may arrive at each meal, from taverns and the like."""
-    return city_stat(state, "attracts")
+    return city_stat(state, "attracts") + int(beasts.bonus(state, "attracts"))
 
 
 def _arrivals(pop, food_left, housing, tries):
@@ -2286,7 +2381,7 @@ def advance_time(state, now):
     state["updated"] = now
     res = state["resources"]
     jobs, housing, _ = work_plan(state)
-    wildlife_speed = city_stat(state, "wildlife_speed")
+    wildlife_speed = city_stat(state, "wildlife_speed") + beasts.bonus(state, "wildlife_speed")
     rng = random.Random()
 
     while remaining > 0:
@@ -2321,6 +2416,7 @@ def advance_time(state, now):
     trip = state["expedition"]
     if trip and now >= trip["arrive"]:
         _arrive(state, trip)
+    beasts.tick(state, now)
 
 
 def build(state, now, area, x, y, bid):
@@ -2339,6 +2435,7 @@ def build(state, now, area, x, y, bid):
     _pay(state, b["cost"])
     scared = tile["animal"]
     tile.update(building=bid, progress=0, additions=[], animal=None, priority=0)
+    beasts.note(state, now, "build")
     log(state, now, f"Built {b['name']} at ({x},{y}) in {area_name(area)}."
         + (f" The {WILDLIFE[scared]['name'].lower()} fled." if scared else ""))
     return None
@@ -2428,6 +2525,7 @@ def research(state, now, rid):
         return f"Not enough to research {r['name']} (need {fmt_goods(missing)})."
     _pay(state, r["cost"])
     state["research"].append(rid)
+    beasts.note(state, now, "research")
     log(state, now, f"Researched {r['name']}.")
     return None
 
@@ -2531,6 +2629,7 @@ def tame(state, now, area, x, y):
         return f"Not enough bait to tame the {w['name'].lower()} (need {fmt_goods(missing)})."
     _pay(state, tame_cost(tile["animal"]))
     state["resources"]["livestock"] += w["livestock"]
+    beasts.note(state, now, "tame")
     tile["animal"] = None
     log(state, now, f"Tamed {w['name'].lower()} in {area_name(area)}: +{w['livestock']} Livestock.")
     return None
@@ -2578,7 +2677,7 @@ def expedition_cost(state, rx, ry):
 
 def expedition_time(state, rx, ry):
     """Seconds the journey takes. Stables and the like shorten it."""
-    speed = 1 + min(MAX_EXPLORE_SPEED, city_stat(state, "explore_speed"))
+    speed = 1 + min(MAX_EXPLORE_SPEED, city_stat(state, "explore_speed")) + beasts.bonus(state, "explore_speed")
     return round(EXPEDITION_TIME * (abs(rx) + abs(ry)) / speed)
 
 
@@ -2615,19 +2714,51 @@ def send_expedition(state, now, rx, ry):
 
 
 def _arrive(state, trip):
+    """The expedition reaches its goal: map the area, and note what else it found
+    in a report the player is shown."""
+    when, rng = trip["arrive"], random.Random()
     env = region_env(state, trip["rx"], trip["ry"])
     home = state["areas"][0]
-    area = _new_area(trip["rx"], trip["ry"], env, home["climate"] + ENVIRONMENTS[env]["temp"],
-                     random.Random())
+    area = _new_area(trip["rx"], trip["ry"], env, home["climate"] + ENVIRONMENTS[env]["temp"], rng)
     state["areas"].append(area)
     state["expedition"] = None
-    log(state, trip["arrive"], f"*** The expedition has mapped a new area: {area_name(area)}. ***")
+    log(state, when, f"*** The expedition has mapped a new area: {area_name(area)}. ***")
+
+    distance = abs(trip["rx"]) + abs(trip["ry"])
+    loot = {}
+    if rng.random() < EXPEDITION_LOOT_CHANCE:
+        res, least, most = rng.choice(EXPEDITION_LOOT)
+        loot[res] = rng.randint(least, most) * distance
+        state["resources"][res] += loot[res]
+    egg = beasts.expedition_egg(state, when, distance, rng)
+    if egg:
+        log(state, when, "*** The expedition brought back a beast egg! See the Beast tab. ***")
+    tiles = [t for row in area["tiles"] for t in row]
+    land = {}
+    for t in tiles:
+        land[TERRAINS[t["terrain"]]["name"]] = land.get(TERRAINS[t["terrain"]]["name"], 0) + 1
+    state["reports"].append({
+        "t": when, "area": area_name(area), "land": ENVIRONMENTS[env]["name"], "where": where(trip["rx"], trip["ry"]),
+        "terrain": sorted(land.items(), key=lambda kv: -kv[1])[:5],
+        "animals": sorted({WILDLIFE[t["animal"]]["name"] for t in tiles if t["animal"]}),
+        "loot": loot,
+        "egg": beasts.RARITIES[beasts.SPECIES[egg["species"]]["rarity"]]["name"] if egg else None,
+    })
+    del state["reports"][:-10]
+    beasts.note(state, when, "explore")
 
 
 def apply_action(state, now, action, data):
     """Run one player action. Returns an error message, or None on success."""
     if action == "advance":
         return advance(state, now)
+    if action == "beast_active":
+        return beasts.set_active(state, now, data.get("beast"))
+    if action == "mission_deliver":
+        return beasts.deliver(state, now)
+    if action == "report_seen":     # the player has read the oldest expedition report
+        del state["reports"][:1]
+        return None
     if action == "slaughter":
         return slaughter(state, now, data.get("count"))
     if action == "dismiss_away":
@@ -2780,6 +2911,8 @@ def view(state, ai=0):
                       "problem": research_problem(state, rid),
                       "affordable": not _missing(state, r["cost"])}
                      for rid, r in RESEARCH.items()],
+        "beast": beasts.view(state, state["updated"]),
+        "reports": state["reports"],
         "explore": {
             "destinations": explore,
             "expedition": trip and {**trip, "where": where(trip["rx"], trip["ry"]),
@@ -2883,6 +3016,8 @@ def find(state, kind, what):
 def housing_sources(state):
     """Where the city's housing comes from: [[name, places], ...]."""
     out = {"Starting camp": BASE_HOUSING}
+    if int(beasts.bonus(state, "housing")):
+        out[beasts.title(beasts.active(state))] = int(beasts.bonus(state, "housing"))
     for tile in all_tiles(state):
         if tile["building"] and tile_housing(tile):
             name = BUILDINGS[tile["building"]]["name"]
@@ -2911,6 +3046,7 @@ def summary(state):
         "tech_name": TECH_LEVELS[state["tech"]]["name"],
         "population": state["population"],
         "research": len(state["research"]),
+        "beast": max((b["level"] for b in state["beasts"]), default=0),
         "areas": len(state["areas"]),
         "buildings": sum(1 for t in all_tiles(state) if t["building"]),
         "resources": {k: int(state["resources"].get(k, 0)) for k in RESOURCES},
