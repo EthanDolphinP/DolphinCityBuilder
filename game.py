@@ -155,6 +155,7 @@ RESOURCES = {
     "ore":   "Ore",
     "tools": "Tools",
     "gold":  "Gold",
+    "electronics": "Electronics",
     "livestock": "Livestock",
     "knowledge": "Knowledge",
 }
@@ -195,6 +196,10 @@ TECH_LEVELS = [
      "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100}},
     {"name": "City", "population": 60, "research": 15, "areas": 3,
      "cost": {"stone": 800, "ore": 300, "tools": 120, "gold": 500, "knowledge": 300}},
+    {"name": "Metropolis", "population": 100, "research": 24, "areas": 4,
+     "cost": {"stone": 1500, "tools": 400, "gold": 1500, "knowledge": 800}},
+    {"name": "Megacity", "population": 180, "research": 36, "areas": 6,
+     "cost": {"tools": 1000, "electronics": 600, "gold": 5000, "knowledge": 2500}},
 ]
 
 # Groups the build menu is divided into, in the order they are shown. Every
@@ -574,6 +579,143 @@ BUILDINGS = {
         "produces": {"knowledge": 30},
         "desc": "Experiments on an industrial scale.",
     },
+    # ---- Metropolis ----
+    "high_rise": {
+        "name": "High-Rise", "glyph": "\u03a0", "tech": 4, "category": "housing",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 300, "tools": 60, "gold": 150}, "housing": 30,
+        "desc": "A steel and glass tower of flats. Needs flat ground.",
+    },
+    "hospital": {
+        "name": "Hospital", "glyph": "8", "tech": 4, "category": "support", "research": "modern_medicine",
+        "terrain": ["plains", "desert"],
+        "cost": {"stone": 250, "tools": 80, "gold": 300}, "housing": 4, "attracts": 2,
+        "desc": "People move to where they will be looked after: two extra arrivals per meal.",
+    },
+    "industrial_farm": {
+        "name": "Industrial Farm", "glyph": "\u0393", "tech": 4, "category": "food", "power": 5, "research": "mechanised_farming",
+        "terrain": ["plains"], "max_height": 2, "min_fertility": 40,
+        "cost": {"stone": 100, "tools": 80, "gold": 100}, "workers": 3, "time": 12 * MIN, "produces": {"food": 34},
+        "modifiers": ["fertility", "crop_temperature", "adjacent_water"],
+        "desc": "Tractors, combines and fertiliser: a farm that feeds a district with three workers.",
+    },
+    "electronics_plant": {
+        "name": "Electronics Plant", "glyph": "\u039e", "tech": 4, "category": "materials", "power": 8, "research": "semiconductors",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 250, "tools": 120, "gold": 250}, "workers": 6, "time": 20 * MIN,
+        "consumes": {"ore": 8, "tools": 2}, "produces": {"electronics": 4},
+        "desc": "Makes electronics from ore and tools. Everything in a Megacity is built with them.",
+    },
+    "recycling_centre": {
+        "name": "Recycling Centre", "glyph": "3", "tech": 4, "category": "materials", "power": 4, "research": "recycling",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 150, "tools": 60}, "workers": 4, "time": 15 * MIN,
+        "produces": {"ore": 6, "wood": 6, "stone": 6},
+        "modifiers": ["customers"],
+        "desc": "Recovers ore, wood and stone from what the city throws away. Faster with homes next to it.",
+    },
+    "shopping_mall": {
+        "name": "Shopping Mall", "glyph": "\u03a3", "tech": 4, "category": "trade", "power": 6,
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 300, "tools": 80, "gold": 200}, "workers": 6, "time": 20 * MIN, "produces": {"gold": 36},
+        "modifiers": ["customers"],
+        "desc": "Shops under one roof. Needs flat ground; faster with homes next to it.",
+    },
+    "container_port": {
+        "name": "Container Port", "glyph": "\u0394", "tech": 4, "category": "trade", "power": 8, "research": "container_shipping",
+        "terrain": ["ocean", "lake"], "min_temp": 1,
+        "cost": {"stone": 400, "tools": 150, "gold": 300}, "workers": 6, "time": 20 * MIN,
+        "produces": {"gold": 45, "food": 12},
+        "modifiers": ["open_water"],
+        "desc": "Cranes and container ships on a lake or ocean. Faster on bigger water.",
+    },
+    "research_institute": {
+        "name": "Research Institute", "glyph": "\u03a6", "tech": 4, "category": "knowledge", "power": 8, "research": "computing",
+        "terrain": ["plains", "desert"],
+        "cost": {"stone": 300, "tools": 120, "gold": 400}, "workers": 6, "time": 20 * MIN,
+        "produces": {"knowledge": 70},
+        "desc": "Computers and specialists. Needed for Megacity research.",
+    },
+    "solar_farm": {
+        "name": "Solar Farm", "glyph": "\u0398", "tech": 4, "category": "power", "research": "photovoltaics",
+        "terrain": ["plains", "desert"],
+        "cost": {"stone": 150, "tools": 100, "gold": 150}, "workers": 1, "generates": 20,
+        "generates_modifiers": ["sunlight"],
+        "desc": "Fields of panels with no fuel. Gives more the hotter the tile: best in deserts, poor in the cold.",
+    },
+    "nuclear_plant": {
+        "name": "Nuclear Plant", "glyph": "\u03a8", "tech": 4, "category": "power", "research": "nuclear_fission",
+        "terrain": ["plains", "desert"], "max_height": 2, "adjacent": "water",
+        "cost": {"stone": 800, "tools": 300, "gold": 600}, "workers": 6, "generates": 80,
+        "time": 30 * MIN, "consumes": {"ore": 5},
+        "desc": "A great deal of power from a little ore. Must be on flat ground next to water for cooling.",
+    },
+    "airport": {
+        "name": "Airport", "glyph": "\u039b", "tech": 4, "category": "support", "research": "aviation",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 500, "tools": 150, "gold": 400}, "explore_speed": 0.5, "attracts": 1,
+        "desc": "Expeditions travel 50% faster, and one extra person arrives per meal. Needs flat ground.",
+    },
+    # ---- Megacity ----
+    "arcology": {
+        "name": "Arcology", "glyph": "\u03a9", "tech": 5, "category": "housing",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 800, "tools": 200, "electronics": 120, "gold": 600}, "housing": 90,
+        "desc": "A whole neighbourhood in one building, with its own streets, parks and shops.",
+    },
+    "vertical_farm": {
+        "name": "Vertical Farm", "glyph": "4", "tech": 5, "category": "food", "power": 12, "research": "hydroponics",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 300, "tools": 100, "electronics": 60}, "workers": 3, "time": 12 * MIN, "produces": {"food": 70},
+        "desc": "Floor upon floor of crops under lamps, anywhere, whatever the soil or weather.",
+    },
+    "robotics_factory": {
+        "name": "Robotics Factory", "glyph": "7", "tech": 5, "category": "materials", "power": 20, "research": "robotics",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 500, "tools": 200, "electronics": 100, "gold": 500}, "workers": 3, "time": 20 * MIN,
+        "consumes": {"ore": 14}, "produces": {"tools": 20, "electronics": 6},
+        "desc": "Machines building machines: tools and electronics from ore, with hardly any workers.",
+    },
+    "drone_port": {
+        "name": "Drone Port", "glyph": "<", "tech": 5, "category": "trade", "power": 12, "research": "autonomous_logistics",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 300, "tools": 100, "electronics": 80}, "workers": 3, "time": 20 * MIN, "produces": {"gold": 80},
+        "modifiers": ["customers"],
+        "desc": "Deliveries by air to every door. Faster with homes next to it.",
+    },
+    "data_centre": {
+        "name": "Data Centre", "glyph": "9", "tech": 5, "category": "knowledge", "power": 25, "research": "machine_learning",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 400, "tools": 150, "electronics": 150, "gold": 500}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 180},
+        "modifiers": ["cooling"],
+        "desc": "Racks of machines that learn. Runs faster on a cold tile, slower on a hot one.",
+    },
+    "tidal_array": {
+        "name": "Tidal Array", "glyph": ">", "tech": 5, "category": "power", "research": "offshore_energy",
+        "terrain": ["ocean"],
+        "cost": {"stone": 300, "tools": 150, "electronics": 60}, "workers": 1, "generates": 45,
+        "desc": "Turbines on the sea bed, turned by the tide. No fuel.",
+    },
+    "fusion_plant": {
+        "name": "Fusion Plant", "glyph": "5", "tech": 5, "category": "power", "research": "fusion_power",
+        "terrain": ["plains", "desert"], "max_height": 2, "adjacent": "water",
+        "cost": {"stone": 1500, "tools": 500, "electronics": 400, "gold": 2000}, "workers": 6, "generates": 250,
+        "desc": "The power of the sun, from water. No fuel. Must be on flat ground next to water.",
+    },
+    "desalination_plant": {
+        "name": "Desalination Plant", "glyph": "?", "tech": 5, "category": "support", "research": "desalination",
+        "terrain": ["plains", "desert"], "adjacent": "ocean",
+        "cost": {"stone": 300, "tools": 100, "electronics": 50}, "fertility_aura": 35,
+        "desc": "Turns sea water fresh. Built on land beside the ocean; adds +35 fertility to the 8 surrounding tiles.",
+    },
+    "maglev_hub": {
+        "name": "Maglev Hub", "glyph": "1", "tech": 5, "category": "support", "research": "maglev",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 600, "tools": 200, "electronics": 150, "gold": 800}, "explore_speed": 0.5, "attracts": 2,
+        "speed_aura": {"for": ["shopping_mall", "drone_port", "trading_post", "research_institute", "data_centre"], "bonus": 0.2},
+        "desc": "Floating trains. Expeditions travel 50% faster, two extra people arrive per meal, and shops and research on the 8 surrounding tiles work 20% faster.",
+    },
 }
 
 # Research is bought with Knowledge. Fields:
@@ -759,6 +901,87 @@ RESEARCH = {
         "name": "Scientific Method", "tech": 3, "building": "university", "cost": {"knowledge": 150},
         "desc": "Test everything; trust nothing untested.",
     },
+    # ---- Metropolis ----
+    "modern_medicine": {
+        "name": "Modern Medicine", "tech": 4, "building": "laboratory", "cost": {"knowledge": 200},
+        "desc": "Antibiotics, surgery and clean wards.",
+    },
+    "mechanised_farming": {
+        "name": "Mechanised Farming", "tech": 4, "building": "laboratory", "cost": {"knowledge": 220},
+        "boost": {"farm": 1.2, "irrigated_farm": 1.2, "orchard": 1.2, "terrace_farm": 1.2, "rice_paddy": 1.2},
+        "desc": "Engines in the fields.",
+    },
+    "recycling": {
+        "name": "Recycling", "tech": 4, "building": "laboratory", "cost": {"knowledge": 200},
+        "desc": "Nothing is rubbish twice.",
+    },
+    "photovoltaics": {
+        "name": "Photovoltaics", "tech": 4, "building": "laboratory", "cost": {"knowledge": 250},
+        "desc": "Electricity straight from sunlight.",
+    },
+    "container_shipping": {
+        "name": "Container Shipping", "tech": 4, "building": "laboratory", "cost": {"knowledge": 250},
+        "boost": {"harbor": 1.25},
+        "desc": "The same steel box on ship, train and lorry.",
+    },
+    "aviation": {
+        "name": "Aviation", "tech": 4, "building": "laboratory", "cost": {"knowledge": 280},
+        "desc": "Powered flight.",
+    },
+    "semiconductors": {
+        "name": "Semiconductors", "tech": 4, "building": "laboratory", "cost": {"knowledge": 300},
+        "desc": "Circuits etched in silicon.",
+    },
+    "computing": {
+        "name": "Computing", "tech": 4, "building": "laboratory", "cost": {"knowledge": 350},
+        "boost": {"laboratory": 1.25, "university": 1.25},
+        "desc": "Machines that calculate.",
+    },
+    "nuclear_fission": {
+        "name": "Nuclear Fission", "tech": 4, "building": "laboratory", "cost": {"knowledge": 400},
+        "desc": "Splitting the atom, carefully.",
+    },
+    "smart_grid": {
+        "name": "Smart Grid", "tech": 4, "building": "laboratory", "cost": {"knowledge": 300},
+        "desc": "Storing power and sending it where it is needed.",
+    },
+    # ---- Megacity ----
+    "hydroponics": {
+        "name": "Hydroponics", "tech": 5, "building": "research_institute", "cost": {"knowledge": 700},
+        "boost": {"greenhouse": 1.3},
+        "desc": "Crops without soil.",
+    },
+    "robotics": {
+        "name": "Robotics", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
+        "boost": {"factory": 1.3, "electronics_plant": 1.3, "deep_mine": 1.2},
+        "desc": "Tireless hands.",
+    },
+    "autonomous_logistics": {
+        "name": "Autonomous Logistics", "tech": 5, "building": "research_institute", "cost": {"knowledge": 800},
+        "boost": {"container_port": 1.25, "shopping_mall": 1.2},
+        "desc": "Goods that find their own way.",
+    },
+    "machine_learning": {
+        "name": "Machine Learning", "tech": 5, "building": "research_institute", "cost": {"knowledge": 1000},
+        "boost": {"research_institute": 1.25},
+        "desc": "Programs that improve with practice.",
+    },
+    "offshore_energy": {
+        "name": "Offshore Energy", "tech": 5, "building": "research_institute", "cost": {"knowledge": 700},
+        "desc": "Power from tide and swell.",
+    },
+    "desalination": {
+        "name": "Desalination", "tech": 5, "building": "research_institute", "cost": {"knowledge": 600},
+        "desc": "Fresh water from the sea.",
+    },
+    "maglev": {
+        "name": "Maglev", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
+        "desc": "Trains that float on magnets.",
+    },
+    "fusion_power": {
+        "name": "Fusion Power", "tech": 5, "building": "research_institute", "cost": {"knowledge": 1500},
+        "desc": "A star in a bottle.",
+    },
 }
 
 # Additions are attached to a building that is already standing. Fields:
@@ -876,12 +1099,12 @@ ADDITIONS = {
         "desc": "20% faster.",
     },
     "library": {
-        "name": "Library", "for": ["school", "university", "observatory", "laboratory"], "research": "masonry",
+        "name": "Library", "for": ["school", "university", "observatory", "laboratory", "research_institute"], "research": "masonry",
         "cost": {"wood": 30, "stone": 30}, "speed": 1.2,
         "desc": "20% faster.",
     },
     "irrigation_pipes": {
-        "name": "Irrigation Pipes", "for": ["irrigated_farm", "orchard", "greenhouse", "rice_paddy"], "research": "water_wheels",
+        "name": "Irrigation Pipes", "for": ["irrigated_farm", "orchard", "greenhouse", "rice_paddy", "industrial_farm", "vertical_farm"], "research": "water_wheels",
         "cost": {"stone": 20, "ore": 15}, "speed": 1.2,
         "desc": "20% faster.",
     },
@@ -891,19 +1114,79 @@ ADDITIONS = {
         "desc": "+2 power.",
     },
     "crane": {
-        "name": "Loading Crane", "for": ["harbor", "fishery"], "research": "mechanics",
+        "name": "Loading Crane", "for": ["harbor", "fishery", "container_port"], "research": "mechanics",
         "cost": {"wood": 40, "ore": 20}, "speed": 1.25,
         "desc": "25% faster.",
     },
     "transformer": {
-        "name": "Transformer", "for": ["wind_turbine", "hydro_dam", "power_plant", "geothermal_plant"], "research": "electricity",
+        "name": "Transformer", "for": ["wind_turbine", "hydro_dam", "power_plant", "geothermal_plant", "nuclear_plant", "fusion_plant"], "research": "electricity",
         "cost": {"ore": 30, "tools": 10}, "generates": 4,
         "desc": "+4 power.",
     },
     "assembly_line": {
-        "name": "Assembly Line", "for": ["factory", "glassworks", "smithy"], "research": "mass_production",
+        "name": "Assembly Line", "for": ["factory", "glassworks", "smithy", "electronics_plant", "recycling_centre"], "research": "mass_production",
         "cost": {"tools": 20, "gold": 30}, "speed": 1.3,
         "desc": "30% faster.",
+    },
+    "penthouses": {
+        "name": "Penthouses", "for": ["high_rise", "arcology"],
+        "cost": {"stone": 100, "gold": 150}, "housing": 10,
+        "desc": "Houses 10 more people.",
+    },
+    "emergency_wing": {
+        "name": "Emergency Wing", "for": ["hospital"],
+        "cost": {"stone": 150, "tools": 50, "gold": 200}, "attracts": 1,
+        "desc": "One more extra arrival per meal.",
+    },
+    "food_court": {
+        "name": "Food Court", "for": ["shopping_mall", "airport", "maglev_hub"],
+        "cost": {"stone": 80, "gold": 100}, "housing": 2, "aura_bonus": 0.05,
+        "desc": "Room for 2 more people, and a small lift to whatever the building speeds up nearby.",
+    },
+    "advertising": {
+        "name": "Advertising", "for": ["shopping_mall", "drone_port", "container_port"],
+        "cost": {"gold": 200}, "produces": {"gold": 10},
+        "desc": "+10 Gold per cycle.",
+    },
+    "battery_bank": {
+        "name": "Battery Bank", "for": ["solar_farm", "wind_turbine", "tidal_array"], "research": "smart_grid",
+        "cost": {"ore": 80, "tools": 40}, "generates": 8,
+        "desc": "+8 power.",
+    },
+    "express_link": {
+        "name": "Express Link", "for": ["airport", "maglev_hub"],
+        "cost": {"stone": 200, "tools": 80, "gold": 200}, "explore_speed": 0.25,
+        "desc": "Expeditions travel a further 25% faster.",
+    },
+    "clean_room": {
+        "name": "Clean Room", "for": ["electronics_plant", "robotics_factory", "research_institute", "data_centre"],
+        "cost": {"stone": 100, "tools": 60, "gold": 150}, "speed": 1.25,
+        "desc": "25% faster.",
+    },
+    "grow_lamps": {
+        "name": "Grow Lamps", "for": ["vertical_farm", "greenhouse"], "research": "hydroponics",
+        "cost": {"tools": 40, "electronics": 30}, "produces": {"food": 15},
+        "desc": "+15 Food per cycle.",
+    },
+    "delivery_swarm": {
+        "name": "Delivery Swarm", "for": ["drone_port", "robotics_factory"], "research": "autonomous_logistics",
+        "cost": {"electronics": 60}, "speed": 1.3,
+        "desc": "30% faster.",
+    },
+    "supercomputer": {
+        "name": "Supercomputer", "for": ["data_centre", "research_institute"], "research": "machine_learning",
+        "cost": {"electronics": 120, "gold": 300}, "produces": {"knowledge": 40},
+        "desc": "+40 Knowledge per cycle.",
+    },
+    "extra_pumps": {
+        "name": "Extra Pumps", "for": ["desalination_plant"],
+        "cost": {"tools": 60, "electronics": 30}, "fertility_aura": 15,
+        "desc": "+15 more fertility to the surrounding tiles.",
+    },
+    "superconductors": {
+        "name": "Superconductors", "for": ["fusion_plant", "nuclear_plant", "tidal_array"], "research": "fusion_power",
+        "cost": {"tools": 100, "electronics": 100}, "generates": 30,
+        "desc": "+30 power.",
     },
 }
 
@@ -1017,6 +1300,16 @@ def _mod_near_mine(area, x, y):
     return 1.0, "no mine nearby"
 
 
+def _mod_sunlight(area, x, y):
+    t = area["tiles"][y][x]["temp"]
+    return max(0.5, min(1.5, 0.7 + t / 50)), f"{t}C sun"
+
+
+def _mod_cooling(area, x, y):
+    t = area["tiles"][y][x]["temp"]
+    return max(0.6, min(1.4, 1.2 - t / 50)), f"{t}C air"
+
+
 MODIFIERS = {
     "fertility": _mod_fertility,
     "crop_temperature": _mod_crop_temperature,
@@ -1027,6 +1320,8 @@ MODIFIERS = {
     "open_water": _mod_open_water,
     "customers": _mod_customers,
     "near_mine": _mod_near_mine,
+    "sunlight": _mod_sunlight,
+    "cooling": _mod_cooling,
 }
 
 
