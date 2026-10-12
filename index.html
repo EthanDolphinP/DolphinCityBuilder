@@ -103,7 +103,7 @@
   .mini i.a { opacity: 1; box-shadow: inset 0 0 0 2px #e58fd0; }
   .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
-  .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
+  .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
   #away { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   #away .panel { max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; margin: 0;
@@ -208,7 +208,13 @@
     <div id="tab-people" hidden>
       <div class="panel"><h2>Will the city grow?</h2><div id="pplGrowth"></div></div>
       <div class="cols">
-        <div class="panel"><h2>Food</h2><div id="pplFood"></div></div>
+        <div class="panel"><h2>Food</h2><div id="pplFood"></div>
+          <form id="slaughterForm" class="bar" hidden>
+            Slaughter <input id="slaughterN" type="number" min="1" step="1" value="1"> livestock
+            <button>Slaughter</button>
+            <span id="slaughterNote" class="dim small"></span>
+          </form>
+        </div>
         <div class="panel"><h2>Housing</h2><div id="pplHousing"></div></div>
       </div>
       <div class="panel"><h2>Work</h2><div id="pplWork"></div></div>
@@ -847,6 +853,11 @@ function renderPeople() {
     `<p>In store: <span class="hi">${food}</span> food = <span class="hi">${meals}</span> ${meals === 1 ? 'meal' : 'meals'}` +
     (net < 0 ? `. At this rate it runs out in about <span class="bad">${duration(food / -net * 3600)}</span>.` : '.') + `</p>`);
 
+  const herd = Math.floor(state.resources.livestock);
+  $('slaughterForm').hidden = herd < 1;
+  $('slaughterN').max = herd;
+  $('slaughterNote').textContent = `You have ${herd}. Each gives ${view.defs.slaughter_food} food straight away; a Butcher gets more from each animal.`;
+
   // Housing
   setHTML($('pplHousing'),
     `<span class="hi">${pop}</span> people in housing for <span class="hi">${status.housing}</span>` +
@@ -1191,6 +1202,10 @@ $('research').addEventListener('toggle', e => {
   const key = e.target.dataset && e.target.dataset.fold;
   if (key && key.startsWith('res:')) foldState.set(key, e.target.open);
 }, true);
+$('slaughterForm').onsubmit = e => {
+  e.preventDefault();
+  act('slaughter', { count: Number($('slaughterN').value) });
+};
 $('resSearch').oninput = () => renderResearch();
 for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { if (view && !visiting) renderMarket(); };
 $('mktFilters').onclick = e => {

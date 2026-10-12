@@ -136,7 +136,7 @@ TERRAINS = {
                "spread_from": ["plains"], "near": ["plains"], "need": 3, "chance": 0.3,
                "groups": ["plains"],
                "height": (1, 2), "fertility": (60, 90), "temp": 0,
-               "boost": {"pasture": 1.4, "dairy": 1.3},
+               "boost": {"pasture": 1.4, "dairy": 1.3, "breeding_pen": 1.3},
                "desc": "Open flowering grassland. The best grazing there is: pastures and dairies work faster here."},
 }
 GROUP_NAMES = {"water": "water", "fresh": "fresh water"}
@@ -180,6 +180,7 @@ LIVESTOCK_FOR_FULL_SPEED = 10   # herd size at which "livestock_speed" buildings
 WILDLIFE_TIME = 45 * MIN    # how often a new animal wanders into each area
 MAX_WILDLIFE = 4            # wild animals an area holds at once
 TAME_FOOD_PER_HEAD = 3      # food used as bait, per livestock the animal is worth
+SLAUGHTER_FOOD = 6          # food from slaughtering one livestock by hand (a Butcher gets more)
 AWAY_TIME = 5 * MIN         # unwatched for this long -> the player gets a "while you were away" report
 
 # Index 0 is the starting level. The other entries say what it takes to advance
@@ -287,15 +288,22 @@ BUILDINGS = {
         "name": "Pasture", "glyph": "P", "tech": 0, "category": "food", "research": "animal_husbandry",
         "terrain": ["plains"],
         "cost": {"wood": 20}, "workers": 1, "time": 15 * MIN,
-        "herd": 10, "per_head": {"food": 0.6},
+        "herd": 10, "per_head": {"food": 0.6}, "fertility_aura": 8,
         "modifiers": ["fertility"],
-        "desc": "Keeps up to 10 of your livestock and farms them for food. Faster on fertile grass.",
+        "desc": "Keeps up to 10 of your livestock and farms them for food. Faster on fertile grass. Its manure adds +8 fertility to the 8 surrounding tiles.",
     },
     "salt_lick": {
         "name": "Salt Lick", "glyph": "l", "tech": 0, "category": "support",
         "terrain": ["plains", "forest"],
         "cost": {"wood": 5, "food": 20}, "wildlife_speed": 0.5,
         "desc": "Draws animals in from the wild: wildlife appears 50% more often in all your areas.",
+    },
+    "butcher": {
+        "name": "Butcher", "glyph": "2", "tech": 0, "category": "food", "research": "animal_husbandry",
+        "terrain": ["plains", "forest", "desert", "hill"],
+        "cost": {"wood": 15}, "workers": 1, "time": 15 * MIN,
+        "consumes": {"livestock": 1}, "produces": {"food": 14},
+        "desc": "Turns livestock into meat: 14 food from each animal, more than twice what slaughtering by hand gives. Stops when the herd is gone.",
     },
     "hunting_lodge": {
         "name": "Hunting Lodge", "glyph": "N", "tech": 0, "category": "food",
@@ -406,6 +414,14 @@ BUILDINGS = {
         "housing": 2, "attracts": 1,
         "desc": "Stone pools over hot springs. Earns gold, has rooms for 2, and its fame brings one extra arrival per meal like a tavern.",
     },
+    "breeding_pen": {
+        "name": "Breeding Pen", "glyph": "{", "tech": 1, "category": "food", "research": "selective_breeding",
+        "terrain": ["plains"],
+        "cost": {"wood": 35}, "workers": 1, "time": 30 * MIN,
+        "consumes": {"food": 6}, "produces": {"livestock": 1},
+        "modifiers": ["fertility"],
+        "desc": "Raises new livestock on feed: 1 animal from 6 food. A steady supply that does not depend on finding wildlife. Faster on fertile grass.",
+    },
     "tavern": {
         "name": "Tavern", "glyph": "v", "tech": 1, "category": "housing",
         "terrain": ["plains", "forest", "desert", "hill"],
@@ -476,6 +492,13 @@ BUILDINGS = {
         "modifiers": ["near_mine"],
         "desc": "Turns ore into tools. Faster next to a mine.",
     },
+    "cattle_market": {
+        "name": "Cattle Market", "glyph": "]", "tech": 2, "category": "trade", "research": "bookkeeping",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"wood": 60, "stone": 40}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 12},
+        "livestock_speed": True,
+        "desc": "Shows, auctions and stud fees: gold from owning a fine herd, without selling it. Works faster the more livestock the city owns: normal speed at 10. Needs flat ground.",
+    },
     "water_mill": {
         "name": "Water Mill", "glyph": "w", "tech": 2, "category": "power",
         "terrain": ["river"],
@@ -538,6 +561,13 @@ BUILDINGS = {
         "terrain": ["hot_springs", "volcanic"],
         "cost": {"stone": 120, "tools": 25}, "workers": 2, "generates": 14,
         "desc": "Power from the heat underground, with no fuel. Only on hot springs or a volcanic plain.",
+    },
+    "zoo": {
+        "name": "Zoo", "glyph": "[", "tech": 3, "category": "trade", "power": 2,
+        "terrain": ["plains", "forest"],
+        "cost": {"stone": 120, "gold": 80, "livestock": 8}, "workers": 3, "time": 20 * MIN, "produces": {"gold": 20},
+        "livestock_speed": True, "attracts": 1,
+        "desc": "People come from far away to see the animals: gold, and one extra arrival per meal. Works faster the more livestock the city owns: normal speed at 10. Costs 8 livestock to stock.",
     },
     "wind_turbine": {
         "name": "Wind Turbine", "glyph": "y", "tech": 3, "category": "power", "research": "electricity",
@@ -1026,7 +1056,7 @@ ADDITIONS = {
         "desc": "25% faster.",
     },
     "market_stalls": {
-        "name": "Market Stalls", "for": ["trading_post", "caravanserai", "bath_house", "salt_works"], "research": "bookkeeping",
+        "name": "Market Stalls", "for": ["trading_post", "caravanserai", "bath_house", "salt_works", "cattle_market"], "research": "bookkeeping",
         "cost": {"wood": 40, "gold": 15}, "produces": {"gold": 2},
         "desc": "+2 Gold per cycle.",
     },
@@ -1066,12 +1096,12 @@ ADDITIONS = {
         "desc": "+1 Knowledge per cycle.",
     },
     "smokehouse": {
-        "name": "Smokehouse", "for": ["fishing_dock", "hunting_lodge", "fishery"], "research": "smoking",
+        "name": "Smokehouse", "for": ["fishing_dock", "hunting_lodge", "fishery", "butcher"], "research": "smoking",
         "cost": {"wood": 20}, "produces": {"food": 1},
         "desc": "+1 Food per cycle.",
     },
     "feeding_trough": {
-        "name": "Feeding Trough", "for": ["pasture", "dairy"],
+        "name": "Feeding Trough", "for": ["pasture", "dairy", "breeding_pen"],
         "cost": {"wood": 15, "food": 10}, "speed": 1.2,
         "desc": "20% faster.",
     },
@@ -1146,7 +1176,7 @@ ADDITIONS = {
         "desc": "Room for 4 more people.",
     },
     "advertising": {
-        "name": "Advertising", "for": ["shopping_mall", "drone_port", "container_port"],
+        "name": "Advertising", "for": ["shopping_mall", "drone_port", "container_port", "zoo"],
         "cost": {"gold": 200}, "produces": {"gold": 10},
         "desc": "+10 Gold per cycle.",
     },
@@ -1237,7 +1267,7 @@ ADDITIONS = {
         "desc": "20% faster.",
     },
     "ice_house": {
-        "name": "Ice House", "for": ["fishing_dock", "fishery", "hunting_lodge", "dairy"], "research": "masonry",
+        "name": "Ice House", "for": ["fishing_dock", "fishery", "hunting_lodge", "dairy", "butcher"], "research": "masonry",
         "cost": {"stone": 25}, "produces": {"food": 2},
         "desc": "+2 Food per cycle.",
     },
@@ -1312,7 +1342,7 @@ ADDITIONS = {
         "desc": "Needs 2 fewer workers.",
     },
     "counting_house": {
-        "name": "Counting House", "for": ["trading_post", "caravanserai", "salt_works", "weaver"],
+        "name": "Counting House", "for": ["trading_post", "caravanserai", "salt_works", "weaver", "cattle_market", "zoo"],
         "cost": {"wood": 20, "stone": 20}, "produces": {"gold": 1},
         "desc": "+1 Gold per cycle.",
     },
@@ -1421,6 +1451,32 @@ ADDITIONS = {
         "cost": {"wood": 30, "livestock": 2}, "explore_speed": 0.1,
         "desc": "Expeditions travel a further 10% faster. Costs 2 livestock.",
     },
+    # ---- livestock ----
+    "ox_plough": {
+        "name": "Ox Plough", "for": ["farm", "terrace_farm", "irrigated_farm", "rice_paddy"], "research": "draft_animals",
+        "cost": {"wood": 15, "livestock": 2}, "speed": 1.25,
+        "desc": "25% faster. Costs 2 livestock.",
+    },
+    "stud_book": {
+        "name": "Stud Book", "for": ["breeding_pen", "cattle_market"],
+        "cost": {"wood": 20, "gold": 20}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "petting_corner": {
+        "name": "Petting Corner", "for": ["zoo"],
+        "cost": {"wood": 40, "livestock": 4}, "attracts": 1,
+        "desc": "One more extra arrival per meal. Costs 4 livestock.",
+    },
+    "guard_dogs": {
+        "name": "Guard Dogs", "for": ["trading_post", "caravanserai", "cattle_market", "salt_works"], "research": "animal_taming",
+        "cost": {"food": 20, "livestock": 1}, "produces": {"gold": 1},
+        "desc": "+1 Gold per cycle: less goes missing. Costs 1 livestock.",
+    },
+    "pack_mules": {
+        "name": "Pack Mules", "for": ["mine", "quarry", "salt_works", "peat_cutter"], "research": "draft_animals",
+        "cost": {"wood": 15, "livestock": 2}, "speed": 1.2,
+        "desc": "20% faster. Costs 2 livestock.",
+    },
 }
 
 # Kinds of area an expedition can find. Fields:
@@ -1470,6 +1526,20 @@ WILDLIFE = {
     "bison":   {"name": "Bison",          "glyph": "n", "terrain": ["meadow"],           "livestock": 5, "weight": 4},
     "buffalo": {"name": "Water Buffalo",  "glyph": "f", "terrain": ["swamp", "marsh"],   "livestock": 5, "weight": 3},
     "yak":     {"name": "Yaks",           "glyph": "y", "terrain": ["glacier", "mountain", "foothills"], "livestock": 4, "weight": 3},
+    "pheasant": {"name": "Pheasants",     "glyph": "p", "terrain": ["meadow", "plains", "foothills"], "livestock": 1, "weight": 3},
+    "bees":    {"name": "Wild Bees",      "glyph": "x", "terrain": ["meadow", "ancient_grove", "forest"], "livestock": 1, "weight": 2},
+    "turkey":  {"name": "Wild Turkeys",   "glyph": "t", "terrain": ["forest", "foothills"], "livestock": 2, "weight": 3},
+    "geese":   {"name": "Geese",          "glyph": "u", "terrain": ["river", "lake", "marsh"], "livestock": 2, "weight": 3},
+    "beaver":  {"name": "Beavers",        "glyph": "v", "terrain": ["river", "lake", "swamp"], "livestock": 2, "weight": 2},
+    "turtle":  {"name": "Sea Turtles",    "glyph": "w", "terrain": ["ocean"],              "livestock": 2, "weight": 3},
+    "seal":    {"name": "Seals",          "glyph": "q", "terrain": ["ocean"],              "livestock": 3, "weight": 2},
+    "ostrich": {"name": "Ostriches",      "glyph": "s", "terrain": ["desert", "salt_flat"], "livestock": 3, "weight": 2},
+    "ibex":    {"name": "Ibex",           "glyph": "i", "terrain": ["mountain", "glacier", "hot_springs"], "livestock": 3, "weight": 3},
+    "donkey":  {"name": "Wild Asses",     "glyph": "j", "terrain": ["desert", "foothills"], "livestock": 4, "weight": 2},
+    "llama":   {"name": "Llamas",         "glyph": "l", "terrain": ["hill", "foothills"],  "livestock": 4, "weight": 2},
+    "elk":     {"name": "Elk",            "glyph": "m", "terrain": ["dense_forest", "ancient_grove", "swamp"], "livestock": 5, "weight": 2},
+    "muskox":  {"name": "Musk Oxen",      "glyph": "z", "terrain": ["glacier", "mountain"], "livestock": 6, "weight": 1},
+    "elephant": {"name": "Elephants",     "glyph": "h", "terrain": ["plains", "swamp"],    "livestock": 10, "weight": 0.4},
 }
 
 
@@ -2364,6 +2434,18 @@ def tame(state, now, area, x, y):
     return None
 
 
+def slaughter(state, now, count):
+    """Kill livestock by hand for food: quick, but a Butcher gets far more from each animal."""
+    if not (isinstance(count, int) and not isinstance(count, bool) and count >= 1):
+        return "Choose how many livestock to slaughter."
+    if state["resources"]["livestock"] < count:
+        return f"You only have {int(state['resources']['livestock'])} livestock."
+    state["resources"]["livestock"] -= count
+    state["resources"]["food"] += count * SLAUGHTER_FOOD
+    log(state, now, f"Slaughtered {count} livestock for {count * SLAUGHTER_FOOD} Food.")
+    return None
+
+
 # ---- Exploration ----
 
 def region_env(state, rx, ry):
@@ -2444,6 +2526,8 @@ def apply_action(state, now, action, data):
     """Run one player action. Returns an error message, or None on success."""
     if action == "advance":
         return advance(state, now)
+    if action == "slaughter":
+        return slaughter(state, now, data.get("count"))
     if action == "dismiss_away":
         state["report"] = None
         return None
@@ -2609,6 +2693,7 @@ def view(state, ai=0):
             "research": RESEARCH,
             "additions": ADDITIONS,
             "max_additions": MAX_ADDITIONS,
+            "slaughter_food": SLAUGHTER_FOOD,
             "environments": ENVIRONMENTS,
             "wildlife": WILDLIFE,
         },
