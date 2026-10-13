@@ -58,6 +58,8 @@ CITIES = {}               # name -> state
 DIRTY = set()             # names changed since the last write to disk
 MARKET = None
 FAILED = {}               # name -> [wrong passwords in a row, locked until]
+ONLINE = {}               # name -> when its own player's page last asked for it
+ONLINE_SECONDS = 45       # a city not heard from for this long has no window open (pages ask every 3-20s)
 LAST_SAVE = 0             # when everything was last written to disk
 
 
@@ -237,6 +239,7 @@ def city_view(state, now, area=0, find=None):
     out["now"] = now
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]))
     out["cities"] = all_city_names()
+    out["online"] = sorted(n for n, seen in ONLINE.items() if now - seen <= ONLINE_SECONDS)
     # Bills are part of what the city gains and loses per hour.
     rates = out["status"]["rates"]
     for k, v in market.bill_rates(MARKET, state["name"]).items():
@@ -260,6 +263,7 @@ def handle_get(path, query, token, now):
         state = get_city(name, now)
         if not signed_in(state, token):
             return 401, SIGN_IN
+        ONLINE[name] = now
         out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0])
         out["away"] = game.check_in(state, now)
         return 200, out
@@ -278,6 +282,7 @@ def handle_get(path, query, token, now):
         out = city_view(state, now, _area(query.get("area", ["0"])[0]))
         out["visiting"] = True
         out["state"].pop("social", None)    # who a city deals with, and its lists, are its own business
+        out["state"].pop("messages", None)
         out["market"]["duels"] = []     # another city's challenges are its own business
         return 200, out
 
@@ -296,6 +301,7 @@ def handle_post(path, data, token, now):
     state = get_city(name, now)
     if not signed_in(state, token):
         return 401, SIGN_IN
+    ONLINE[name] = now
 
     if action == "restart":
         market.drop_city(MARKET, name)
@@ -312,6 +318,7 @@ def handle_post(path, data, token, now):
             state["sessions"] = [_token_hash(token)]    # signs every other browser out
             error = None
     elif action == "sign_out":
+        ONLINE.pop(name, None)
         state["sessions"].remove(_token_hash(token))
         flush()
         return 200, {"error": None}
@@ -333,6 +340,11 @@ def handle_post(path, data, token, now):
     elif action == "beast_offer_accept":
         error = market.accept_beast(MARKET, state, now, data.get("offer"),
                                     lambda seller: find_city(seller, now), data.get("pay"))
+    elif action == "message_send":
+        error = market.send_message(state, now, data.get("to"), data.get("text"),
+                                    lambda other: find_city(other, now))
+    elif action == "messages_read":
+        error = market.read_messages(state, data.get("other"))
     elif action == "duel_post":
         error = market.post_duel(MARKET, state, now, data, lambda other: find_city(other, now))
     elif action == "duel_cancel":       # withdraw one you sent, or decline one sent to you

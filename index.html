@@ -568,7 +568,7 @@
         <h2>Social</h2>
         <div id="socSummary" class="stats"></div>
         <p class="dim small" style="margin-bottom:0">Every dealing you have with another city is noted here: trades, beast
-          trades, bills and duels. Mark a city as an ally or an enemy to keep it at the top of the list. The lists are
+          trades, bills and duels. You can also write to other cities, and see who has the game open right now. Mark a city as an ally or an enemy to keep it at the top of the list. The lists are
           only for you: they change nothing in the game and no other city can see them.</p>
       </div>
       <details class="panel" open>
@@ -578,6 +578,16 @@
           <span id="socFilters" class="bar" style="margin:0"></span>
         </div>
         <div id="socCities" class="scroll" style="margin-top:10px"></div>
+      </details>
+      <details class="panel" open id="socMsgPanel">
+        <summary class="cat">Messages <span id="socMsgCount" class="count"></span></summary>
+        <div id="socTalks" class="bar areaChips" style="margin-top:0"></div>
+        <form id="msgForm" class="bar">
+          To <input id="msgTo" list="cityList" placeholder="city name" autocomplete="off" style="width:170px">
+          <input id="msgText" maxlength="500" placeholder="Write a message" autocomplete="off" style="flex:1 1 240px">
+          <button>Send</button>
+        </form>
+        <div id="socThread" style="max-height:320px;overflow-y:auto;margin-top:8px"></div>
       </details>
       <details class="panel" open id="socHistPanel">
         <summary class="cat">History <span id="socHistCount" class="count"></span></summary>
@@ -792,7 +802,7 @@ const HOWTO = [
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
   ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
-  ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game.'],
+  ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
 ];
@@ -1063,6 +1073,8 @@ function render() {
   setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (challenged ? ' <span class="hi">(duel)</span>' : todo ? ' <span class="good">(mission)</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
+  const mailNew = visiting ? 0 : (state.messages || []).filter(m => !m.read).length;
+  setHTML(document.querySelector('[data-tab=social]'), 'Social' + (mailNew ? ` <span class="good">(${mailNew} new)</span>` : ''));
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'social', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
@@ -1637,12 +1649,14 @@ function renderArena() {
 }
 
 let socFilter = 'known';    // which cities the Social tab lists
+let readSent = '';          // the last conversation this page told the server it has read
 const SOC_KINDS = { trade: ['trade', 'trades'], beast: ['beast trade', 'beast trades'], bill: ['bill event', 'bill events'],
                     duel: ['duel event', 'duel events'], ban: ['ban', 'bans'] };
 function renderSocial() {
   const { state } = view, book = state.social || {}, lists = book.lists || {}, history = book.history || [];
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   // Everything known about each other city: its list, how many dealings of each kind, and the latest one.
+  const online = new Set((view.online || []).filter(c => c !== state.name));
   const info = new Map();
   const of = name => { if (!info.has(name)) info.set(name, { name, tag: lists[name] || '', n: 0, kinds: {}, last: null, exists: false }); return info.get(name); };
   for (const c of view.cities) if (c !== state.name) of(c).exists = true;
@@ -1651,11 +1665,13 @@ function renderSocial() {
   const all = [...info.values()];
   const tagged = t => all.filter(c => c.tag === t).length, dealt = all.filter(c => c.n).length;
   setHTML($('socSummary'), stat('Allies', tagged('ally')) + stat('Enemies', tagged('enemy')) +
+    stat('Online now', online.size, online.size ? esc([...online].slice(0, 4).join(', ')) + (online.size > 4 ? '...' : '') : 'nobody else') +
     stat('Cities dealt with', dealt, `of ${all.filter(c => c.exists).length} others`) + stat('Dealings noted', history.length));
 
   // ---- cities ----
   const filters = { known: ['Listed or dealt with', c => c.tag || c.n], ally: ['Allies', c => c.tag === 'ally'],
-                    enemy: ['Enemies', c => c.tag === 'enemy'], all: ['Every city', () => true] };
+                    enemy: ['Enemies', c => c.tag === 'enemy'], online: ['Online now', c => online.has(c.name)],
+                    all: ['Every city', () => true] };
   const words = $('socSearch').value.trim().toLowerCase();
   const named = all.filter(c => c.name.toLowerCase().includes(words));
   setHTML($('socFilters'), Object.entries(filters).map(([k, [label, test]]) =>
@@ -1668,15 +1684,40 @@ function renderSocial() {
     cities.map(c => {
       const count = Object.entries(SOC_KINDS).filter(([k]) => c.kinds[k]).map(([k, [one, many]]) => `${c.kinds[k]} ${c.kinds[k] === 1 ? one : many}`).join(', ');
       return `<tr><td class="${c.tag === 'ally' ? 'good' : c.tag === 'enemy' ? 'bad' : 'hi'}">${esc(c.name)}` +
+        (online.has(c.name) ? ' <span class="good small">online</span>' : '') +
         (c.exists ? '' : ' <span class="dim small">(gone)</span>') + (myBanned.includes(c.name) ? ' <span class="dim small">(banned)</span>' : '') + `</td>` +
         `<td><button data-soc-tag="ally" data-city="${esc(c.name)}" class="${c.tag === 'ally' ? 'on' : ''}">Ally</button> ` +
         `<button data-soc-tag="enemy" data-city="${esc(c.name)}" class="${c.tag === 'enemy' ? 'on' : ''}">Enemy</button></td>` +
         `<td class="dim">${count || 'none yet'}</td>` +
         `<td class="dim small" style="white-space:normal;min-width:200px">${c.last ? `[${clock(c.last.t)}] ${esc(c.last.text)}` : ''}</td>` +
-        `<td>${c.exists ? `<button data-soc-visit="${esc(c.name)}">Visit</button> ` : ''}` +
+        `<td>${c.exists ? `<button data-soc-visit="${esc(c.name)}">Visit</button> <button data-soc-msg="${esc(c.name)}">Message</button> ` : ''}` +
         (c.n ? `<button data-soc-hist="${esc(c.name)}">History</button>` : '') + `</td></tr>`;
     }).join('') + `</table>`
     : `<span class="dim">${socFilter === 'all' || words ? 'No cities match.' : 'Nothing here yet. Choose Every city to mark allies and enemies, or trade with someone.'}</span>`);
+
+  // ---- messages ----
+  const mail = state.messages || [];
+  const talks = new Map();    // city -> { last, unread }
+  for (const m of mail) { const t = talks.get(m.city) || { unread: 0 }; t.last = m; if (!m.read) t.unread++; talks.set(m.city, t); }
+  const unread = mail.filter(m => !m.read).length, to = $('msgTo').value.trim();
+  $('socMsgCount').textContent = unread ? `(${unread} new)` : mail.length ? `(${talks.size} ${talks.size === 1 ? 'city' : 'cities'})` : '';
+  setHTML($('socTalks'), talks.size ? `<span class="dim small">Conversations</span>` +
+    [...talks.entries()].sort((a, b) => b[1].last.t - a[1].last.t).map(([name, t]) =>
+      `<button data-talk="${esc(name)}" class="chip ${name === to ? 'on' : ''}">${online.has(name) ? '<span class="good">*</span> ' : ''}${esc(name)}` +
+      (t.unread ? ` <span class="good">${t.unread} new</span>` : '') + `</button>`).join('') : '');
+  const thread = mail.filter(m => m.city === to), box = $('socThread'), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+  const before = box._html;
+  setHTML(box, !to ? `<span class="dim">${mail.length ? 'Pick a conversation above, or type a city name to start one.' : 'No messages yet. Type a city name and a message to start a conversation.'}</span>`
+    : (view.cities.includes(to) && to !== state.name ? `<div class="dim small" style="margin-bottom:4px">${esc(to)} is ${online.has(to) ? '<span class="good">online now</span>' : 'not online'}.</div>` : '') +
+      (thread.length ? thread.map(m => `<div class="opt small"><span class="dim">[${clock(m.t)}]</span> ` +
+        `<span class="${m.mine ? 'dim' : 'hi'}">${m.mine ? 'You' : esc(m.city)}:</span> <span style="white-space:normal;overflow-wrap:anywhere">${esc(m.text)}</span></div>`).join('')
+        : `<span class="dim">No messages with ${esc(to)} yet.</span>`));
+  if (box._html !== before && (atEnd || !before)) box.scrollTop = box.scrollHeight;
+  // Looking at a conversation on this tab marks it read.
+  if (tab === 'social' && to && talks.has(to) && talks.get(to).unread && readSent !== to + ':' + talks.get(to).last.id) {
+    readSent = to + ':' + talks.get(to).last.id;
+    act('messages_read', { other: to });   // not "city": that names the sender of every request
+  }
 
   // ---- history ----
   const pick = $('socCity'), was = pick.value;
@@ -2122,6 +2163,23 @@ $('tab-beast').addEventListener('toggle', e => {   // remember which kinds of be
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
 }, true);
+function openTalk(name) {
+  $('msgTo').value = name;
+  renderSocial();
+  $('socMsgPanel').open = true;
+  $('socMsgPanel').scrollIntoView({ block: 'start' });
+  $('msgText').focus();
+}
+$('socTalks').onclick = e => { const b = e.target.closest('[data-talk]'); if (b) { $('msgTo').value = b.dataset.talk; renderSocial(); $('msgText').focus(); } };
+$('msgTo').oninput = () => { if (view && !visiting) renderSocial(); };
+$('msgForm').onsubmit = async e => {
+  e.preventDefault();
+  const to = $('msgTo').value.trim(), text = $('msgText').value.trim();
+  if (!to || !text) { $('msg').textContent = 'Type a city name and a message.'; return; }
+  const sent = (view.state.messages || []).length;
+  await act('message_send', { to, text });
+  if ((view.state.messages || []).length > sent || !$('msg').textContent) { $('msgText').value = ''; $('socThread').scrollTop = $('socThread').scrollHeight; }
+};
 $('socFilters').onclick = e => { if (e.target.dataset.filter) { socFilter = e.target.dataset.filter; renderSocial(); } };
 for (const id of ['socSearch', 'socHistSearch', 'socCity', 'socKind']) $(id).oninput = () => { if (view && !visiting) renderSocial(); };
 $('socCities').onclick = e => {
@@ -2131,6 +2189,7 @@ $('socCities').onclick = e => {
     act('social_list', { target: d.city, list: lists[d.city] === d.socTag ? '' : d.socTag });
   }
   else if (d.socVisit) visit(d.socVisit);
+  else if (d.socMsg) openTalk(d.socMsg);
   else if (d.socHist) { $('socCity').value = d.socHist; renderSocial(); $('socHistPanel').open = true; $('socHistPanel').scrollIntoView({ block: 'start' }); }
 };
 $('beastSearch').oninput = () => { if (view) renderBeast(); };

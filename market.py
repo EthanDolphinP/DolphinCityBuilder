@@ -47,6 +47,9 @@ FINISHED_KEPT = 20      # sold-out offers remembered per city, for posting again
 SALES_KEPT = 50         # unseen sales remembered per city
 MAX_BILLS_PER_CITY = 10
 SOCIAL_KEPT = 300       # dealings with other cities remembered per city
+MAX_MESSAGE = 500       # characters in one message to another city
+MESSAGES_KEPT = 300     # messages (sent and received) remembered per city
+MESSAGES_PER_MINUTE = 10
 MIN_BILL_HOURS, MAX_BILL_HOURS = 1, 168
 MISSES_ALLOWED = 3      # payments in a row that may fail before a bill is cancelled
 
@@ -649,3 +652,46 @@ def duels_view(market, name):
             entry["boost"] = beasts.duel_boost(d["beast"]["species"], d["bet"]["res"], d["bet"]["qty"])
         out.append(entry)
     return out
+
+
+# ---- Messages ----
+# A private note from one city to another. Each city keeps its own copy of
+# what it sent and received, so one city restarting does not lose the other's.
+
+def _mailbox(state):
+    return state.setdefault("messages", [])
+
+
+def send_message(state, now, to, text, get_city):
+    target = get_city(to) if to != state["name"] else None
+    if not target:
+        return "Pick another city that exists to write to."
+    if state["name"] in target["banned"]:
+        return f"{to} is not accepting messages from your city."
+    text = " ".join(text.split()) if isinstance(text, str) else ""
+    if not text:
+        return "Write a message first."
+    if len(text) > MAX_MESSAGE:
+        return f"Messages can be at most {MAX_MESSAGE} characters."
+    recent = [m for m in _mailbox(state) if m["mine"] and now - m["t"] < 60]
+    if len(recent) >= MESSAGES_PER_MINUTE:
+        return "You are sending messages too quickly. Wait a moment."
+    state["message_count"] = state.get("message_count", 0) + 1
+    _mailbox(state).append({"id": state["message_count"], "t": now, "city": to, "mine": True, "text": text, "read": True})
+    waiting = any(m["city"] == state["name"] and not m["read"] for m in _mailbox(target))
+    target["message_count"] = target.get("message_count", 0) + 1
+    _mailbox(target).append({"id": target["message_count"], "t": now, "city": state["name"], "mine": False,
+                             "text": text, "read": False})
+    for box in (_mailbox(state), _mailbox(target)):
+        del box[:-MESSAGES_KEPT]
+    if not waiting:     # one line in the log per conversation waiting, not one per message
+        game.log(target, now, f"{state['name']} sent you a message. See the Social tab.")
+    return None
+
+
+def read_messages(state, other):
+    """The player has looked at what `other` wrote to them."""
+    for m in _mailbox(state):
+        if m["city"] == other:
+            m["read"] = True
+    return None
