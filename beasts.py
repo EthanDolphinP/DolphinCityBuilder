@@ -31,6 +31,7 @@ rest, and use these fields (added up over the whole city):
 touch `game` at import time: only inside functions.
 """
 
+import math
 import random
 
 import game
@@ -205,6 +206,51 @@ ART = {
     ],
 }
 
+# ---- Duels ----
+# Two cities each bet goods on one of their beasts and the beasts fight; the
+# winner's city takes both bets (see "Duels" in market.py). A beast does not
+# fight better for being a higher level. It fights better the more is bet on
+# it, and far better when the bet is the material its species likes.
+LIKES = {
+    "mossback": "food", "stonehorn": "stone", "glimmerwing": "wood", "magpie_drake": "gold",
+    "trailhound": "food", "herdmother": "livestock", "sunscale": "ore",
+    "hearth_lynx": "wood", "stormcrest": "livestock", "goldmaw": "gold",
+    "world_turtle": "stone", "frost_wyrm": "tools", "sky_serpent": "electronics",
+}
+DUEL = {
+    "per": 50,       # every doubling past this much of the liked material...
+    "step": 0.25,    # ...adds this much to all four stats (0.25 = 25%)
+    "other": 0.2,    # a material it does not care for counts for this share of the amount
+    "max": 3.0,      # the most a bet can multiply the stats by
+}
+DUEL_ROUNDS = 40
+DUEL_RESULTS_KEPT = 6
+
+
+def duel_boost(species, res, qty):
+    """What a bet of `qty` of `res` multiplies this species' stats by in a duel."""
+    amount = qty if res == LIKES[species] else qty * DUEL["other"]
+    return round(min(DUEL["max"], 1 + DUEL["step"] * math.log2(1 + amount / DUEL["per"])), 2)
+
+
+def fight(one, two, rng):
+    """Fight two sets of stats ({"hp", "atk", "def", "spd"}). Returns (index of the winner, rounds).
+    The faster beast strikes first and is harder to hit. Each round is {"by", "dmg", "left"};
+    dmg 0 is a miss, and "left" is the health the one struck has left."""
+    sides, hp, rounds = (one, two), [one["hp"], two["hp"]], []
+    first = 0 if one["spd"] > two["spd"] or (one["spd"] == two["spd"] and rng.random() < 0.5) else 1
+    for _ in range(DUEL_ROUNDS):
+        for i in (first, 1 - first):
+            j = 1 - i
+            dodge = max(0, min(0.35, (sides[j]["spd"] - sides[i]["spd"]) / (sides[j]["spd"] + sides[i]["spd"])))
+            dmg = 0 if rng.random() < dodge else max(1, round(sides[i]["atk"] * rng.uniform(0.8, 1.2) - sides[j]["def"] * 0.5))
+            hp[j] = max(0, hp[j] - dmg)
+            rounds.append({"by": i, "dmg": dmg, "left": hp[j]})
+            if hp[j] <= 0:
+                return i, rounds
+    # Nobody fell: whoever has the larger share of their health left wins.
+    return (0 if hp[0] / one["hp"] >= hp[1] / two["hp"] else 1), rounds
+
 # kind of mission -> how it is asked for.
 #   pay        a resource the city hands over with the Deliver button, or
 #   event      something the city does: "build", "tame", "research", "explore"
@@ -247,6 +293,8 @@ def take(state, beast_id):
         return None, "You have no such beast."
     if beast["stage"] != "egg" and beast["id"] == state.get("beast_active"):
         return None, "Your active beast can't be traded. Make another beast active first."
+    if beast.get("duel"):
+        return None, "That beast is waiting for a duel. Withdraw the duel first."
     state["beasts"].remove(beast)
     return beast, None
 
@@ -267,7 +315,8 @@ def public(beast):
     if beast["stage"] == "egg":
         return {"egg": True, "name": f"{rarity['name']} egg", "rarity": rarity["name"], "color": rarity["color"]}
     return {"egg": False, "name": species["name"], "species": beast["species"], "rarity": rarity["name"],
-            "color": rarity["color"], "level": beast["level"], "stats": beast["stats"], "nature": species["nature"]}
+            "color": rarity["color"], "level": beast["level"], "stats": beast["stats"], "nature": species["nature"],
+            "likes": LIKES[beast["species"]]}
 
 
 def _egg_task(rng):
@@ -543,6 +592,7 @@ def view(state, now):
         else:
             entry.update(name=species["name"], nature=species["nature"], desc=species["desc"],
                          species=b["species"], stats=b["stats"], art="\n".join(ART[b["species"]]),
+                         likes=LIKES[b["species"]], duel=bool(b.get("duel")),
                          xp=b["xp"], xp_needed=xp_needed(b["level"]), max_level=b["level"] >= MAX_LEVEL,
                          bonus=_describe(species["bonus"], b["level"], power),
                          next_bonus=_describe(species["bonus"], min(MAX_LEVEL, b["level"] + 1), power))
@@ -559,4 +609,6 @@ def view(state, now):
         "rarities": RARITIES,
         "stats": STATS,
         "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"]} for k, s in SPECIES.items()},
+        "duel": DUEL,
+        "duels": state.get("duels", []),
     }
