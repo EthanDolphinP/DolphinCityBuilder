@@ -2847,6 +2847,7 @@ def advance(state, now):
 # goods added.
 
 MAX_PRESENT_MESSAGE = 300
+MAX_SOCIAL_LIST = 200       # cities one city can mark as ally or enemy (the lists do nothing in the game)
 
 
 def give_present(state, now, message, gifts, egg=None):
@@ -3084,6 +3085,18 @@ def apply_action(state, now, action, data):
         return slaughter(state, now, data.get("count"))
     if action == "dismiss_away":
         state["report"] = None
+        return None
+    if action == "social_list":     # put another city on the ally or enemy list, or take it off both
+        target, tag = data.get("target"), data.get("list")
+        if not isinstance(target, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,24}", target) or target == state["name"]:
+            return "Pick another city."
+        lists = state.setdefault("social", {"lists": {}, "history": []})["lists"]
+        if tag not in ("ally", "enemy"):
+            lists.pop(target, None)
+        elif target not in lists and len(lists) >= MAX_SOCIAL_LIST:
+            return f"You can keep at most {MAX_SOCIAL_LIST} cities on your lists."
+        else:
+            lists[target] = tag
         return None
     if action == "present_open":
         return open_present(state, now, data.get("present"))

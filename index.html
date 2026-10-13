@@ -159,7 +159,7 @@
   .spcHead { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: flex-start; margin: 8px 0 4px; }
   .tradeForm { border: 1px solid var(--accent); background: var(--inset); padding: 8px 10px; margin: 6px 0; white-space: normal; }
   .tradeForm .bar { margin: 6px 0; align-items: center; }
-  .visiting [data-deliver], .visiting [data-egg-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
+  .visiting [data-deliver], .visiting [data-egg-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market], .visiting [data-tab=social] { display: none; }
   #away, #report, #present { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
@@ -212,6 +212,7 @@
       <button data-tab="explore">Explore</button>
       <button data-tab="research">Research</button>
       <button data-tab="market">Market</button>
+      <button data-tab="social">Social</button>
       <button data-tab="board">Leaderboard</button>
       <button data-tab="guide">Guide</button>
       <button data-tab="settings">Settings</button>
@@ -481,7 +482,7 @@
           <label><span class="k">Check the server for changes</span><select data-setting="poll">
             <option value="3">Every 3 seconds</option><option value="5">Every 5 seconds</option><option value="10">Every 10 seconds</option><option value="20">Every 20 seconds</option></select></label>
           <label><span class="k">Open the game on</span><select data-setting="startTab">
-            <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="market">Market</option></select></label>
+            <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="market">Market</option><option value="social">Social</option></select></label>
           <label class="check"><input data-setting="tutorial" type="checkbox"> Show the Getting started list on the City tab</label>
           <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
           <label class="check"><input data-setting="reports" type="checkbox"> Show a report when an expedition returns</label>
@@ -558,6 +559,36 @@
       <details class="panel" id="gSecWildlife">
         <summary class="cat">Wildlife <span id="gCountWildlife" class="count"></span></summary>
         <div id="guideWildlife" class="scroll"></div>
+      </details>
+    </div>
+
+    <!-- Social -->
+    <div id="tab-social" hidden>
+      <div class="panel">
+        <h2>Social</h2>
+        <div id="socSummary" class="stats"></div>
+        <p class="dim small" style="margin-bottom:0">Every dealing you have with another city is noted here: trades, beast
+          trades, bills and duels. Mark a city as an ally or an enemy to keep it at the top of the list. The lists are
+          only for you: they change nothing in the game and no other city can see them.</p>
+      </div>
+      <details class="panel" open>
+        <summary class="cat">Cities <span id="socCityCount" class="count"></span></summary>
+        <div class="bar" style="margin-top:0">
+          <input id="socSearch" type="search" placeholder="Search cities by name" style="flex:1 1 200px">
+          <span id="socFilters" class="bar" style="margin:0"></span>
+        </div>
+        <div id="socCities" class="scroll" style="margin-top:10px"></div>
+      </details>
+      <details class="panel" open id="socHistPanel">
+        <summary class="cat">History <span id="socHistCount" class="count"></span></summary>
+        <div class="bar" style="margin-top:0">
+          <select id="socCity"></select>
+          <select id="socKind">
+            <option value="">Every kind</option><option value="trade">Trades</option><option value="beast">Beast trades</option>
+            <option value="bill">Bills</option><option value="duel">Duels</option><option value="ban">Bans</option></select>
+          <input id="socHistSearch" type="search" placeholder="Search the history, e.g. gold, won" style="flex:1 1 200px">
+        </div>
+        <div id="socHistory" style="margin-top:8px"></div>
       </details>
     </div>
 
@@ -761,7 +792,7 @@ const HOWTO = [
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
   ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
-  ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills.'],
+  ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
 ];
@@ -1032,7 +1063,7 @@ function render() {
   setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (challenged ? ' <span class="hi">(duel)</span>' : todo ? ' <span class="good">(mission)</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
-  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
+  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'social', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
   $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
@@ -1089,6 +1120,7 @@ function render() {
   renderResearch();
   renderExplore();
   if (!visiting) renderMarket();
+  if (!visiting) renderSocial();
 
   const text = state.log.slice().reverse().map(e => `[${clock(e.t)}] ${e.text}`).join('\n');
   if ($('log').textContent !== text) $('log').textContent = text;
@@ -1604,6 +1636,65 @@ function renderArena() {
   }).join('') : `<span class="dim">No duels fought yet.</span>`);
 }
 
+let socFilter = 'known';    // which cities the Social tab lists
+const SOC_KINDS = { trade: ['trade', 'trades'], beast: ['beast trade', 'beast trades'], bill: ['bill event', 'bill events'],
+                    duel: ['duel event', 'duel events'], ban: ['ban', 'bans'] };
+function renderSocial() {
+  const { state } = view, book = state.social || {}, lists = book.lists || {}, history = book.history || [];
+  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
+  // Everything known about each other city: its list, how many dealings of each kind, and the latest one.
+  const info = new Map();
+  const of = name => { if (!info.has(name)) info.set(name, { name, tag: lists[name] || '', n: 0, kinds: {}, last: null, exists: false }); return info.get(name); };
+  for (const c of view.cities) if (c !== state.name) of(c).exists = true;
+  for (const name of Object.keys(lists)) of(name);
+  for (const h of history) { const c = of(h.city); c.n++; c.kinds[h.kind] = (c.kinds[h.kind] || 0) + 1; c.last = h; }
+  const all = [...info.values()];
+  const tagged = t => all.filter(c => c.tag === t).length, dealt = all.filter(c => c.n).length;
+  setHTML($('socSummary'), stat('Allies', tagged('ally')) + stat('Enemies', tagged('enemy')) +
+    stat('Cities dealt with', dealt, `of ${all.filter(c => c.exists).length} others`) + stat('Dealings noted', history.length));
+
+  // ---- cities ----
+  const filters = { known: ['Listed or dealt with', c => c.tag || c.n], ally: ['Allies', c => c.tag === 'ally'],
+                    enemy: ['Enemies', c => c.tag === 'enemy'], all: ['Every city', () => true] };
+  const words = $('socSearch').value.trim().toLowerCase();
+  const named = all.filter(c => c.name.toLowerCase().includes(words));
+  setHTML($('socFilters'), Object.entries(filters).map(([k, [label, test]]) =>
+    `<button data-filter="${k}" class="${k === socFilter ? 'on' : ''}">${label} (${named.filter(test).length})</button>`).join(''));
+  const rank = c => c.tag === 'ally' ? 0 : c.tag === 'enemy' ? 1 : 2;
+  const cities = named.filter(filters[socFilter][1]).sort((a, b) =>
+    rank(a) - rank(b) || (b.last ? b.last.t : 0) - (a.last ? a.last.t : 0) || a.name.localeCompare(b.name));
+  $('socCityCount').textContent = `(${cities.length})`;
+  setHTML($('socCities'), cities.length ? `<table><tr><th>City</th><th>Your list</th><th>Dealings</th><th>Latest</th><th></th></tr>` +
+    cities.map(c => {
+      const count = Object.entries(SOC_KINDS).filter(([k]) => c.kinds[k]).map(([k, [one, many]]) => `${c.kinds[k]} ${c.kinds[k] === 1 ? one : many}`).join(', ');
+      return `<tr><td class="${c.tag === 'ally' ? 'good' : c.tag === 'enemy' ? 'bad' : 'hi'}">${esc(c.name)}` +
+        (c.exists ? '' : ' <span class="dim small">(gone)</span>') + (myBanned.includes(c.name) ? ' <span class="dim small">(banned)</span>' : '') + `</td>` +
+        `<td><button data-soc-tag="ally" data-city="${esc(c.name)}" class="${c.tag === 'ally' ? 'on' : ''}">Ally</button> ` +
+        `<button data-soc-tag="enemy" data-city="${esc(c.name)}" class="${c.tag === 'enemy' ? 'on' : ''}">Enemy</button></td>` +
+        `<td class="dim">${count || 'none yet'}</td>` +
+        `<td class="dim small" style="white-space:normal;min-width:200px">${c.last ? `[${clock(c.last.t)}] ${esc(c.last.text)}` : ''}</td>` +
+        `<td>${c.exists ? `<button data-soc-visit="${esc(c.name)}">Visit</button> ` : ''}` +
+        (c.n ? `<button data-soc-hist="${esc(c.name)}">History</button>` : '') + `</td></tr>`;
+    }).join('') + `</table>`
+    : `<span class="dim">${socFilter === 'all' || words ? 'No cities match.' : 'Nothing here yet. Choose Every city to mark allies and enemies, or trade with someone.'}</span>`);
+
+  // ---- history ----
+  const pick = $('socCity'), was = pick.value;
+  const options = `<option value="">Every city</option>` + all.filter(c => c.n).sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => `<option value="${esc(c.name)}">${esc(c.name)} (${c.n})</option>`).join('');
+  if (pick._html !== options) { setHTML(pick, options); pick.value = [...pick.options].some(o => o.value === was) ? was : ''; }
+  const kind = $('socKind').value, text = $('socHistSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const rows = history.filter(h => (!pick.value || h.city === pick.value) && (!kind || h.kind === kind) &&
+    text.every(w => `${h.city} ${h.text}`.toLowerCase().includes(w))).reverse();
+  $('socHistCount').textContent = `(${rows.length}${rows.length === history.length ? '' : ' of ' + history.length})`;
+  const tagClass = name => lists[name] === 'ally' ? 'good' : lists[name] === 'enemy' ? 'bad' : 'hi';
+  setHTML($('socHistory'), rows.length ? rows.slice(0, 100).map(h =>
+      `<div class="opt small"><span class="dim">[${clock(h.t)}]</span> <span class="${tagClass(h.city)}">${esc(h.city)}</span> ` +
+      `<span class="dim">${esc(SOC_KINDS[h.kind] ? SOC_KINDS[h.kind][0].replace(' event', '') : h.kind)}:</span> ${esc(h.text)}</div>`).join('') +
+      (rows.length > 100 ? `<p class="dim small">Showing the latest 100 of ${rows.length}. Narrow it down with the menus or the search box.</p>` : '')
+    : `<span class="dim">${history.length ? 'Nothing matches.' : 'No dealings with other cities yet. Trades, beast trades, bills and duels will be noted here from now on.'}</span>`);
+}
+
 function renderSettings() {
   // Fill the menus once, then show the current choices.
   const fill = (key, options) => {
@@ -2031,6 +2122,17 @@ $('tab-beast').addEventListener('toggle', e => {   // remember which kinds of be
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
 }, true);
+$('socFilters').onclick = e => { if (e.target.dataset.filter) { socFilter = e.target.dataset.filter; renderSocial(); } };
+for (const id of ['socSearch', 'socHistSearch', 'socCity', 'socKind']) $(id).oninput = () => { if (view && !visiting) renderSocial(); };
+$('socCities').onclick = e => {
+  const d = e.target.dataset;
+  if (d.socTag) {
+    const lists = (view.state.social || {}).lists || {};
+    act('social_list', { target: d.city, list: lists[d.city] === d.socTag ? '' : d.socTag });
+  }
+  else if (d.socVisit) visit(d.socVisit);
+  else if (d.socHist) { $('socCity').value = d.socHist; renderSocial(); $('socHistPanel').open = true; $('socHistPanel').scrollIntoView({ block: 'start' }); }
+};
 $('beastSearch').oninput = () => { if (view) renderBeast(); };
 $('duelForm').addEventListener('input', () => { if (view) fillDuels(); });
 $('duelForm').onsubmit = e => {

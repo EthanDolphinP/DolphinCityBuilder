@@ -277,6 +277,7 @@ def handle_get(path, query, token, now):
             return 403, {"error": f"{name} has banned your city from viewing it."}
         out = city_view(state, now, _area(query.get("area", ["0"])[0]))
         out["visiting"] = True
+        out["state"].pop("social", None)    # who a city deals with, and its lists, are its own business
         out["market"]["duels"] = []     # another city's challenges are its own business
         return 200, out
 
@@ -348,7 +349,7 @@ def handle_post(path, data, token, now):
         error = market.propose_bill(MARKET, state, now, data,
                                     lambda other: find_city(other, now))
     elif action == "bill_accept":
-        error = market.accept_bill(MARKET, state, now, data.get("bill"))
+        error = market.accept_bill(MARKET, state, now, data.get("bill"), lambda other: find_city(other, now))
     elif action == "bill_cancel":
         error = market.cancel_bill(MARKET, state, now, data.get("bill"),
                                    lambda other: find_city(other, now))
@@ -358,6 +359,9 @@ def handle_post(path, data, token, now):
             error = BAD_NAME
         else:
             error = game.set_ban(state, now, target, action == "ban")
+            if not error:
+                market.social(state, now, target, "ban",
+                              "You banned them." if action == "ban" else "You lifted your ban on them.")
             if action == "ban" and not error:
                 market.drop_proposals(MARKET, target, name)
     else:

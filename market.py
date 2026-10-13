@@ -46,8 +46,19 @@ HISTORY_LENGTH = 20
 FINISHED_KEPT = 20      # sold-out offers remembered per city, for posting again
 SALES_KEPT = 50         # unseen sales remembered per city
 MAX_BILLS_PER_CITY = 10
+SOCIAL_KEPT = 300       # dealings with other cities remembered per city
 MIN_BILL_HOURS, MAX_BILL_HOURS = 1, 168
 MISSES_ALLOWED = 3      # payments in a row that may fail before a bill is cancelled
+
+
+def social(state, now, other, kind, text):
+    """Note a dealing with city `other` in this city's Social history. `kind` is "trade",
+    "beast", "bill", "duel" or "ban"; `text` is told from this city's side."""
+    if not state:
+        return
+    book = state.setdefault("social", {"lists": {}, "history": []})
+    book["history"].append({"t": now, "city": other, "kind": kind, "text": text})
+    del book["history"][:-SOCIAL_KEPT]
 
 
 def new_market():
@@ -227,6 +238,8 @@ def accept(market, buyer, now, offer_id, get_city, lots=None, amount=None):
         del seller["sales"][:-SALES_KEPT]
 
     _record(market, now, offer["city"], buyer["name"], offer["give"], give_qty, offer["want"], want_qty)
+    social(buyer, now, offer["city"], "trade", f"You bought {got} from their offer for {paid}.")
+    social(seller, now, buyer["name"], "trade", f"They bought {got} from your offer for {paid}.")
     return None
 
 
@@ -293,15 +306,20 @@ def propose_bill(market, state, now, data, get_city):
     market["next_id"] += 1
     market["bills"].append(bill)
     game.log(state, now, f"Proposed a bill: {bill_text(bill)}.")
+    social(state, now, to, "bill", f"You proposed a bill: {bill_text(bill)}.")
+    social(target, now, state["name"], "bill", f"They proposed a bill: {bill_text(bill)}.")
     return None
 
 
-def accept_bill(market, state, now, bill_id):
+def accept_bill(market, state, now, bill_id, get_city=None):
     bill = _bill(market, bill_id)
     if not bill or bill["status"] != "proposed" or bill["to"] != state["name"]:
         return "That bill is not waiting for your answer."
     bill.update(status="active", next=now + bill["every"])
     game.log(state, now, f"Agreed to a bill: {bill_text(bill)}.")
+    social(state, now, bill["from"], "bill", f"You agreed to their bill: {bill_text(bill)}.")
+    social(get_city(bill["from"]) if get_city else None, now, state["name"], "bill",
+           f"They agreed to your bill: {bill_text(bill)}.")
     return None
 
 
@@ -315,6 +333,9 @@ def cancel_bill(market, state, now, bill_id, get_city):
         city = state if name == state["name"] else get_city(name)
         if city:
             game.log(city, now, f"{state['name']} ended the bill: {bill_text(bill)}.")
+            other = bill["to"] if name == bill["from"] else bill["from"]
+            social(city, now, other, "bill",
+                   f"{'You' if city is state else 'They'} ended the bill: {bill_text(bill)}.")
     return None
 
 
@@ -346,6 +367,8 @@ def run_bills(market, now, get_city):
                     text += f" It was cancelled after {MISSES_ALLOWED} missed payments in a row."
             game.log(sender, when, text)
             game.log(receiver, when, text)
+            social(sender, when, bill["to"], "bill", text)
+            social(receiver, when, bill["from"], "bill", text)
             if bill["missed"] >= MISSES_ALLOWED:
                 market["bills"].remove(bill)
                 break
@@ -451,6 +474,8 @@ def accept_beast(market, buyer, now, offer_id, get_city, pay_beast=None):
     beasts.give(buyer, now, offer["beast"])
     game.log(buyer, now, f"Traded with {offer['city']}: gave {paid}, received {name}. See the Beast tab.")
     game.log(seller, now, f"{buyer['name']} took your beast offer: gave {name}, received {paid}.")
+    social(buyer, now, offer["city"], "beast", f"You took their beast offer: gave {paid}, received {name}.")
+    social(seller, now, buyer["name"], "beast", f"They took your beast offer: you gave {name}, received {paid}.")
     return None
 
 
@@ -524,6 +549,8 @@ def post_duel(market, state, now, data, get_city):
     game.log(state, now, f"Challenged {to} to a duel with {beasts.title(beast)}.")
     game.log(target, now, f"{state['name']} has challenged you to a duel with a {beasts.title(beast)}. "
                           f"Accept or decline it in the Arena on the Beast tab.")
+    social(state, now, to, "duel", f"You challenged them to a duel with your {beasts.title(beast)}.")
+    social(target, now, state["name"], "duel", f"They challenged you to a duel with their {beasts.title(beast)}.")
     return None
 
 
@@ -549,8 +576,12 @@ def cancel_duel(market, state, now, duel_id, get_city):
     _end_duel(market, duel, challenger, refund=True)
     if mine:
         game.log(state, now, f"Withdrew a challenge; {_goods(duel['bet'])} returned.")
+        social(state, now, duel.get("to"), "duel", "You withdrew your challenge.")
+        social(get_city(duel.get("to")), now, state["name"], "duel", "They withdrew their challenge.")
     else:
         game.log(state, now, f"Declined a duel with {duel['city']}.")
+        social(state, now, duel["city"], "duel", "You declined their duel.")
+        social(challenger, now, state["name"], "duel", "They declined your duel.")
         if challenger:
             game.log(challenger, now, f"{state['name']} declined your duel; {_goods(duel['bet'])} returned.")
     return None
@@ -599,6 +630,9 @@ def accept_duel(market, state, now, duel_id, get_city, beast_id, bet, rng=None):
         game.log(city, now, f"Duel: your {sides[i]['name']} (bet {sides[i]['bet']}) "
                             f"{'beat' if winner == i else 'lost to'} {foe['city']}'s {foe['name']} (bet {foe['bet']}). "
                             + (f"You won {prize}." if winner == i else "You lost your bet."))
+        social(city, now, foe["city"], "duel",
+               f"Your {sides[i]['name']} (bet {sides[i]['bet']}) {'beat' if winner == i else 'lost to'} their "
+               f"{foe['name']} (bet {foe['bet']}). " + (f"You won {prize}." if winner == i else "You lost your bet."))
     beasts.give_xp(cities[winner], now, fighters[winner], beasts.DUEL_XP)
     return None
 
