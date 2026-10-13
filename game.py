@@ -3032,6 +3032,8 @@ def apply_action(state, now, action, data):
         return beasts.set_active(state, now, data.get("beast"))
     if action == "mission_deliver":
         return beasts.deliver(state, now)
+    if action == "egg_deliver":
+        return beasts.deliver(state, now, data.get("beast"))
     if action == "report_seen":     # the player has read the oldest expedition report
         del state["reports"][:1]
         return None

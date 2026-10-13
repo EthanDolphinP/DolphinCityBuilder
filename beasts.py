@@ -1,10 +1,15 @@
 """Beasts: companions that set a city a mission each day and grow as it completes them.
 
-Every city starts with one common egg. An egg hatches once it has been kept
-warm for a while and its city has completed one mission for it. A hatched
-beast gains experience from missions, levels up, and gives the city a bonus
-that depends on its species ("nature") and grows with its level. Only the
-city's active beast sets missions and gives its bonus; the others wait.
+Every city starts with one common egg. Each egg comes with one small mission
+of its own. It hatches once it has been kept warm for a while and that mission
+is done. Egg missions never run out of time, every egg has its own, and they
+have nothing to do with the daily beast mission: any number of eggs can be
+hatched in a day.
+
+A hatched beast gains experience from beast missions, levels up, and gives the
+city a bonus that depends on its species ("nature") and grows with its level.
+Only the city's active beast sets beast missions (one each day) and gives its
+bonus; the others wait. Only a hatched beast can be the active one.
 
 More eggs can be found by expeditions; rarer species are likelier far from home.
 
@@ -28,7 +33,7 @@ import game
 
 HOUR = 3600
 MISSION_TIME = 24 * HOUR    # a new mission this often
-HATCH_TIME = 2 * HOUR       # warmth an egg needs (as well as one completed mission)
+HATCH_TIME = 2 * HOUR       # warmth an egg needs (as well as its own mission)
 MAX_LEVEL = 10
 MISSION_XP = 10             # experience for a completed mission, before bonuses
 EGG_CHANCE = 0.15           # chance an expedition finds an egg...
@@ -116,8 +121,18 @@ def new_egg(state, now, species):
     state["beast_count"] = state.get("beast_count", 0) + 1
     beast = {"id": state["beast_count"], "species": species, "stage": "egg", "level": 0, "xp": 0,
              "obtained": now, "missions": 0}
+    beast["task"] = _egg_task(random.Random())
     state["beasts"].append(beast)
     return beast
+
+
+def _egg_task(rng):
+    """The one small mission an egg needs done before it will hatch."""
+    kind = rng.choice([k for k, m in MISSIONS.items() if m["min_level"] == 0])
+    m = MISSIONS[kind]
+    need = max(1, int(m["base"]))
+    return {"kind": kind, "need": need, "done": 0, "complete": False, "pay": m.get("pay"),
+            "text": m["text"].format(n=need, s="" if need == 1 else "s")}
 
 
 def random_species(rng, distance=0, rarity=None):
@@ -142,6 +157,25 @@ def migrate(state, now):
         setup(state, now)
         game.log(state, now, "A strange egg has been found at the edge of the city. See the Beast tab.")
     state.setdefault("reports", [])
+    # Eggs used to share the daily mission; now each has a mission of its own.
+    for beast in state["beasts"]:
+        if beast["stage"] == "egg" and beast["missions"] < 1 and "task" not in beast:
+            old = state.get("mission")
+            if old and not old["complete"] and old.get("beast") == beast["id"]:
+                beast["task"] = {k: old[k] for k in ("kind", "need", "done", "complete", "pay", "text")}
+                state["mission"] = None
+            else:
+                beast["task"] = _egg_task(random.Random())
+    _pick_active(state)
+
+
+def _pick_active(state):
+    """Only a hatched beast can be active. If the active one is an egg (or missing) and the
+    city has a hatched beast, the highest-level one takes over."""
+    beast = active(state)
+    hatched = [b for b in state["beasts"] if b["stage"] != "egg"]
+    if hatched and (not beast or beast["stage"] == "egg"):
+        state["beast_active"] = max(hatched, key=lambda b: b["level"])["id"]
 
 
 def get(state, beast_id):
@@ -156,6 +190,8 @@ def set_active(state, now, beast_id):
     beast = get(state, beast_id)
     if not beast:
         return "You have no such beast."
+    if beast["stage"] == "egg":
+        return "Only a hatched beast can be the active one. Eggs hatch wherever they are."
     state["beast_active"] = beast_id
     game.log(state, now, f"{title(beast)} is now the city's active beast.")
     return None
@@ -216,7 +252,7 @@ def give_xp(state, now, beast, amount):
 
 def _issue(state, now, rng):
     beast = active(state)
-    if not beast:
+    if not beast or beast["stage"] == "egg":
         return
     level = beast["level"]
     kinds = [k for k, m in MISSIONS.items() if m["min_level"] <= level
@@ -241,15 +277,32 @@ def _complete(state, now):
     if not beast:
         return
     game.log(state, now, f"Mission complete: {mission['text']}.")
-    if beast["stage"] == "egg":
-        beast["missions"] += 1
-    else:
+    if beast["stage"] != "egg":
         give_xp(state, now, beast, round(MISSION_XP * (1 + game.city_stat(state, "beast_xp"))))
     tick(state, now)
 
 
+def _complete_egg(state, now, beast):
+    beast["task"]["complete"] = True
+    beast["missions"] = 1
+    game.log(state, now, f"Egg mission complete: {beast['task']['text']}.")
+    tick(state, now)
+
+
+def _waiting_eggs(state):
+    """Eggs whose own mission is still to do."""
+    return [b for b in state["beasts"] if b["stage"] == "egg" and b.get("task") and not b["task"]["complete"]]
+
+
 def note(state, now, event, amount=1):
-    """Something happened in the city that a mission may be waiting for."""
+    """Something happened in the city that missions may be waiting for. It counts towards
+    the beast mission and towards every egg's own mission at once."""
+    for beast in _waiting_eggs(state):
+        task = beast["task"]
+        if MISSIONS[task["kind"]].get("event") == event:
+            task["done"] = min(task["need"], task["done"] + amount)
+            if task["done"] >= task["need"]:
+                _complete_egg(state, now, beast)
     mission = state.get("mission")
     if mission and not mission["complete"] and MISSIONS[mission["kind"]].get("event") == event:
         mission["done"] = min(mission["need"], mission["done"] + amount)
@@ -257,16 +310,22 @@ def note(state, now, event, amount=1):
             _complete(state, now)
 
 
-def deliver(state, now):
-    """Hand over what a "bring me" mission asks for."""
-    mission = state.get("mission")
+def deliver(state, now, egg_id=None):
+    """Hand over what a "bring me" mission asks for: the beast mission, or the egg's own if `egg_id` is given."""
+    egg = get(state, egg_id) if egg_id is not None else None
+    if egg_id is not None and egg not in _waiting_eggs(state):
+        return "That egg is not waiting for anything."
+    mission = egg["task"] if egg else state.get("mission")
     if not mission or mission["complete"] or not mission["pay"]:
         return "There is nothing to deliver right now."
     if state["resources"][mission["pay"]] < mission["need"]:
         return f"You need {mission['need']} {game.RESOURCES[mission['pay']]} for that."
     state["resources"][mission["pay"]] -= mission["need"]
     mission["done"] = mission["need"]
-    _complete(state, now)
+    if egg:
+        _complete_egg(state, now, egg)
+    else:
+        _complete(state, now)
     return None
 
 
@@ -275,9 +334,14 @@ def tick(state, now):
     for beast in state["beasts"]:
         if beast["stage"] == "egg" and beast["missions"] >= 1 and now - beast["obtained"] >= hatch_time(state):
             beast.update(stage="hatched", level=1, xp=0, hatched=now)
+            beast.pop("task", None)
             species = SPECIES[beast["species"]]
             game.log(state, now, f"*** The egg has hatched: a {species['name']} "
                                  f"({RARITIES[species['rarity']]['name'].lower()}), {species['nature'].lower()}. ***")
+    _pick_active(state)
+    beast = active(state)
+    if not beast or beast["stage"] == "egg":
+        return      # beast missions start once the city has a hatched beast
     if now >= state["mission_at"]:
         _issue(state, now, random.Random())
         # one mission per period; after a long absence the clock starts again from now
@@ -328,7 +392,7 @@ def view(state, now):
                  "rarity": rarity["name"], "color": rarity["color"], "level": b["level"]}
         if egg:     # what is inside stays a surprise
             entry.update(name=f"{rarity['name']} egg", warm=now - b["obtained"], warm_needed=hatch_time(state),
-                         missions=b["missions"])
+                         missions=b["missions"], task=b.get("task"))
         else:
             entry.update(name=species["name"], nature=species["nature"], desc=species["desc"],
                          xp=b["xp"], xp_needed=xp_needed(b["level"]), max_level=b["level"] >= MAX_LEVEL,
@@ -337,6 +401,7 @@ def view(state, now):
         beasts.append(entry)
     return {
         "beasts": beasts,
+        "hatched": any(b["stage"] != "egg" for b in state["beasts"]),
         "mission": state.get("mission"),
         "mission_at": state["mission_at"],
         "mission_period": mission_period(state),

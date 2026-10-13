@@ -150,7 +150,7 @@
   .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
-  .visiting [data-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
+  .visiting [data-deliver], .visiting [data-egg-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
   #away, #report { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
@@ -254,16 +254,18 @@
     <div id="tab-beast" hidden>
       <div class="cols">
         <div class="panel"><h2>Your beast</h2><div id="beastActive"></div></div>
-        <div class="panel"><h2>Mission</h2><div id="beastMission"></div></div>
+        <div class="panel"><h2>Beast mission</h2><div id="beastMission"></div></div>
       </div>
       <div class="panel"><h2>Eggs and other beasts</h2><div id="beastOthers"></div></div>
       <details class="panel">
         <summary class="cat">How beasts work</summary>
-        <p class="dim small" style="margin:0">Your active beast sets the city one mission at a time. An egg hatches once it
-          has been kept warm long enough and you have completed one mission for it. After that every
-          completed mission gives the beast experience; as it levels up, the bonus it gives the city grows.
+        <p class="dim small" style="margin:0">Every egg has one small mission of its own, shown with the egg. It
+          hatches once it has been kept warm long enough and that mission is done. Egg missions never run out,
+          and you can do as many as you have eggs: they are separate from beast missions. Your active beast
+          sets the city one beast mission at a time, and a new one comes each day. Every completed beast
+          mission gives the beast experience; as it levels up, the bonus it gives the city grows.
           What the bonus is depends on the kind of beast. Only the active beast sets missions and gives its
-          bonus, and you can change which one is active at any time. Expeditions sometimes bring back more
+          bonus, and you can change which hatched beast is active at any time. Expeditions sometimes bring back more
           eggs, and rarer kinds are likelier the further from home they go. The Beast Den, Incubator,
           Training Ground and Beast Sanctuary (each needs research) make all of this faster or stronger.</p>
       </details>
@@ -857,7 +859,8 @@ function render() {
       state.hungry ? '<span class="bad">HUNGRY: half speed</span>' : `eats ${pop} food`));
 
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-  const todo = !visiting && view.beast.mission && !view.beast.mission.complete;   // a mission is waiting
+  // a beast mission, or an egg's own mission, is waiting
+  const todo = !visiting && ((view.beast.mission && !view.beast.mission.complete) || view.beast.beasts.some(b => b.egg && b.task && !b.task.complete));
   setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (todo ? ' <span class="good">(mission)</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
@@ -1171,7 +1174,16 @@ function renderBeast() {
         `<div class="dim small">Nobody knows what is inside until it hatches. It needs two things:</div>` +
         `<div class="opt">${tick(warm)} Kept warm for ${duration(b.warm_needed)}` +
         (warm ? '' : ` - <span class="hi" data-timer="hatch${b.id}"></span> to go`) + `</div>` +
-        `<div class="opt">${tick(b.missions >= 1)} One mission completed while it is your active beast</div>`;
+        `<div class="opt">${tick(b.missions >= 1)} Its own mission` + (b.task ? `: <span class="${b.missions >= 1 ? 'good' : 'hi'}">${esc(b.task.text)}</span>` : ' done') + `</div>`;
+      const t = b.task;
+      if (t && !t.complete && t.pay) {
+        const have = Math.floor(state.resources[t.pay]), ok = have >= t.need;
+        html += `<div class="small">You have ${have} of ${t.need} ${esc(R[t.pay])}</div>` + meter(Math.min(have, t.need), t.need, ok ? '' : 'alt') +
+          `<div class="bar"><button data-egg-deliver="${b.id}" ${ok ? '' : 'disabled'}>Deliver ${t.need} ${esc(R[t.pay])}</button></div>`;
+      } else if (t && !t.complete) {
+        html += `<div class="small">${t.done} of ${t.need} done <span class="dim">- this counts up by itself as you do it</span></div>` + meter(t.done, t.need, 'alt');
+      }
+      if (warm && b.missions >= 1) html += `<div class="good small">Hatching...</div>`;
     } else {
       html += `<div class="desc">${esc(b.desc)}</div>` +
         kv([['Nature', esc(b.nature)], ['Level', `<span class="hi">${b.level}</span> of ${bv.max_level}`]]) +
@@ -1189,7 +1201,8 @@ function renderBeast() {
 
   const m = bv.mission;
   let html = '';
-  if (!m) html = `<p class="dim">No mission yet.</p>`;
+  if (!bv.hatched) html = `<p class="dim">Beast missions start once you have a hatched beast. Your egg has a mission of its own, shown with the egg.</p>`;
+  else if (!m) html = `<p class="dim">No mission yet.</p>`;
   else {
     const forBeast = bv.beasts.find(b => b.id === m.beast);
     html = `<p class="big ${m.complete ? 'good' : 'hi'}">${esc(m.text)}</p>` +
@@ -1204,14 +1217,14 @@ function renderBeast() {
         `<p class="dim small">This counts up by itself as you do it.</p>`;
     }
   }
-  setHTML($('beastMission'), html +
+  setHTML($('beastMission'), html + (bv.hatched ?
     `<div class="opt">Next mission in <span class="hi" data-timer="mission"></span>` +
     (m && !m.complete ? ` <span class="dim small">- an unfinished mission is replaced then</span>` : '') + `</div>` +
-    `<div class="opt dim small">A new mission comes every ${duration(bv.mission_period)}.</div>`);
+    `<div class="opt dim small">A new beast mission comes every ${duration(bv.mission_period)}. Egg missions are separate and do not use it up.</div>` : ''));
 
   const others = bv.beasts.filter(b => !b.active);
   setHTML($('beastOthers'), (others.length ? `<div class="areaCards">` + others.map(b =>
-      `<div class="areaCard"><div class="info">${card(b)}<div class="bar"><button data-beast-active="${b.id}">Make active</button></div></div></div>`).join('') + `</div>`
+      `<div class="areaCard"><div class="info">${card(b)}${b.egg ? '' : `<div class="bar"><button data-beast-active="${b.id}">Make active</button></div>`}</div></div>`).join('') + `</div>`
     : `<p class="dim" style="margin:0">None yet.</p>`) +
     `<p class="dim small">Each expedition has about a ${bv.egg_chance}% chance of finding an egg one area from home, and more further out.</p>`);
 }
@@ -1608,6 +1621,7 @@ document.addEventListener('keydown', e => {
 });
 $('tab-beast').onclick = e => {
   if ('deliver' in e.target.dataset) act('mission_deliver');
+  else if (e.target.dataset.eggDeliver) act('egg_deliver', { beast: +e.target.dataset.eggDeliver });
   else if (e.target.dataset.beastActive) act('beast_active', { beast: +e.target.dataset.beastActive });
 };
 $('switch').onclick = async () => { try { await api('sign_out'); } catch {} signOut(''); };
