@@ -235,7 +235,7 @@ def city_view(state, now, area=0, find=None):
         out["found"] = game.find(state, *find.split(":", 1))
     out["state"] = {k: v for k, v in state.items() if k not in PRIVATE}
     out["now"] = now
-    out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET))
+    out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]))
     out["cities"] = all_city_names()
     # Bills are part of what the city gains and loses per hour.
     rates = out["status"]["rates"]
@@ -277,6 +277,7 @@ def handle_get(path, query, token, now):
             return 403, {"error": f"{name} has banned your city from viewing it."}
         out = city_view(state, now, _area(query.get("area", ["0"])[0]))
         out["visiting"] = True
+        out["market"]["duels"] = []     # another city's challenges are its own business
         return 200, out
 
     return 404, {"error": "Not found."}
@@ -332,12 +333,12 @@ def handle_post(path, data, token, now):
         error = market.accept_beast(MARKET, state, now, data.get("offer"),
                                     lambda seller: find_city(seller, now), data.get("pay"))
     elif action == "duel_post":
-        error = market.post_duel(MARKET, state, now, data)
-    elif action == "duel_cancel":
-        error = market.cancel_duel(MARKET, state, now, data.get("duel"))
+        error = market.post_duel(MARKET, state, now, data, lambda other: find_city(other, now))
+    elif action == "duel_cancel":       # withdraw one you sent, or decline one sent to you
+        error = market.cancel_duel(MARKET, state, now, data.get("duel"), lambda other: find_city(other, now))
     elif action == "duel_accept":
         error = market.accept_duel(MARKET, state, now, data.get("duel"),
-                                   lambda other: find_city(other, now), data.get("beast"), data.get("qty"))
+                                   lambda other: find_city(other, now), data.get("beast"), data.get("bet"))
     elif action == "offer_cancel":
         error = market.cancel(MARKET, state, now, data.get("offer"))
     elif action == "offer_accept":

@@ -135,6 +135,9 @@ def tidy(market, now, get_city):
     for offer in [o for o in market["offers"] if not o["give_qty"]]:
         market["offers"].remove(offer)
         _finish(offer, get_city(offer["city"]), now)
+    # Duels from when a challenge was open to anyone: call them off and give the bets back.
+    for duel in [d for d in market.get("duels", []) if "to" not in d]:
+        _end_duel(market, duel, get_city(duel["city"]), refund=True)
 
 
 def reactivate(market, state, now, finished_id):
@@ -458,11 +461,15 @@ def beast_offers_view(market):
 
 
 # ---- Duels ----
-# A city challenges: it names one of its hatched beasts, bets some of one
-# material on it, and says what an opponent must bet at least. The bet is held
-# by the market; the beast stays at home but can't be traded meanwhile. Another
-# city answers with a beast and a bet of its own, the two fight at once (see
-# beasts.fight), and the winner's city takes both bets.
+# One city challenges another by name: it picks one of its hatched beasts and
+# bets some of one material on it. The other city can see the beast but not
+# the bet. It either declines, or accepts by picking a beast and a bet of its
+# own. Once both have agreed the bets are shown, the beasts fight at once (see
+# beasts.fight) and the winner's city takes both bets. The winning beast also
+# gains a little experience.
+#
+# A challenger's bet is held by the market until the duel is fought, declined
+# or withdrawn. Its beast stays at home but can't be traded meanwhile.
 
 def _valid_stake(stake):
     if (isinstance(stake, dict) and stake.get("res") in game.RESOURCES and stake["res"] not in game.UNTRADEABLE
@@ -489,101 +496,122 @@ def _fighter(market, state, beast_id):
     return beast, None
 
 
-def post_duel(market, state, now, data):
-    bet, ask = _valid_stake(data.get("bet")), _valid_stake(data.get("ask"))
-    if not bet or not ask:
-        return "Say what you bet and what your opponent must bet: whole amounts of 1 or more."
+def post_duel(market, state, now, data, get_city):
+    """Challenge the city named in data["to"]."""
+    to = data.get("to")
+    target = get_city(to) if to != state["name"] else None
+    if not target:
+        return "Pick another city that exists to challenge."
+    if state["name"] in target["banned"]:
+        return f"{to} is not accepting challenges from your city."
+    bet = _valid_stake(data.get("bet"))
+    if not bet:
+        return "Say what you bet: a whole amount of 1 or more."
     duels = market.setdefault("duels", [])
     if sum(1 for d in duels if d["city"] == state["name"]) >= MAX_DUELS_PER_CITY:
-        return f"You can have at most {MAX_DUELS_PER_CITY} duels waiting."
+        return f"You can have at most {MAX_DUELS_PER_CITY} challenges waiting for an answer."
     beast, error = _fighter(market, state, data.get("beast"))
     if error:
         return error
     if state["resources"][bet["res"]] < bet["qty"]:
         return f"You don't have {_goods(bet)} to bet."
-    state["resources"][bet["res"]] -= bet["qty"]      # held until the duel is fought or withdrawn
+    state["resources"][bet["res"]] -= bet["qty"]      # held until the duel is fought, declined or withdrawn
     beast["duel"] = market["next_id"]
-    duels.append({"id": market["next_id"], "city": state["name"], "posted": now, "beast_id": beast["id"],
-                  "beast": beasts.public(beast), "bet": bet, "ask": ask})
+    duels.append({"id": market["next_id"], "city": state["name"], "to": to, "posted": now,
+                  "beast_id": beast["id"], "beast": beasts.public(beast), "bet": bet})
     market["next_id"] += 1
-    game.log(state, now, f"{beasts.title(beast)} is waiting for a duel. You bet {_goods(bet)}; "
-                         f"an opponent must bet at least {_goods(ask)}.")
+    # The bet is left out of the log: a city's log can be read by anyone visiting it.
+    game.log(state, now, f"Challenged {to} to a duel with {beasts.title(beast)}.")
+    game.log(target, now, f"{state['name']} has challenged you to a duel with a {beasts.title(beast)}. "
+                          f"Accept or decline it in the Arena on the Beast tab.")
     return None
 
 
-def _end_duel(market, duel, challenger):
+def _end_duel(market, duel, challenger, refund=False):
+    """Take a duel off the list and free the challenger's beast; `refund` gives its bet back too."""
     market["duels"].remove(duel)
-    beast = beasts.get(challenger, duel["beast_id"]) if challenger else None
+    if not challenger:
+        return
+    beast = beasts.get(challenger, duel["beast_id"])
     if beast:
         beast.pop("duel", None)
-    return beast
+    if refund:
+        challenger["resources"][duel["bet"]["res"]] += duel["bet"]["qty"]
 
 
-def cancel_duel(market, state, now, duel_id):
+def cancel_duel(market, state, now, duel_id, get_city):
+    """The challenger withdraws, or the challenged city declines. Either way the bet goes back."""
     duel = _duel(market, duel_id)
-    if not duel or duel["city"] != state["name"]:
-        return "That duel is no longer waiting."
-    _end_duel(market, duel, state)
-    state["resources"][duel["bet"]["res"]] += duel["bet"]["qty"]
-    game.log(state, now, f"Withdrew a duel; {_goods(duel['bet'])} returned.")
+    if not duel or state["name"] not in (duel["city"], duel.get("to")):
+        return "That challenge is no longer waiting."
+    mine = duel["city"] == state["name"]
+    challenger = state if mine else get_city(duel["city"])
+    _end_duel(market, duel, challenger, refund=True)
+    if mine:
+        game.log(state, now, f"Withdrew a challenge; {_goods(duel['bet'])} returned.")
+    else:
+        game.log(state, now, f"Declined a duel with {duel['city']}.")
+        if challenger:
+            game.log(challenger, now, f"{state['name']} declined your duel; {_goods(duel['bet'])} returned.")
     return None
 
 
-def accept_duel(market, state, now, duel_id, get_city, beast_id, qty, rng=None):
-    """Answer a challenge with one of this city's beasts and a bet of `qty` of the material asked for."""
+def accept_duel(market, state, now, duel_id, get_city, beast_id, bet, rng=None):
+    """Accept a challenge with one of this city's beasts and a bet of its own. The fight happens at once."""
     duel = _duel(market, duel_id)
-    if not duel:
-        return "That duel is no longer waiting."
-    if duel["city"] == state["name"]:
-        return "That is your own challenge."
+    if not duel or duel.get("to") != state["name"]:
+        return "That challenge is no longer waiting."
     challenger = get_city(duel["city"])
     theirs = beasts.get(challenger, duel["beast_id"]) if challenger else None
     if not theirs:      # the challenger or its beast is gone: call it off
-        _end_duel(market, duel, challenger)
-        if challenger:
-            challenger["resources"][duel["bet"]["res"]] += duel["bet"]["qty"]
+        _end_duel(market, duel, challenger, refund=True)
         return "That challenge is no longer open."
     mine, error = _fighter(market, state, beast_id)
     if error:
         return error
-    ask = duel["ask"]
-    if not _valid_qty(qty) or qty < ask["qty"]:
-        return f"You must bet at least {_goods(ask)}."
-    my_bet = {"res": ask["res"], "qty": qty}
-    if state["resources"][ask["res"]] < qty:
+    my_bet = _valid_stake(bet)
+    if not my_bet:
+        return "Say what you bet: a whole amount of 1 or more."
+    if state["resources"][my_bet["res"]] < my_bet["qty"]:
         return f"You don't have {_goods(my_bet)} to bet."
-    state["resources"][ask["res"]] -= qty
+    state["resources"][my_bet["res"]] -= my_bet["qty"]
 
-    # Each beast's stats are raised by what was bet on it, then they fight.
+    # Both have agreed. Each beast's stats are raised by what was bet on it, then they fight.
     cities, fighters, bets = (challenger, state), (theirs, mine), (duel["bet"], my_bet)
-    boosts = [beasts.duel_boost(b["species"], bet["res"], bet["qty"]) for b, bet in zip(fighters, bets)]
+    boosts = [beasts.duel_boost(b["species"], stake["res"], stake["qty"]) for b, stake in zip(fighters, bets)]
     stats = [{k: max(1, round(v * boost)) for k, v in b["stats"].items()} for b, boost in zip(fighters, boosts)]
     winner, rounds = beasts.fight(stats[0], stats[1], rng or random.Random())
     _end_duel(market, duel, challenger)
-    for bet in bets:
-        cities[winner]["resources"][bet["res"]] += bet["qty"]
-    prize = " and ".join(_goods(bet) for bet in bets)
+    for stake in bets:
+        cities[winner]["resources"][stake["res"]] += stake["qty"]
+    prize = " and ".join(_goods(stake) for stake in bets)
 
     sides = [{"city": c["name"], "name": beasts.title(b), "color": beasts.public(b)["color"], "level": b["level"],
-              "bet": _goods(bet), "boost": boost, "stats": st}
-             for c, b, bet, boost, st in zip(cities, fighters, bets, boosts, stats)]
+              "bet": _goods(stake), "boost": boost, "stats": st}
+             for c, b, stake, boost, st in zip(cities, fighters, bets, boosts, stats)]
     for i, city in enumerate(cities):
         # Each city keeps the fight told from its own side: "me" is index 0.
-        mine_first = [sides[i], sides[1 - i]]
         city.setdefault("duels", []).append({
-            "id": duel["id"], "t": now, "won": winner == i, "prize": prize, "sides": mine_first,
-            "rounds": [dict(r, by=int(r["by"] != i)) for r in rounds]})
+            "id": duel["id"], "t": now, "won": winner == i, "prize": prize, "xp": beasts.DUEL_XP if winner == i else 0,
+            "sides": [sides[i], sides[1 - i]], "rounds": [dict(r, by=int(r["by"] != i)) for r in rounds]})
         del city["duels"][:-beasts.DUEL_RESULTS_KEPT]
         foe = sides[1 - i]
-        game.log(city, now, f"Duel: your {sides[i]['name']} {'beat' if winner == i else 'lost to'} "
-                            f"{foe['city']}'s {foe['name']}. "
-                            + (f"You won {prize}." if winner == i else f"You lost your bet of {sides[i]['bet']}."))
+        game.log(city, now, f"Duel: your {sides[i]['name']} (bet {sides[i]['bet']}) "
+                            f"{'beat' if winner == i else 'lost to'} {foe['city']}'s {foe['name']} (bet {foe['bet']}). "
+                            + (f"You won {prize}." if winner == i else "You lost your bet."))
+    beasts.give_xp(cities[winner], now, fighters[winner], beasts.DUEL_XP)
     return None
 
 
-def duels_view(market):
-    """Waiting duels as every city may see them."""
-    return [{"id": d["id"], "city": d["city"], "posted": d["posted"], "beast": d["beast"],
-             "bet": dict(d["bet"], text=_goods(d["bet"])), "ask": dict(d["ask"], text=_goods(d["ask"])),
-             "boost": beasts.duel_boost(d["beast"]["species"], d["bet"]["res"], d["bet"]["qty"])}
-            for d in market.get("duels", [])]
+def duels_view(market, name):
+    """The challenges city `name` has sent or been sent. A bet is only shown to the city that made it."""
+    out = []
+    for d in market.get("duels", []):
+        if name not in (d["city"], d.get("to")):
+            continue
+        entry = {"id": d["id"], "city": d["city"], "to": d.get("to"), "posted": d["posted"], "beast": d["beast"]}
+        if d["city"] == name:
+            entry["bet"] = dict(d["bet"], text=_goods(d["bet"]))
+            entry["boost"] = beasts.duel_boost(d["beast"]["species"], d["bet"]["res"], d["bet"]["qty"])
+        out.append(entry)
+    return out

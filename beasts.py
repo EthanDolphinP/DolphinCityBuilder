@@ -346,8 +346,9 @@ ART = {
 }
 
 # ---- Duels ----
-# Two cities each bet goods on one of their beasts and the beasts fight; the
-# winner's city takes both bets (see "Duels" in market.py). A beast does not
+# One city challenges another; each bets goods on one of its beasts, unseen by
+# the other, and the beasts fight. The winner's city takes both bets and the
+# winning beast gains DUEL_XP (see "Duels" in market.py). A beast does not
 # fight better for being a higher level. It fights better the more is bet on
 # it, and far better when the bet is the material its species likes.
 LIKES = {
@@ -368,6 +369,7 @@ DUEL = {
 }
 DUEL_ROUNDS = 40
 DUEL_RESULTS_KEPT = 6
+DUEL_XP = 3                 # experience the winning beast gains (a mission gives MISSION_XP)
 
 
 def duel_boost(species, res, qty):
@@ -799,7 +801,7 @@ def view(state, now):
         "rarities": RARITIES,
         "stats": STATS,
         "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"]} for k, s in SPECIES.items()},
-        "duel": DUEL,
+        "duel": DUEL, "duel_xp": DUEL_XP,
         "nest_at": state.get("nest_at"), "nest_time": NEST_TIME, "nest_full": NEST_FULL,
         "tame_egg": round((TAME_EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
         "species_count": len(SPECIES),

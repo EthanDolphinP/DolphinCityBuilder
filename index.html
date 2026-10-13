@@ -289,18 +289,22 @@
       </details>
       <details class="panel" id="arenaPanel" open>
         <summary class="cat">Arena <span id="duelCount" class="count"></span></summary>
-        <p class="dim small" style="margin-top:0">Bet goods on one of your beasts and challenge the other cities. The winner's
-          city takes both bets. Level does not matter in a duel: a beast fights harder the more is bet on it, and
-          much harder when the bet is the material it likes.</p>
+        <p class="dim small" style="margin-top:0">Challenge another city to a duel. They can see your beast but not your
+          bet, and they choose whether to accept. If they do, they pick a beast and a bet of their own, both bets are
+          shown, and the beasts fight. The winner's city takes both bets and the winning beast gains a little
+          experience. Level does not matter in the fight: a beast fights harder the more is bet on it, and much
+          harder when the bet is the material it likes.</p>
         <form id="duelForm" class="bar" style="margin-top:0">
           Send <select id="duelBeast"></select>
+          against <input id="duelTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px">
           and bet <input id="duelBetQty" type="number" min="1" step="1" value="50" style="width:100px"> <select id="duelBetRes"></select>
-          An opponent must bet at least <input id="duelAskQty" type="number" min="1" step="1" value="50" style="width:100px"> <select id="duelAskRes"></select>
-          <button>Challenge</button>
+          <button>Send challenge</button>
         </form>
         <p id="duelPreview" class="small hi" style="margin:4px 0 10px"></p>
-        <div class="cat" style="margin-top:0">Challenges waiting</div>
+        <div class="cat" style="margin-top:0">Challenges for you</div>
         <div id="duels" class="scroll"></div>
+        <div class="cat">Challenges you sent</div>
+        <div id="duelsSent" class="scroll"></div>
         <div class="cat">Your recent duels</div>
         <div id="duelResults"></div>
       </details>
@@ -315,8 +319,10 @@
           bonus, and you can change which hatched beast is active at any time. Expeditions sometimes bring back more
           eggs, and rarer kinds are likelier the further from home they go. The Beast Den, Incubator,
           Training Ground and Beast Sanctuary (each needs research) make all of this faster or stronger.
-          In the Arena, two cities each bet goods on a beast and the two fight; the winner's city takes both
-          bets. Each kind of beast likes one material, and betting that on it raises its stats the most.
+          In the Arena you challenge another city to a duel. Each side bets goods on a beast without seeing
+          the other's bet; if the challenge is accepted the beasts fight, the winner's city takes both bets and
+          the winning beast gains a little experience. Each kind of beast likes one material, and betting
+          that on it raises its stats the most.
           Every beast also has Health, Attack, Defense and Speed. They differ a little from one beast to the
           next of the same kind, and they do not change anything in the city. Any beast or egg except your
           active beast can be offered to other cities with its Trade button, for a material or for a beast
@@ -754,7 +760,7 @@ const HOWTO = [
   ['Wildlife and livestock', 'Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
-  ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there, two cities each bet goods on a beast and the winner takes both bets; a beast fights harder the more is bet on it, especially in the material it likes.'],
+  ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
@@ -1022,7 +1028,8 @@ function render() {
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   // a beast mission, or an egg's own mission, is waiting
   const todo = !visiting && ((view.beast.mission && !view.beast.mission.complete) || view.beast.beasts.some(b => b.egg && b.task && !b.task.complete));
-  setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (todo ? ' <span class="good">(mission)</span>' : ''));
+  const challenged = !visiting && (view.market.duels || []).some(d => d.to === state.name);
+  setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (challenged ? ' <span class="hi">(duel)</span>' : todo ? ' <span class="good">(mission)</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
@@ -1511,34 +1518,37 @@ function renderBeast() {
 
 const duelPick = new Map();   // challenge id -> which of the player's beasts they chose to send
 const duelQty = new Map();    // challenge id -> how much they have typed to bet
+const duelRes = new Map();    // challenge id -> the material they chose to bet
 // What a bet multiplies a beast's stats by in a duel (the same sum the server does).
 function duelBoost(likes, res, qty) {
   const d = view.beast.duel, amount = res === likes ? qty : qty * d.other;
   return amount > 0 ? Math.round(Math.min(d.max, 1 + d.step * Math.log2(1 + amount / d.per)) * 100) / 100 : 1;
 }
 const boostText = b => `+${Math.round((b - 1) * 100)}%`;
-// The line under the challenge form, and the line beside each challenge's bet box.
+// The line under the challenge form, and the line under each challenge's answer.
 function fillDuels() {
   const R = view.defs.resources, mine = view.beast.beasts.filter(b => !b.egg);
   const b = mine.find(x => x.id === +$('duelBeast').value), qty = Math.floor(+$('duelBetQty').value);
   $('duelPreview').textContent = !b ? '' :
     `${b.name} likes ${R[b.likes]}. ` + (qty >= 1 ? `Betting ${qty} ${R[$('duelBetRes').value]} raises its stats by ${boostText(duelBoost(b.likes, $('duelBetRes').value, qty))}` +
-      ($('duelBetRes').value === b.likes ? '.' : `; the same amount of ${R[b.likes]} would raise them by ${boostText(duelBoost(b.likes, b.likes, qty))}.`) : '');
+      ($('duelBetRes').value === b.likes ? '.' : `; the same amount of ${R[b.likes]} would raise them by ${boostText(duelBoost(b.likes, b.likes, qty))}.`) : '') +
+    ' The other city will not see your bet.';
   for (const box of $('duels').querySelectorAll('[data-duel-qty]')) {
-    const id = +box.dataset.duelQty, d = (view.market.duels || []).find(x => x.id === id);
-    if (!d) continue;
-    if (!duelQty.has(id)) duelQty.set(id, String(d.ask.qty));
-    if (box.value !== duelQty.get(id)) box.value = duelQty.get(id);
+    const id = +box.dataset.duelQty;
     const pick = $('duels').querySelector(`[data-duel-pick="${id}"]`), me = pick && mine.find(x => x.id === +pick.value);
-    const out = $('duels').querySelector(`[data-duel-note="${id}"]`), bet = Math.floor(+box.value);
-    if (!out || !me) continue;
-    const have = Math.floor(view.state.resources[d.ask.res]);
-    out.className = 'small ' + (bet < d.ask.qty || bet > have ? 'bad' : 'good');
-    out.textContent = bet < d.ask.qty ? `Bet at least ${d.ask.text}.` : bet > have ? `You have only ${have} ${R[d.ask.res]}.`
-      : `Your ${me.name} would fight at ${boostText(duelBoost(me.likes, d.ask.res, bet))}` + (me.likes === d.ask.res ? ' (it likes this).' : ` (it likes ${R[me.likes]}).`);
+    const res = $('duels').querySelector(`[data-duel-res="${id}"]`), out = $('duels').querySelector(`[data-duel-note="${id}"]`);
+    if (!me || !res || !out) continue;
+    if (!duelQty.has(id)) duelQty.set(id, '50');
+    if (!duelRes.has(id)) duelRes.set(id, me.likes);      // start on what the chosen beast likes
+    if (box.value !== duelQty.get(id)) box.value = duelQty.get(id);
+    if (res.value !== duelRes.get(id)) res.value = duelRes.get(id);
+    const bet = Math.floor(+box.value), have = Math.floor(view.state.resources[res.value]);
+    out.className = 'small ' + (bet < 1 || bet > have ? 'bad' : 'good');
+    out.textContent = bet < 1 ? 'Bet at least 1.' : bet > have ? `You have only ${have} ${R[res.value]}.`
+      : `Your ${me.name} would fight at ${boostText(duelBoost(me.likes, res.value, bet))}` + (me.likes === res.value ? ' (it likes this).' : ` (it likes ${R[me.likes]}).`);
   }
 }
-function renderArena(statLine) {
+function renderArena() {
   const { state } = view, bv = view.beast, R = view.defs.resources, own = !visiting;
   $('arenaPanel').hidden = !own;
   if (!own) return;
@@ -1548,28 +1558,37 @@ function renderArena(statLine) {
     `<option value="${b.id}">${esc(b.name)} (${stats(b.stats)}, likes ${esc(R[b.likes])})</option>`).join('');
   const el = $('duelBeast'), was = el.value;
   if (el._html !== names) { setHTML(el, names); el.value = fighters.some(b => String(b.id) === was) ? was : ''; }
-  for (const id of ['duelBetRes', 'duelAskRes']) if (!$(id).options.length) {
-    $(id).innerHTML = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
-    $(id).value = 'gold';
+  if (!$('duelBetRes').options.length) {
+    $('duelBetRes').innerHTML = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
+    $('duelBetRes').value = 'gold';
   }
+  setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
+  const materials = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
+  const beastCell = b => `<span style="color:${esc(b.color)}">${esc(b.name)}</span> <span class="dim small">${esc(b.rarity.toLowerCase())}, likes ${esc(R[b.likes])}</span>`;
+  const head = `<th>Beast</th><th>Health / Attack / Defense / Speed</th>`;
 
-  const duels = view.market.duels || [];
-  $('duelCount').textContent = `(${duels.length} waiting)`;
-  setHTMLKeep($('duels'), duels.length ? `<table><tr><th>City</th><th>Beast</th><th>Health / Attack / Defense / Speed</th><th>Their bet</th><th>You must bet</th><th></th></tr>` +
-    duels.map(d => {
-      const b = d.beast, me = d.city === state.name;
+  const duels = view.market.duels || [], forMe = duels.filter(d => d.to === state.name), sent = duels.filter(d => d.city === state.name);
+  $('duelCount').textContent = forMe.length ? `(${forMe.length} for you)` : sent.length ? `(${sent.length} sent)` : '';
+  setHTMLKeep($('duels'), forMe.length ? `<table><tr><th>From</th>${head}<th>Their bet</th><th>Your answer</th></tr>` +
+    forMe.map(d => {
       const picked = fighters.some(x => x.id === duelPick.get(d.id)) ? duelPick.get(d.id) : fighters.length && fighters[0].id;
-      return `<tr class="${me ? 'me' : ''}"><td>${esc(d.city)}${me ? ' <span class="dim">(you)</span>' : ''}</td>` +
-        `<td><span style="color:${esc(b.color)}">${esc(b.name)}</span> <span class="dim small">likes ${esc(R[b.likes])}</span></td>` +
-        `<td>${stats(b.stats)} <span class="good">${boostText(d.boost)}</span></td>` +
-        `<td>${esc(d.bet.text)}</td><td>at least ${esc(d.ask.text)}</td><td style="white-space:normal">` +
-        (me ? `<button data-duel-cancel="${d.id}">Withdraw</button>`
-          : !fighters.length ? `<span class="dim small">You have no hatched beast free to fight.</span>`
-          : `<div class="buy"><select data-duel-pick="${d.id}" style="max-width:200px">` + fighters.map(x =>
-              `<option value="${x.id}" ${x.id === picked ? 'selected' : ''}>${esc(x.name)} (${stats(x.stats)})</option>`).join('') + `</select> ` +
-            `<input data-duel-qty="${d.id}" data-k="duel${d.id}" type="number" min="${d.ask.qty}" step="1" style="width:100px" title="How much ${esc(R[d.ask.res])} to bet"> ${esc(R[d.ask.res])} ` +
-            `<button data-duel-accept="${d.id}">Fight</button></div><div data-duel-note="${d.id}" class="small"></div>`) + `</td></tr>`;
-    }).join('') + `</table>` : `<span class="dim">Nobody is waiting for a duel. Challenge the other cities above.</span>`, fillDuels);
+      return `<tr><td class="hi">${esc(d.city)}</td><td>${beastCell(d.beast)}</td><td>${stats(d.beast.stats)}</td>` +
+        `<td class="dim">hidden until you accept</td><td style="white-space:normal">` +
+        (fighters.length
+          ? `<div class="buy"><select data-duel-pick="${d.id}" style="max-width:200px">` + fighters.map(x =>
+              `<option value="${x.id}" ${x.id === picked ? 'selected' : ''}>${esc(x.name)} (${stats(x.stats)})</option>`).join('') + `</select> bet ` +
+            `<input data-duel-qty="${d.id}" data-k="duel${d.id}" type="number" min="1" step="1" style="width:90px"> ` +
+            `<select data-duel-res="${d.id}">${materials}</select> ` +
+            `<button data-duel-accept="${d.id}">Accept</button> <button data-duel-cancel="${d.id}">Decline</button></div>` +
+            `<div data-duel-note="${d.id}" class="small"></div>`
+          : `<span class="dim small">You have no hatched beast free to fight.</span> <button data-duel-cancel="${d.id}">Decline</button>`) + `</td></tr>`;
+    }).join('') + `</table>` : `<span class="dim">Nobody has challenged you.</span>`, fillDuels);
+
+  setHTML($('duelsSent'), sent.length ? `<table><tr><th>To</th>${head}<th>Your bet</th><th>Sent</th><th></th></tr>` +
+    sent.map(d => `<tr><td class="hi">${esc(d.to)}</td><td>${beastCell(d.beast)}</td><td>${stats(d.beast.stats)} <span class="good">${boostText(d.boost)}</span></td>` +
+      `<td>${esc(d.bet.text)} <span class="dim small">(they can't see it)</span></td><td class="dim">${clock(d.posted)}</td>` +
+      `<td><button data-duel-cancel="${d.id}">Withdraw</button></td></tr>`).join('') + `</table>`
+    : `<span class="dim">You have no challenges waiting for an answer.</span>`);
 
   const results = (bv.duels || []).slice().reverse();
   setHTML($('duelResults'), results.length ? results.map(r => {
@@ -1577,7 +1596,7 @@ function renderArena(statLine) {
     const side = s => `<span style="color:${esc(s.color)}">${esc(s.name)}</span> <span class="dim small">${esc(s.city)}, bet ${esc(s.bet)}, ${boostText(s.boost)}: ${stats(s.stats)}</span>`;
     return `<details class="fold" data-fold="duel:${r.id}" ${isOpen('duel:' + r.id, false) ? 'open' : ''}><summary>` +
       `<span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> against ${esc(foe.city)}'s ${esc(foe.name)} ` +
-      `<span class="dim">[${clock(r.t)}]</span> - ${r.won ? 'you took ' + esc(r.prize) : 'you lost ' + esc(me.bet)}</summary>` +
+      `<span class="dim">[${clock(r.t)}]</span> - ${r.won ? 'you took ' + esc(r.prize) + (r.xp ? ` and ${esc(me.name)} gained ${r.xp} experience` : '') : 'you lost ' + esc(me.bet)}</summary>` +
       `<div><div>${side(me)}</div><div>${side(foe)}</div>` +
       r.rounds.map(h => `<div class="${h.by ? 'dim' : ''}">${esc(who[h.by].name)} ` +
         (h.dmg ? `hits for ${h.dmg}. ${esc(who[1 - h.by].name)} has ${h.left} health left.` : 'misses.') + `</div>`).join('') +
@@ -2017,28 +2036,31 @@ $('duelForm').addEventListener('input', () => { if (view) fillDuels(); });
 $('duelForm').onsubmit = e => {
   e.preventDefault();
   if (!$('duelBeast').value) { $('msg').textContent = 'Pick which beast to send.'; return; }
-  act('duel_post', { beast: +$('duelBeast').value,
-                     bet: { res: $('duelBetRes').value, qty: Math.floor(+$('duelBetQty').value) },
-                     ask: { res: $('duelAskRes').value, qty: Math.floor(+$('duelAskQty').value) } });
+  act('duel_post', { beast: +$('duelBeast').value, to: $('duelTo').value.trim(),
+                     bet: { res: $('duelBetRes').value, qty: Math.floor(+$('duelBetQty').value) } });
 };
 $('duels').addEventListener('input', e => {
   const d = e.target.dataset;
   if (d.duelQty) duelQty.set(+d.duelQty, e.target.value);
+  else if (d.duelRes) duelRes.set(+d.duelRes, e.target.value);
   else if (d.duelPick) duelPick.set(+d.duelPick, +e.target.value);
   fillDuels();
 });
+$('duelsSent').onclick = e => { if (e.target.dataset.duelCancel) act('duel_cancel', { duel: +e.target.dataset.duelCancel }); };
 $('duels').onclick = async e => {
   const d = e.target.dataset;
   if (d.duelCancel) act('duel_cancel', { duel: +d.duelCancel });
   else if (d.duelAccept) {
     const id = +d.duelAccept, pick = $('duels').querySelector(`[data-duel-pick="${id}"]`);
-    const before = (view.beast.duels || []).length && view.beast.duels[view.beast.duels.length - 1].id;
-    await act('duel_accept', { duel: id, beast: +pick.value, qty: Math.floor(+duelQty.get(id)) });
-    const last = (view.beast.duels || [])[view.beast.duels.length - 1];
-    if (last && last.id !== before) {      // the fight happened: open its story
+    const newest = () => { const all = view.beast.duels || []; return all.length ? all[all.length - 1] : null; };
+    const before = newest();
+    await act('duel_accept', { duel: id, beast: +pick.value, bet: { res: duelRes.get(id), qty: Math.floor(+duelQty.get(id)) } });
+    const last = newest();
+    if (last && (!before || last.id !== before.id)) {      // the fight happened: open its story
       foldState.set('duel:' + last.id, true);
-      duelQty.delete(id);
-      $('msg').textContent = last.won ? `Your ${last.sides[0].name} won the duel. You took ${last.prize}.` : `Your ${last.sides[0].name} lost the duel.`;
+      for (const m of [duelQty, duelRes, duelPick]) m.delete(id);
+      const foe = last.sides[1];
+      $('msg').textContent = `${foe.city} had bet ${foe.bet}. ` + (last.won ? `Your ${last.sides[0].name} won. You took ${last.prize}.` : `Your ${last.sides[0].name} lost.`);
       renderBeast();
     }
   }
