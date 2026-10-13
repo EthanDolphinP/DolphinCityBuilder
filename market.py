@@ -23,6 +23,9 @@ or throw it away.
 Every sale from a city's offers is also noted in that city's "sales" list, so
 the Market screen can show what sold since the owner last looked.
 
+Beasts and eggs are traded one at a time, for a material or for another beast
+(see "Beast trades" at the end).
+
 A bill is a repeating trade between two named cities ("every 24 hours I send
 you 10 Stone and you send me 20 Gold"). One city proposes it, the other has to
 accept it, and either can cancel it at any time. When a payment comes due and
@@ -31,9 +34,11 @@ either side can't pay, nothing changes hands that time.
 
 import math
 
+import beasts
 import game
 
 MAX_OFFERS_PER_CITY = 10
+MAX_BEAST_OFFERS_PER_CITY = 5
 MAX_QUANTITY = 1_000_000
 HISTORY_LENGTH = 20
 FINISHED_KEPT = 20      # sold-out offers remembered per city, for posting again
@@ -44,7 +49,7 @@ MISSES_ALLOWED = 3      # payments in a row that may fail before a bill is cance
 
 
 def new_market():
-    return {"next_id": 1, "offers": [], "history": [], "bills": []}
+    return {"next_id": 1, "offers": [], "history": [], "bills": [], "beast_offers": []}
 
 
 def _find(market, offer_id):
@@ -230,6 +235,7 @@ def drop_city(market, name):
     """Remove a city's open offers and bills (used when the city is restarted)."""
     market["offers"] = [o for o in market["offers"] if o["city"] != name]
     market["bills"] = [b for b in market["bills"] if name not in (b["from"], b["to"])]
+    market["beast_offers"] = [o for o in market.get("beast_offers", []) if o["city"] != name]
 
 
 def drop_proposals(market, sender, receiver):
@@ -350,3 +356,99 @@ def bill_rates(market, name):
         rates[b["give"]] = rates.get(b["give"], 0) - sign * b["give_qty"] * per_hour
         rates[b["want"]] = rates.get(b["want"], 0) + sign * b["want_qty"] * per_hour
     return rates
+
+
+# ---- Beast trades ----
+# A city offers one beast (or egg) and says what it wants for it: an amount of
+# a material, or another beast of a named species and level. The beast is held
+# by the market until the trade is taken or cancelled.
+
+def _valid_want(want):
+    if not isinstance(want, dict):
+        return None
+    if want.get("kind") == "resource":
+        if want.get("res") in game.RESOURCES and want["res"] not in game.UNTRADEABLE and _valid_qty(want.get("qty")):
+            return {"kind": "resource", "res": want["res"], "qty": want["qty"]}
+    elif want.get("kind") == "beast":
+        level = want.get("level", 1)
+        if want.get("species") in beasts.SPECIES and _valid_qty(level) and level <= beasts.MAX_LEVEL:
+            return {"kind": "beast", "species": want["species"], "level": level}
+    return None
+
+
+def want_text(want):
+    if want["kind"] == "resource":
+        return f"{want['qty']} {game.RESOURCES[want['res']]}"
+    return f"a {beasts.SPECIES[want['species']]['name']} of level {want['level']} or higher"
+
+
+def _beast_offer(market, offer_id):
+    return next((o for o in market.get("beast_offers", []) if o["id"] == offer_id), None)
+
+
+def post_beast(market, state, now, data):
+    want = _valid_want(data.get("want"))
+    if not want:
+        return "Say what you want for it: an amount of a material, or a kind of beast and a level."
+    offers = market.setdefault("beast_offers", [])
+    if sum(1 for o in offers if o["city"] == state["name"]) >= MAX_BEAST_OFFERS_PER_CITY:
+        return f"You can have at most {MAX_BEAST_OFFERS_PER_CITY} beasts on offer."
+    beast, error = beasts.take(state, data.get("beast"))
+    if error:
+        return error
+    offers.append({"id": market["next_id"], "city": state["name"], "posted": now, "beast": beast, "want": want})
+    market["next_id"] += 1
+    game.log(state, now, f"Offered {beasts.title(beast)} for {want_text(want)}.")
+    return None
+
+
+def cancel_beast(market, state, now, offer_id):
+    offer = _beast_offer(market, offer_id)
+    if not offer or offer["city"] != state["name"]:
+        return "That beast is no longer on offer."
+    market["beast_offers"].remove(offer)
+    beasts.give(state, now, offer["beast"])
+    game.log(state, now, f"Withdrew a beast offer; {beasts.title(offer['beast'])} came home.")
+    return None
+
+
+def accept_beast(market, buyer, now, offer_id, get_city, pay_beast=None):
+    """Take a beast offer, paying what it asks. For a beast-for-beast offer `pay_beast` is the
+    id of the buyer's beast to hand over."""
+    offer = _beast_offer(market, offer_id)
+    if not offer:
+        return "That beast is no longer on offer."
+    if offer["city"] == buyer["name"]:
+        return "That is your own offer."
+    seller = get_city(offer["city"])
+    if not seller:
+        market["beast_offers"].remove(offer)
+        return "The city that offered it no longer exists."
+    want, name = offer["want"], beasts.title(offer["beast"])
+    if want["kind"] == "resource":
+        if buyer["resources"][want["res"]] < want["qty"]:
+            return f"You don't have {want_text(want)} to pay."
+        buyer["resources"][want["res"]] -= want["qty"]
+        seller["resources"][want["res"]] += want["qty"]
+        paid = want_text(want)
+    else:
+        mine = beasts.get(buyer, pay_beast)
+        if (not mine or mine["stage"] == "egg" or mine["species"] != want["species"]
+                or mine["level"] < want["level"]):
+            return f"Pick one of your beasts to give: {want_text(want)}."
+        mine, error = beasts.take(buyer, pay_beast)
+        if error:
+            return error
+        paid = f"{beasts.title(mine)} (level {mine['level']})"
+        beasts.give(seller, now, mine)
+    market["beast_offers"].remove(offer)
+    beasts.give(buyer, now, offer["beast"])
+    game.log(buyer, now, f"Traded with {offer['city']}: gave {paid}, received {name}. See the Beast tab.")
+    game.log(seller, now, f"{buyer['name']} took your beast offer: gave {name}, received {paid}.")
+    return None
+
+
+def beast_offers_view(market):
+    """Beast offers as other cities may see them."""
+    return [{"id": o["id"], "city": o["city"], "posted": o["posted"], "beast": beasts.public(o["beast"]),
+             "want": dict(o["want"], text=want_text(o["want"]))} for o in market.get("beast_offers", [])]

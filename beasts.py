@@ -11,6 +11,10 @@ city a bonus that depends on its species ("nature") and grows with its level.
 Only the city's active beast sets beast missions (one each day) and gives its
 bonus; the others wait. Only a hatched beast can be the active one.
 
+Every beast also has four stats (STATS) and its species has a picture (ART).
+Beasts and eggs can be traded between cities: see the beast offers in
+market.py, which use take() and give() here to move a beast.
+
 More eggs can be found by expeditions; rarer species are likelier far from home.
 
 Content lives in the tables below: RARITIES, SPECIES and MISSIONS. The
@@ -98,6 +102,109 @@ SPECIES = {
                     "desc": "A ribbon of cloud and scale. Cities it favours are spoken of far away."},
 }
 
+# Every beast has four stats of its own. They are for show and for trading:
+# nothing in the city depends on them. Each is rolled once, when the egg is
+# found, within STAT_SPREAD of its species' base value below.
+STATS = {"hp": "Health", "atk": "Attack", "def": "Defense", "spd": "Speed"}
+STAT_SPREAD = 0.15
+BASE_STATS = {      # (health, attack, defense, speed)
+    "mossback":     (70, 8, 18, 4),
+    "stonehorn":    (60, 14, 14, 6),
+    "glimmerwing":  (35, 9, 6, 18),
+    "magpie_drake": (45, 12, 8, 14),
+    "trailhound":   (55, 16, 10, 20),
+    "herdmother":   (90, 12, 16, 8),
+    "sunscale":     (50, 18, 12, 14),
+    "hearth_lynx":  (70, 22, 14, 22),
+    "stormcrest":   (65, 26, 12, 28),
+    "goldmaw":      (95, 16, 22, 8),
+    "world_turtle": (160, 20, 40, 4),
+    "frost_wyrm":   (110, 38, 24, 18),
+    "sky_serpent":  (150, 45, 30, 36),
+}
+
+# A small picture of each species, drawn in text.
+ART = {
+    "mossback": [
+        r"     ____",
+        r"  __/_\/_\__",
+        r" (o_|_/\_|__)~",
+        r"   U      U",
+    ],
+    "stonehorn": [
+        r"  \\  //",
+        r"  (o__o)____",
+        r"  /         \~",
+        r"  |_|-----|_|",
+    ],
+    "glimmerwing": [
+        r"  /\  o o  /\ ",
+        r" /**\ ( ) /**\ ",
+        r" \**/ ( ) \**/",
+        r"  \/   v   \/",
+    ],
+    "magpie_drake": [
+        r"    __",
+        r"  <(o )___/|",
+        r"   ( ._>  /",
+        r"    `--^^'   $",
+    ],
+    "trailhound": [
+        r"   /\_",
+        r"  ( o \______",
+        r"   \_  ____  )~",
+        r"    |_|    |_|",
+    ],
+    "herdmother": [
+        r"  (\_____/)",
+        r"  ( o   o )~~~",
+        r"  /~~~~~~~\ ",
+        r"  |_|~~~|_|",
+    ],
+    "sunscale": [
+        r"   \ | /",
+        r"  __(o)>____",
+        r" <__  ____  \_",
+        r"    ^^    ^^  `~",
+    ],
+    "hearth_lynx": [
+        r"  /\_/\ ",
+        r" ( o.o )",
+        r"  > ^ <   _",
+        r" (_____)_//",
+    ],
+    "stormcrest": [
+        r" \\\    ///",
+        r"  \\\__///",
+        r"    (o>",
+        r"    /| |\ ",
+    ],
+    "goldmaw": [
+        r"   @..@",
+        r"  (----)   $",
+        r" ( >__< )",
+        r" ^^ ~~ ^^",
+    ],
+    "world_turtle": [
+        r"    _A_n_A_",
+        r"   /_|_|_|_\ ",
+        r" (o___________)~",
+        r"   UU      UU",
+    ],
+    "frost_wyrm": [
+        r"   * /^\ *",
+        r"  __( o o )",
+        r" /  \ vv /~~\_",
+        r" \___\__/____/",
+    ],
+    "sky_serpent": [
+        r" ~~  _/^\_  ~~",
+        r"  ~ ( o o )__",
+        r" ~~~ \_v_/   \__",
+        r"  ~~~~~~~~~~\___)",
+    ],
+}
+
 # kind of mission -> how it is asked for.
 #   pay        a resource the city hands over with the Deliver button, or
 #   event      something the city does: "build", "tame", "research", "explore"
@@ -122,8 +229,45 @@ def new_egg(state, now, species):
     beast = {"id": state["beast_count"], "species": species, "stage": "egg", "level": 0, "xp": 0,
              "obtained": now, "missions": 0}
     beast["task"] = _egg_task(random.Random())
+    beast["stats"] = roll_stats(species, random.Random())
     state["beasts"].append(beast)
     return beast
+
+
+def roll_stats(species, rng):
+    """This one beast's stats: its species' base values, each a little higher or lower."""
+    return {key: max(1, round(base * rng.uniform(1 - STAT_SPREAD, 1 + STAT_SPREAD)))
+            for key, base in zip(STATS, BASE_STATS[species])}
+
+
+def take(state, beast_id):
+    """Take a beast or egg out of the city, to be traded. Returns (beast, None) or (None, why not)."""
+    beast = get(state, beast_id)
+    if not beast:
+        return None, "You have no such beast."
+    if beast["stage"] != "egg" and beast["id"] == state.get("beast_active"):
+        return None, "Your active beast can't be traded. Make another beast active first."
+    state["beasts"].remove(beast)
+    return beast, None
+
+
+def give(state, now, beast):
+    """Add a beast or egg that came from another city (or back from the market)."""
+    state["beast_count"] = state.get("beast_count", 0) + 1
+    beast["id"] = state["beast_count"]
+    state["beasts"].append(beast)
+    tick(state, now)
+    return beast
+
+
+def public(beast):
+    """What other cities may know about a beast on offer. What is inside an egg stays a surprise."""
+    species = SPECIES[beast["species"]]
+    rarity = RARITIES[species["rarity"]]
+    if beast["stage"] == "egg":
+        return {"egg": True, "name": f"{rarity['name']} egg", "rarity": rarity["name"], "color": rarity["color"]}
+    return {"egg": False, "name": species["name"], "species": beast["species"], "rarity": rarity["name"],
+            "color": rarity["color"], "level": beast["level"], "stats": beast["stats"], "nature": species["nature"]}
 
 
 def _egg_task(rng):
@@ -157,6 +301,9 @@ def migrate(state, now):
         setup(state, now)
         game.log(state, now, "A strange egg has been found at the edge of the city. See the Beast tab.")
     state.setdefault("reports", [])
+    for beast in state["beasts"]:
+        if "stats" not in beast:    # a beast from before stats
+            beast["stats"] = roll_stats(beast["species"], random.Random())
     # Eggs used to share the daily mission; now each has a mission of its own.
     for beast in state["beasts"]:
         if beast["stage"] == "egg" and beast["missions"] < 1 and "task" not in beast:
@@ -395,6 +542,7 @@ def view(state, now):
                          missions=b["missions"], task=b.get("task"))
         else:
             entry.update(name=species["name"], nature=species["nature"], desc=species["desc"],
+                         species=b["species"], stats=b["stats"], art="\n".join(ART[b["species"]]),
                          xp=b["xp"], xp_needed=xp_needed(b["level"]), max_level=b["level"] >= MAX_LEVEL,
                          bonus=_describe(species["bonus"], b["level"], power),
                          next_bonus=_describe(species["bonus"], min(MAX_LEVEL, b["level"] + 1), power))
@@ -409,4 +557,6 @@ def view(state, now):
         "xp_per_mission": round(MISSION_XP * (1 + game.city_stat(state, "beast_xp"))),
         "egg_chance": round(min(EGG_CHANCE_MAX, EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
         "rarities": RARITIES,
+        "stats": STATS,
+        "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"]} for k, s in SPECIES.items()},
     }

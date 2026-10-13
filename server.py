@@ -167,6 +167,7 @@ def startup():
         MARKET = (json.loads(MARKET_FILE.read_text(encoding="utf-8"))
                   if MARKET_FILE.exists() else market.new_market())
         MARKET.setdefault("bills", [])
+        MARKET.setdefault("beast_offers", [])
 
 
 def run_bills(now):
@@ -181,7 +182,7 @@ def city_view(state, now, area=0, find=None):
         out["found"] = game.find(state, *find.split(":", 1))
     out["state"] = {k: v for k, v in state.items() if k not in PRIVATE}
     out["now"] = now
-    out["market"] = MARKET
+    out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET))
     out["cities"] = all_city_names()
     # Bills are part of what the city gains and loses per hour.
     rates = out["status"]["rates"]
@@ -270,6 +271,13 @@ def handle_post(path, data, token, now):
     elif action == "market_seen":      # the player has read what sold while they were away
         state["sales"] = []
         error = None
+    elif action == "beast_offer_post":
+        error = market.post_beast(MARKET, state, now, data)
+    elif action == "beast_offer_cancel":
+        error = market.cancel_beast(MARKET, state, now, data.get("offer"))
+    elif action == "beast_offer_accept":
+        error = market.accept_beast(MARKET, state, now, data.get("offer"),
+                                    lambda seller: find_city(seller, now), data.get("pay"))
     elif action == "offer_cancel":
         error = market.cancel(MARKET, state, now, data.get("offer"))
     elif action == "offer_accept":
