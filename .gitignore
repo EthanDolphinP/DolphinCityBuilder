@@ -2,6 +2,8 @@
 saves/
 old_saves/
 market.json
+presents.json
+presents.taken
 *.tmp
 
 __pycache__/

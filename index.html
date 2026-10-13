@@ -157,15 +157,16 @@
   .tradeForm { border: 1px solid var(--accent); background: var(--inset); padding: 8px 10px; margin: 6px 0; white-space: normal; }
   .tradeForm .bar { margin: 6px 0; align-items: center; }
   .visiting [data-deliver], .visiting [data-egg-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
-  #away, #report { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
+  #away, #report, #present { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
-  #away .panel, #report .panel { max-width: 560px; width: 100%; max-height: 100%; overflow: hidden; margin: 0;
+  #away .panel, #report .panel, #present .panel { max-width: 560px; width: 100%; max-height: 100%; overflow: hidden; margin: 0;
                  border-color: var(--accent); display: flex; flex-direction: column; }
-  #away .head, #report .head { flex: none; align-items: center; flex-wrap: nowrap; }
-  #away .head h1, #report .head h1 { margin: 0; }
-  #awayBody, #reportBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; padding-right: 6px; }
-  #away .bar, #report .bar { flex: none; }
+  #away .head, #report .head, #present .head { flex: none; align-items: center; flex-wrap: nowrap; }
+  #away .head h1, #report .head h1, #present .head h1 { margin: 0; }
+  #presentBody .opt, #presentBody h2 { text-align: left; }
+  #awayBody, #reportBody, #presentBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; padding-right: 6px; }
+  #away .bar, #report .bar, #present .bar { flex: none; }
   #salesBody .list { max-height: 40vh; overflow-y: auto; padding-right: 6px; }
   .buy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .buy input, .fin input { width: 110px; }
@@ -215,6 +216,7 @@
 
     <!-- City -->
     <div id="tab-city">
+      <div class="panel" id="tutorial" style="border-color:var(--accent)" hidden><div id="tutorialBody"></div></div>
       <div class="panel">
         <div class="head">
           <span id="advanceTitle" class="hi"></span>
@@ -452,6 +454,7 @@
             <option value="3">Every 3 seconds</option><option value="5">Every 5 seconds</option><option value="10">Every 10 seconds</option><option value="20">Every 20 seconds</option></select></label>
           <label><span class="k">Open the game on</span><select data-setting="startTab">
             <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="market">Market</option></select></label>
+          <label class="check"><input data-setting="tutorial" type="checkbox"> Show the Getting started list on the City tab</label>
           <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
           <label class="check"><input data-setting="reports" type="checkbox"> Show a report when an expedition returns</label>
           <label class="check"><input data-setting="confirmDemolish" type="checkbox"> Ask before demolishing a building</label>
@@ -508,6 +511,10 @@
           wild animal (pink). The bar under a building shows how far through its cycle it is, and a + in the
           corner is an addition. Click any tile for its details.</p>
       </details>
+      <details class="panel" id="gSecHowto" open>
+        <summary class="cat">How to play <span id="gCountHowto" class="count"></span></summary>
+        <div id="guideHowto"></div>
+      </details>
       <details class="panel" id="gSecTerrain">
         <summary class="cat">Terrain <span id="gCountTerrain" class="count"></span></summary>
         <div id="guideTerrain" class="scroll"></div>
@@ -540,6 +547,13 @@
         <p class="dim small">Click a column heading, or use the menu, to rank by it. View opens another city
           read-only. Ban stops a city from viewing yours and from proposing bills to you.</p>
       </div>
+    </div>
+  </div>
+  <div id="present" hidden>
+    <div class="panel">
+      <div class="head"><h1>A present!</h1></div>
+      <div id="presentBody" style="text-align:center"></div>
+      <div class="bar" id="presentBar" style="justify-content:center"></div>
     </div>
   </div>
   <div id="report" hidden>
@@ -587,7 +601,7 @@ const FONTS = {
 };
 const DEFAULT_SETTINGS = { theme: 'forest', accent: '', font: 'mono', zoom: 100, tile: 'medium', width: 'normal', layout: 'auto',
                            rate: 'hour', clock: 'auto', abbreviate: false, separators: true,
-                           poll: 5, startTab: 'city', away: true, reports: true, confirmDemolish: false, mapKey: true };
+                           poll: 5, startTab: 'city', tutorial: true, away: true, reports: true, confirmDemolish: false, mapKey: true };
 let settings = { ...DEFAULT_SETTINGS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
 function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} }
@@ -703,6 +717,99 @@ function lotPreview() {
   $('lotPreview').textContent = l.lots > 1
     ? `Price: ${l.give} ${R[$('giveRes').value]} for ${l.want} ${R[$('wantRes').value]}. Buyers can take any amount${l.give > 1 ? ' in steps of ' + l.give : ''}, up to all ${give}.`
     : `These amounts share no common factor, so this can only be bought all at once. Round numbers can be bought a part at a time.`;
+}
+// The written part of the Guide tab. [title, text]
+const HOWTO = [
+  ['The basics', 'Your city runs in real time, whether or not the game is open. Buildings work in cycles: each one takes its time, then pays out. Click a tile on the City tab to see the land and what can be built there. When you come back after a while, a window tells you what changed.'],
+  ['First steps', 'Build a Lumber Camp on forest for Wood, something that makes Food (a Farm on plains, a Hunting Lodge in forest or a Fishing Dock on water), then a Hut so more people can move in. A Shaman Hut makes Knowledge for research. The Getting started list on the City tab walks through this.'],
+  ['People and food', 'Everyone eats 1 Food at each meal, every 15 minutes. After a meal a new person arrives if there is a free bed and enough food left over for them. If food runs out nobody leaves, but every building that does not make food works at half speed. The People tab shows exactly what is holding growth back.'],
+  ['Workers', 'Every working building needs people. When there are not enough, some buildings stand idle. Click a building and set its priority to choose which ones are staffed first, or switch one off.'],
+  ['Where to build', 'Each building lists the land it can stand on. Many work faster in the right spot: farms on fertile ground and next to fresh water, mines and quarries on higher hills, fisheries on water with more fish, shops next to homes. The tile panel shows every bonus and penalty a building would get before you build it.'],
+  ['Additions', 'Click a finished building to attach additions to it. Each one improves that building: faster, more output, more beds. A building can hold two.'],
+  ['Research', 'Knowledge buys research on the Research tab. Research unlocks buildings and additions, speeds buildings up, and lets you use difficult land. Each tech level\'s research needs its research building standing in your city: Shaman Hut, School, University, Laboratory, Research Institute.'],
+  ['Tech levels', 'Tribe, Village, Town, City, Metropolis, Megacity. The list at the top of the City tab shows what the next one asks for: people, materials, research and areas. Advancing spends the materials, unlocks new buildings and research, and makes your home area bigger.'],
+  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It costs more the further from home, and takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. You can rename areas to keep track of them.'],
+  ['Wildlife and livestock', 'Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
+  ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
+  ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
+  ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab.'],
+  ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills.'],
+  ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
+  ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
+];
+// Getting started: [title, how to do it, done?]
+const TUTORIAL = [
+  ['Look at a tile', 'Click any tile on the map below. The panel beside it describes the land and lists what you can build there.',
+    c => sel !== null || c.built > 0],
+  ['Get wood', 'Click a forest tile and build a Lumber Camp. Nearly everything is built from Wood. Buildings then work by themselves, even while you are away.',
+    c => c.has('lumber_camp')],
+  ['Grow food', 'Build a Farm on plains, a Hunting Lodge in forest or a Fishing Dock on water. Each person eats 1 Food every 15 minutes.',
+    c => c.has('farm', 'hunting_lodge', 'fishing_dock')],
+  ['Make room for people', 'Build a Hut. A new person arrives at each meal while there is a free bed and food to spare.',
+    c => c.has('hut')],
+  ['Reach 6 people', 'Buildings need workers, so more people means more can run at once. The People tab shows what is holding growth back.',
+    c => c.state.population >= 6],
+  ['Start learning', 'Build a Shaman Hut. It makes Knowledge, which pays for research.',
+    c => c.has('shaman_hut')],
+  ['Research something', 'Open the Research tab and buy your first research. Surveying and Stone Tools are cheap and useful.',
+    c => c.state.research.length >= 1],
+  ['Hatch your egg', 'Open the Beast tab. Your egg hatches once its small mission is done and it has been kept warm for a while.',
+    c => c.beast.hatched],
+  ['Become a Village', 'The list just below shows what the next tech level needs. Press Advance when every line is ticked. The Guide tab explains everything else.',
+    c => c.state.tech >= 1],
+];
+function renderTutorial() {
+  const state = view.state;
+  const built = new Set();
+  let count = 0;
+  for (const a of state.areas) for (const row of a.tiles) for (const t of row) if (t.building) { built.add(t.building); count++; }
+  const c = { state, beast: view.beast, built: count, has: (...ids) => ids.some(id => built.has(id)) };
+  const done = TUTORIAL.map(([, , test]) => !!test(c)), n = done.filter(Boolean).length, next = done.indexOf(false);
+  const show = settings.tutorial && !visiting && next >= 0;
+  $('tutorial').hidden = !show;
+  if (!show) return;
+  setHTML($('tutorialBody'),
+    `<div class="head"><h2 style="margin:0">Getting started <span class="dim">(${n} of ${TUTORIAL.length})</span></h2><button data-tutorial-hide>Hide</button></div>` +
+    TUTORIAL.map(([title, text], i) => i === next
+      ? `<div class="opt"><span class="hi">[ ] ${esc(title)}</span><div class="small" style="margin:3px 0 0 30px">${esc(text)}</div></div>`
+      : `<div class="opt small ${done[i] ? 'good' : 'dim'}">[${done[i] ? 'x' : ' '}] ${esc(title)}</div>`).join('') +
+    `<p class="dim small" style="margin-bottom:0">Hide turns this list off; Settings can bring it back. The Guide tab has more.</p>`);
+}
+
+// Presents sent by the person running the game.
+const PRESENT_SHUT = String.raw`
+      _   _
+     ( \ / )
+   ___\_Y_/___
+  |     |     |
+  |=====+=====|
+  |     |     |
+  |_____|_____|`.slice(1);
+const PRESENT_OPEN = String.raw`
+   \   *  .  *   /
+  __\___________/__
+    *  .   *   .
+  |  .   *   .   |
+  |=====+ +=====|
+  |     | |     |
+  |_____|_|_____|`.slice(1);
+function renderPresent() {
+  const list = visiting ? [] : (view.state.presents || []), p = list[0];
+  $('present').hidden = !p;
+  if (!p) return;
+  const R = view.defs.resources, gifts = Object.entries(p.gifts);
+  setHTML($('presentBody'),
+    `<pre class="beastArt ${p.opened ? 'good' : 'hi'}" style="text-align:left;display:inline-block">${esc(p.opened ? PRESENT_OPEN : PRESENT_SHUT)}</pre>` +
+    (p.message ? `<p class="big" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(p.message)}</p>` : '') +
+    (p.opened
+      ? `<h2>Inside</h2>` + (gifts.length || p.egg
+          ? gifts.map(([k, v]) => `<div class="opt good">+${num(v)} ${esc(R[k])}</div>`).join('') +
+            (p.egg ? `<div class="opt good">A ${esc(view.beast.rarities[p.egg].name.toLowerCase())} beast egg. It is waiting on the Beast tab.</div>` : '') +
+            `<p class="dim small">Added to your stores.</p>`
+          : `<p class="dim">Just the note this time.</p>`)
+      : `<p class="dim">A present has arrived for ${esc(view.state.name)}.</p>`) +
+    (list.length > 1 ? `<p class="dim small">${list.length - 1} more waiting after this one.</p>` : ''));
+  setHTML($('presentBar'), p.opened ? `<button data-present-close="${p.id}">Thanks!</button>` : `<button data-present-open="${p.id}">Open</button>`);
 }
 let boardView = 'overview', boardBanned = false;   // which columns and cities the Leaderboard shows
 let jump = null;       // a tile to select once its area has loaded
@@ -843,6 +950,8 @@ function plain(cost) {
 
 function render() {
   const { state, status, defs } = view;
+  renderTutorial();
+  renderPresent();
   const area = state.areas[view.area];
   const tech = defs.tech[state.tech];
 
@@ -1455,7 +1564,11 @@ function renderGuide(opening) {
   const buildingOnly = tech || cat;   // the two menus are about buildings
 
   const terrains = Object.values(T).filter(t => !buildingOnly && has(`${t.name} ${t.desc || ''} ${(t.groups || []).join(' ')}`));
-  let shown = fill('Terrain', Object.keys(T).length, ['Tile', 'Height', 'Fertility', 'Fish', 'Notes'], terrains.map(t =>
+  const topics = HOWTO.filter(([title, body]) => !buildingOnly && has(title + ' ' + body));
+  setHTML($('guideHowto'), topics.map(([title, body]) => `<div class="opt"><span class="hi">${esc(title)}</span><div class="dim" style="margin-top:2px">${esc(body)}</div></div>`).join(''));
+  $('gCountHowto').textContent = topics.length === HOWTO.length ? `(${HOWTO.length})` : `(${topics.length} of ${HOWTO.length})`;
+  $('gSecHowto').hidden = !topics.length;
+  let shown = topics.length + fill('Terrain', Object.keys(T).length, ['Tile', 'Height', 'Fertility', 'Fish', 'Notes'], terrains.map(t =>
     `<tr><td><span class="glyph" style="color:${esc(t.color)}">${esc(t.glyph + t.glyph)}</span> ${esc(t.name)}</td>` +
     `<td>${range(t.height)}</td><td>${range(t.fertility)}%</td><td>${t.fish ? range(t.fish) + '%' : '-'}</td>` +
     `<td ${wrap}>${esc(t.desc || '')}${t.from ? ' Rare; found more often far from home.' : ''}` +
@@ -1731,6 +1844,11 @@ $('advance').onclick = () => act('advance');
 $('leave').onclick = leave;
 $('awayOk').onclick = () => { $('away').hidden = true; act('dismiss_away'); };
 $('reportOk').onclick = () => { $('report').hidden = true; act('report_seen'); };
+$('tutorial').onclick = e => { if ('tutorialHide' in e.target.dataset) { settings.tutorial = false; saveSettings(); render(); } };
+$('presentBar').onclick = e => {
+  if (e.target.dataset.presentOpen) act('present_open', { present: +e.target.dataset.presentOpen });
+  else if (e.target.dataset.presentClose) act('present_close', { present: +e.target.dataset.presentClose });
+};
 // A pop-up also closes from the button at its top, by clicking outside it, or with Escape.
 for (const [id, ok] of [['away', 'awayOk'], ['report', 'reportOk']])
   $(id).addEventListener('click', e => { if (e.target === $(id) || e.target.dataset.close) $(ok).click(); });

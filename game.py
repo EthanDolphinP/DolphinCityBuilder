@@ -219,7 +219,7 @@ RESOURCES = {
 }
 UNTRADEABLE = {"knowledge"}   # cannot be offered or asked for on the market
 
-START_RESOURCES = {"food": 30, "wood": 40}
+START_RESOURCES = {"food": 50, "wood": 100, "stone": 25, "livestock": 3}
 START_POPULATION = 3
 BASE_HOUSING = 3            # people who can live in the starting camp
 AREA_SIZE = 5
@@ -2834,6 +2834,41 @@ def advance(state, now):
     return None
 
 
+# ---- Presents ----
+# The admin sends these from the console (see server.py --present). A present
+# waits in the city, wrapped, until its player opens it; only then are the
+# goods added.
+
+MAX_PRESENT_MESSAGE = 300
+
+
+def give_present(state, now, message, gifts, egg=None):
+    """Leave a wrapped present in the city. `gifts` is {resource: amount}; `egg` a rarity or None."""
+    state["present_count"] = state.get("present_count", 0) + 1
+    state.setdefault("presents", []).append({
+        "id": state["present_count"], "t": now, "message": str(message or "")[:MAX_PRESENT_MESSAGE],
+        "gifts": {k: v for k, v in gifts.items() if k in RESOURCES and v > 0},
+        "egg": egg if egg in beasts.RARITIES else None, "opened": False})
+    log(state, now, "A present has arrived for the city.")
+
+
+def open_present(state, now, present_id):
+    present = next((p for p in state.get("presents", []) if p["id"] == present_id), None)
+    if not present:
+        return "That present is no longer here."
+    if present["opened"]:
+        return None
+    present["opened"] = True
+    for k, v in present["gifts"].items():
+        state["resources"][k] += v
+    got = [fmt_goods(present["gifts"])] if present["gifts"] else []
+    if present["egg"]:
+        beasts.new_egg(state, now, beasts.random_species(random.Random(), rarity=present["egg"]))
+        got.append(f"a {beasts.RARITIES[present['egg']]['name'].lower()} beast egg")
+    log(state, now, f"Opened a present: {' and '.join(got) or 'nothing inside'}.")
+    return None
+
+
 # ---- Coming back to the city ----
 
 def _remember_seen(state, when):
@@ -3041,6 +3076,11 @@ def apply_action(state, now, action, data):
         return slaughter(state, now, data.get("count"))
     if action == "dismiss_away":
         state["report"] = None
+        return None
+    if action == "present_open":
+        return open_present(state, now, data.get("present"))
+    if action == "present_close":
+        state["presents"] = [p for p in state.get("presents", []) if p["id"] != data.get("present")]
         return None
     if action == "research":
         return research(state, now, data.get("research"))

@@ -81,6 +81,23 @@ and upload the `.json` files from the `saves` folder on your computer. Upload
 **Reload** on the Web tab afterwards. Do this before people start playing on
 the hosted copy, or their progress there will be replaced.
 
+### Sending presents
+
+You can send any city (or every city) a present from a Bash console. The game
+does not need to be stopped or reloaded: the present appears the next time
+anyone uses the game, wrapped, with an Open button.
+
+```
+cd ~/DolphinCityBuilder
+python server.py --present CityName "Thanks for testing!" wood=200 gold=50
+python server.py --present all "Sorry about the downtime." food=100 egg=rare
+```
+
+The message goes in quotes, then as many `material=amount` gifts as you like:
+`food`, `wood`, `stone`, `ore`, `tools`, `gold`, `electronics`, `livestock`,
+`knowledge`. `egg=` adds a beast egg: `common`, `uncommon`, `rare`, `epic` or
+`legendary`. Use `all` instead of a city name to send it to everyone.
+
 ### A forgotten password
 
 In a Bash console, then Reload the web app; whoever signs in to that city next

@@ -34,12 +34,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import beasts
 import game
 import market
 
 ROOT = Path(__file__).parent
 SAVES = ROOT / "saves"
 MARKET_FILE = ROOT / "market.json"
+PRESENTS_FILE = ROOT / "presents.json"   # presents sent from the console, waiting to be handed out
 CITY_NAME = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 BAD_NAME = "City names are 1-24 letters, digits, - or _."
 AUTOSAVE_SECONDS = 60
@@ -174,6 +176,56 @@ def run_bills(now):
     """Market upkeep done before every request: bills that are due, empty offers to clear."""
     market.run_bills(MARKET, now, lambda name: find_city(name, now))
     market.tidy(MARKET, now, lambda name: find_city(name, now))
+    deliver_presents(now)
+
+
+def deliver_presents(now):
+    """Hand out presents the admin has sent from the console (python server.py --present ...).
+    The console only writes them to PRESENTS_FILE; the running game picks them up here, so
+    nothing has to be stopped or reloaded."""
+    if not PRESENTS_FILE.exists():
+        return
+    taken = PRESENTS_FILE.with_suffix(".taken")
+    try:
+        os.replace(PRESENTS_FILE, taken)
+        waiting = json.loads(taken.read_text(encoding="utf-8"))
+        taken.unlink()
+    except (OSError, ValueError):
+        return
+    for present in waiting:
+        names = all_city_names() if present["to"] == "all" else [present["to"]]
+        for name in names:
+            state = find_city(name, now)
+            if state:
+                game.give_present(state, now, present["message"], present["gifts"], present.get("egg"))
+    flush()
+
+
+def send_present(args):
+    """The --present command. Returns what to print."""
+    usage = ("Usage: python server.py --present CityName|all \"message\" wood=100 food=50 egg=rare\n"
+             f"  materials: {', '.join(game.RESOURCES)}\n  egg: {', '.join(beasts.RARITIES)}")
+    if len(args) < 2:
+        return usage
+    to, message, gifts, egg = args[0], args[1], {}, None
+    if to != "all" and not (CITY_NAME.match(to) and (SAVES / f"{to}.json").exists()):
+        return f"There is no city called {to}. City names are case-sensitive: {', '.join(all_city_names()) or 'none yet'}."
+    for word in args[2:]:
+        key, _, value = word.partition("=")
+        if key == "egg" and value in beasts.RARITIES:
+            egg = value
+        elif key in game.RESOURCES and value.isdigit() and 0 < int(value) <= 1_000_000:
+            gifts[key] = gifts.get(key, 0) + int(value)
+        else:
+            return f"Did not understand '{word}'.\n{usage}"
+    if "=" in message and not args[2:]:
+        return f"The message comes before the gifts, in quotes.\n{usage}"
+    waiting = json.loads(PRESENTS_FILE.read_text(encoding="utf-8")) if PRESENTS_FILE.exists() else []
+    waiting.append({"to": to, "message": message[:game.MAX_PRESENT_MESSAGE], "gifts": gifts, "egg": egg})
+    _write(PRESENTS_FILE, waiting)
+    inside = [f"{v} {game.RESOURCES[k]}" for k, v in gifts.items()] + ([f"a {egg} egg"] if egg else [])
+    return (f"Present for {'every city' if to == 'all' else to}: {', '.join(inside) or 'nothing but the message'}.\n"
+            "It is handed out the next time anyone uses the game.")
 
 
 def city_view(state, now, area=0, find=None):
@@ -383,6 +435,8 @@ if __name__ == "__main__":
             saved.pop(key, None)
         _write(path, saved)
         sys.exit(f"{sys.argv[2]} has no password now. Whoever signs in to it next chooses the new one.")
+    if sys.argv[1:2] == ["--present"]:
+        sys.exit(send_present(sys.argv[2:]))
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     startup()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
