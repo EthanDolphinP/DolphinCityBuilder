@@ -12,9 +12,13 @@ amounts, and the smallest piece that keeps both sides in whole numbers is a
 "lot": 1000 Food for 250 Wood sells in lots of 4 Food for 1 Wood. Anyone can
 buy any number of lots while there are some left.
 
+A buyer says how much of the thing on sale they want; that has to be a whole
+number of lots, and the price follows from it.
+
 An offer never refills by itself. When it sells out it is moved to its owner's
-"finished" list, from where the owner can post it again with the same amounts
-(paying for it out of stock again) or throw it away.
+"finished" list, remembered with the amounts it was posted with. From there the
+owner can change the amounts, post it again (paying for it out of stock again)
+or throw it away.
 
 Every sale from a city's offers is also noted in that city's "sales" list, so
 the Market screen can show what sold since the owner last looked.
@@ -99,6 +103,14 @@ def lot(offer):
     return lot_give, full_want // lots, offer["give_qty"] // lot_give
 
 
+def _remember_full(offer):
+    """Make sure an offer knows the amounts it was posted with. Offers from before lots existed
+    don't, and would otherwise be remembered as 0 for 0 once they sold out."""
+    if offer["give_qty"] and offer["want_qty"]:
+        offer.setdefault("full_give", offer["give_qty"])
+        offer.setdefault("full_want", offer["want_qty"])
+
+
 def _finish(offer, seller, now):
     """Note a sold-out offer in its owner's finished list."""
     if not seller:
@@ -111,20 +123,36 @@ def _finish(offer, seller, now):
 
 def tidy(market, now, get_city):
     """Clear away offers with nothing left to sell (left over from when offers could restock)."""
+    for offer in market["offers"]:
+        _remember_full(offer)
     for offer in [o for o in market["offers"] if not o["give_qty"]]:
         market["offers"].remove(offer)
         _finish(offer, get_city(offer["city"]), now)
 
 
 def reactivate(market, state, now, finished_id):
-    """Post a finished offer again with the amounts it first had. The goods come out of stock again."""
+    """Post a finished offer again with the amounts it shows. The goods come out of stock again."""
     old = next((f for f in state.get("finished", []) if f["id"] == finished_id), None)
     if not old:
         return "That finished order is no longer in your list."
+    if not (_valid_qty(old["give_qty"]) and _valid_qty(old["want_qty"])):
+        return "Fill in both amounts on that order before posting it again."
     error = post(market, state, now, {k: old[k] for k in ("give", "give_qty", "want", "want_qty")})
     if not error:
         state["finished"].remove(old)
     return error
+
+
+def edit(state, finished_id, give_qty, want_qty):
+    """Change the amounts a finished offer will be posted with next time."""
+    old = next((f for f in state.get("finished", []) if f["id"] == finished_id), None)
+    if not old:
+        return "That finished order is no longer in your list."
+    # An order that lost its amounts is filled in one box at a time, so one side may still be empty (0).
+    if not all(_valid_qty(q) or q == 0 for q in (give_qty, want_qty)) or isinstance(give_qty, bool) or not (give_qty or want_qty):
+        return f"Amounts must be whole numbers from 1 to {MAX_QUANTITY:,}."
+    old["give_qty"], old["want_qty"] = give_qty, want_qty
+    return None
 
 
 def forget(state, finished_id):
@@ -133,8 +161,8 @@ def forget(state, finished_id):
     return None
 
 
-def accept(market, buyer, now, offer_id, get_city, lots=None):
-    """Take `lots` lots of an offer (all that is left if None).
+def accept(market, buyer, now, offer_id, get_city, lots=None, amount=None):
+    """Buy `amount` of what an offer is selling (or `lots` lots of it; all that is left if both are None).
 
     `get_city(name)` must return the seller's up-to-date state (or None).
     """
@@ -148,12 +176,21 @@ def accept(market, buyer, now, offer_id, get_city, lots=None):
     lot_give, lot_want, left = lot(offer)
     if not left:
         return "That offer is sold out."
-    if lots is None:
+    _remember_full(offer)
+    selling = game.RESOURCES[offer["give"]]
+    if amount is not None:
+        if not _valid_qty(amount):
+            return f"Type how much {selling} to buy."
+        if amount % lot_give:
+            return (f"That offer sells {selling} {lot_give} at a time, "
+                    f"so buy {lot_give}, {lot_give * 2}, {lot_give * 3} and so on.")
+        lots = amount // lot_give
+    elif lots is None:
         lots = left
     if not _valid_qty(lots):
-        return "Choose how many lots to take."
+        return "Choose how much to buy."
     if lots > left:
-        return f"Only {left} lot{'s are' if left != 1 else ' is'} left in that offer."
+        return f"Only {left * lot_give} {selling} is left in that offer."
     give_qty, want_qty = lots * lot_give, lots * lot_want
     if buyer["resources"][offer["want"]] < want_qty:
         return f"You don't have {want_qty} {game.RESOURCES[offer['want']]} to pay."

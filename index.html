@@ -145,7 +145,6 @@
   .mobile th, .mobile td { padding: 7px 10px 7px 0; }
   .mobile .areaCards { grid-template-columns: 1fr; }
   .mobile .setGrid { grid-template-columns: 1fr; }
-  .mobile #away .panel, .mobile #report .panel { max-height: 92vh; }
   .mobile .bar { gap: 6px; }
   .mobile #status { font-size: 13px; }
   .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
@@ -154,8 +153,17 @@
   .visiting [data-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market] { display: none; }
   #away, #report { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
-  #away .panel, #report .panel { max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; margin: 0;
-                 border-color: var(--accent); }
+  /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
+  #away .panel, #report .panel { max-width: 560px; width: 100%; max-height: 100%; overflow: hidden; margin: 0;
+                 border-color: var(--accent); display: flex; flex-direction: column; }
+  #away .head, #report .head { flex: none; align-items: center; flex-wrap: nowrap; }
+  #away .head h1, #report .head h1 { margin: 0; }
+  #awayBody, #reportBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; padding-right: 6px; }
+  #away .bar, #report .bar { flex: none; }
+  #salesBody .list { max-height: 40vh; overflow-y: auto; padding-right: 6px; }
+  .buy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .buy input, .fin input { width: 110px; }
+  .fin { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   #away .gain span { display: inline-block; margin-right: 16px; white-space: nowrap; }
 </style>
 </head>
@@ -340,13 +348,15 @@
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
         <p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
           until it is sold or you cancel. The two amounts set the price, and other cities can buy any part
-          of the offer at that price, a lot at a time. To buy something, offer what you will pay for it.</p>
+          of the offer at that price. To buy from an offer, type how much of it you want and the cost is
+          shown before you press Buy; Max buys all you can afford.</p>
       </details>
 
       <details class="panel" id="finishedPanel" open>
         <summary class="cat">Finished orders <span id="finishedCount" class="count"></span></summary>
-        <p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Reactivate posts
-          one again with the same amounts, taking the goods from your stock again.</p>
+        <p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Change the
+          amounts by typing new ones or with the &times; and &divide; buttons, which change both sides and keep the
+          price. Reactivate posts the order again with the amounts shown, taking the goods from your stock again.</p>
         <div id="finished" class="scroll"></div>
       </details>
 
@@ -503,14 +513,14 @@
   </div>
   <div id="report" hidden>
     <div class="panel">
-      <h1>Expedition report</h1>
+      <div class="head"><h1>Expedition report</h1><button data-close="reportOk">Close</button></div>
       <div id="reportBody"></div>
       <div class="bar"><button id="reportOk">Continue</button></div>
     </div>
   </div>
   <div id="away" hidden>
     <div class="panel">
-      <h1>While you were away</h1>
+      <div class="head"><h1>While you were away</h1><button data-close="awayOk">Close</button></div>
       <div id="awayBody"></div>
       <div class="bar"><button id="awayOk">Continue</button></div>
     </div>
@@ -608,7 +618,45 @@ let awayShown = null;  // the away report already on screen or dismissed
 let finder = { kind: '', what: '' };   // what the Find box is searching for
 let resFilter = 'all';  // which research the Research tab lists
 let mktFilter = 'all';  // which offers the Market tab lists
-const lotInput = new Map();   // how many lots the player has typed for each offer
+const lotInput = new Map();   // how much the player has typed to buy from each offer
+const finInput = new Map();   // amounts being typed into a finished order: "id:give_qty" -> text
+// Replace a list's HTML without losing the box the player is typing in.
+function setHTMLKeep(el, html, fill) {
+  const a = document.activeElement, key = a && el.contains(a) && a.dataset.k;
+  const changed = el._html !== html;
+  setHTML(el, html);
+  fill();
+  if (changed && key) { const again = el.querySelector(`[data-k="${key}"]`); if (again) again.focus(); }
+}
+// What typing `typed` into an offer's box would buy: whole lots only, never more than is left.
+function buyOf(o, typed) {
+  const l = lotOf(o), lots = Math.min(l.lots, Math.floor(typed / l.give) || 0);
+  return { lots, get: lots * l.give, pay: lots * l.want,
+           max: Math.min(l.lots, Math.floor(view.state.resources[o.want] / l.want)) * l.give };
+}
+// Put what the player has typed back into the offer boxes, and say what each would cost.
+function fillOffers() {
+  const R = view.defs.resources;
+  for (const box of $('offers').querySelectorAll('[data-amount]')) {
+    const id = +box.dataset.amount, o = view.market.offers.find(x => x.id === id), typed = lotInput.get(id) || '';
+    if (box.value !== typed) box.value = typed;
+    const out = $('offers').querySelector(`[data-cost="${id}"]`);
+    if (!o || !out) continue;
+    const l = lotOf(o), b = buyOf(o, +typed), have = view.state.resources[o.want];
+    if (typed === '') { out.className = 'dim small'; out.textContent = ''; }
+    else if (!b.lots) { out.className = 'bad small'; out.textContent = `The least you can buy is ${l.give} ${R[o.give]}.`; }
+    else {
+      const short = b.pay > have;
+      out.className = (short ? 'bad' : 'good') + ' small';
+      out.textContent = (b.get !== +typed ? `Rounds to ${b.get} ${R[o.give]}: costs ` : 'Costs ') + `${b.pay} ${R[o.want]}` +
+        (short ? ` (you have ${Math.floor(have)})` : '');
+    }
+  }
+}
+function fillFinished() {
+  for (const box of $('finished').querySelectorAll('[data-fin]'))
+    if (finInput.has(box.dataset.k) && box.value !== finInput.get(box.dataset.k)) box.value = finInput.get(box.dataset.k);
+}
 const gcd = (a, b) => b ? gcd(b, a % b) : a;
 // The smallest piece of an offer that keeps both sides whole, and how many are left.
 // The lot size comes from the amounts the offer was posted with, so it stays the same as the offer sells.
@@ -622,8 +670,8 @@ function lotPreview() {
   if (!(give >= 1 && want >= 1)) { $('lotPreview').textContent = ''; return; }
   const l = lotOf({ give_qty: give, want_qty: want });
   $('lotPreview').textContent = l.lots > 1
-    ? `Sells in lots of ${l.give} ${R[$('giveRes').value]} for ${l.want} ${R[$('wantRes').value]}: buyers can take any number of the ${l.lots} lots.`
-    : `These amounts share no common factor, so this can only be taken all at once. Round numbers split into more lots.`;
+    ? `Price: ${l.give} ${R[$('giveRes').value]} for ${l.want} ${R[$('wantRes').value]}. Buyers can take any amount${l.give > 1 ? ' in steps of ' + l.give : ''}, up to all ${give}.`
+    : `These amounts share no common factor, so this can only be bought all at once. Round numbers can be bought a part at a time.`;
 }
 let boardView = 'overview', boardBanned = false;   // which columns and cities the Leaderboard shows
 let jump = null;       // a tile to select once its area has loaded
@@ -719,8 +767,9 @@ function showAway(a) {
     `<h2>Change in your stores</h2><p class="gain">${gains.join('') || '<span class="dim">Nothing changed.</span>'}</p>` +
     (a.hungry ? `<p class="bad">Your city is out of food. Non-food buildings are working at half speed.</p>` : '') +
     `<h2>What happened</h2>` + (a.events.length
-      ? a.events.slice().reverse().map(e => `<div class="opt"><span class="dim">[${clock(e.t)}]</span> ${esc(e.text)}</div>`).join('')
+      ? a.events.slice().reverse().map(e => `<div class="opt small"><span class="dim">[${clock(e.t)}]</span> ${esc(e.text)}</div>`).join('')
       : `<p class="dim">Nothing else to report.</p>`);
+  $('awayBody').scrollTop = 0;
   $('away').hidden = false;
 }
 
@@ -1344,34 +1393,48 @@ function renderMarket() {
   // Newest first, unless one material is being compared for another: then the best price first.
   const offers = narrowed.filter(filters[mktFilter][1]).sort((a, b) => gives && wants ? price(a) - price(b) : b.posted - a.posted);
   $('offersCount').textContent = `(${offers.length}${offers.length === market.offers.length ? '' : ' of ' + market.offers.length})`;
-  setHTML($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Sold in lots of</th><th>Posted</th><th></th></tr>` +
+  setHTMLKeep($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Price</th><th>Posted</th><th>Buy</th></tr>` +
     offers.map(o => {
-      const l = lotOf(o), max = Math.min(l.lots, Math.floor(state.resources[o.want] / l.want));
+      const l = lotOf(o), max = buyOf(o, 0).max;
       return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
         `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
         `<td class="${mine(o) || max ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
         `<td class="dim">${l.give} ${esc(R[o.give])} for ${l.want} ${esc(R[o.want])}` +
-        (l.lots > 1 ? ` <span class="hi">(${l.lots} lots left)</span>` : l.give < o.give_qty || o.full_give > o.give_qty ? ' (last lot)' : ' (all at once)') + `</td>` +
+        (l.lots > 1 ? '' : l.give < o.give_qty || o.full_give > o.give_qty ? ' (last of it)' : ' (all at once)') + `</td>` +
         `<td class="dim">${clock(o.posted)}</td><td>` +
         (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
-          : (l.lots > 1 ? `<input data-lots="${o.id}" type="number" min="1" max="${l.lots}" step="1" value="${esc(lotInput.get(o.id) || '')}" ` +
-              `placeholder="${max} lots" title="How many lots to buy. Leave empty to buy as many as you can afford." style="width:96px"> ` : '') +
-            `<button data-accept="${o.id}" ${max ? '' : 'disabled'}>${l.lots > 1 ? 'Buy' : 'Accept'}</button>`) + `</td></tr>`;
+          : l.lots > 1
+            ? `<div class="buy"><input data-amount="${o.id}" data-k="buy${o.id}" type="number" min="${l.give}" max="${o.give_qty}" step="${l.give}" ` +
+                `placeholder="${esc(R[o.give])}" title="How much ${esc(R[o.give])} to buy${l.give > 1 ? ', in steps of ' + l.give : ''}"> ` +
+              `<button data-accept="${o.id}">Buy</button> ` +
+              `<button data-max="${o.id}" ${max ? '' : 'disabled'} title="${max ? `Buy ${max} ${esc(R[o.give])}: all you can afford` : 'You cannot afford any of this'}">Max${max ? ' (' + max + ')' : ''}</button></div>` +
+              `<div data-cost="${o.id}" class="dim small"></div>`
+            : `<button data-max="${o.id}" ${max ? '' : 'disabled'}>Buy all</button>`) + `</td></tr>`;
     }).join('') + `</table>` + (gives && wants ? `<p class="dim small">Best price first.</p>` : '')
-    : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`);
+    : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`, fillOffers);
   lotPreview();
 
   // ---- offers of this city's that sold out, ready to post again ----
   const finished = (state.finished || []).slice().reverse();
   $('finishedCount').textContent = `(${finished.length})`;
-  setHTML($('finished'), finished.length ? `<table><tr><th>Sold</th><th>For</th><th>Sold out</th><th></th></tr>` +
+  const box = (f, side) => `<input data-fin="${f.id}" data-side="${side}" data-k="fin${f.id}:${side}" type="number" min="1" step="1" ` +
+    `value="${f[side] || ''}" title="Type a new amount">`;
+  setHTMLKeep($('finished'), finished.length ? `<table><tr><th>You give</th><th>You want</th><th>Change both</th><th>Sold out</th><th></th></tr>` +
     finished.map(f => {
-      const ok = state.resources[f.give] >= f.give_qty;
-      return `<tr><td class="${ok ? '' : 'bad'}">${f.give_qty} ${esc(R[f.give])}</td><td>${f.want_qty} ${esc(R[f.want])}</td>` +
+      const set = f.give_qty >= 1 && f.want_qty >= 1, ok = set && state.resources[f.give] >= f.give_qty;
+      const scale = (label, mul, div) => {
+        const g = f.give_qty * mul / div, w = f.want_qty * mul / div, by = mul + '/' + div;
+        const can = set && Number.isInteger(g) && Number.isInteger(w) && g >= 1 && w >= 1 && g <= 1e6 && w <= 1e6;
+        return `<button data-scale="${f.id}" data-by="${by}" ${can ? '' : 'disabled'} ` +
+          `title="${can ? `Make it ${g} for ${w}` : 'Both amounts have to stay whole numbers from 1 to 1,000,000'}">${label}</button>`;
+      };
+      return `<tr><td><div class="fin">${box(f, 'give_qty')} <span class="${ok || !set ? '' : 'bad'}">${esc(R[f.give])}</span></div></td>` +
+        `<td><div class="fin">${box(f, 'want_qty')} ${esc(R[f.want])}</div></td>` +
+        `<td><div class="fin" style="flex-wrap:nowrap">${scale('&divide;100', 1, 100)}${scale('&divide;10', 1, 10)}${scale('&times;10', 10, 1)}${scale('&times;100', 100, 1)}</div></td>` +
         `<td class="dim">${clock(f.finished)}</td><td>` +
-        `<button data-reactivate="${f.id}" ${ok ? '' : 'disabled'} title="${ok ? 'Post it again' : 'You do not have enough in stock to post it again'}">Reactivate</button> ` +
+        `<button data-reactivate="${f.id}" ${ok ? '' : 'disabled'} title="${ok ? 'Post it again with these amounts' : set ? 'You do not have enough in stock to post it again' : 'Fill in both amounts first'}">Reactivate</button> ` +
         `<button data-forget="${f.id}">Remove</button></td></tr>`;
-    }).join('') + `</table>` : `<span class="dim">None of your offers have sold out yet.</span>`);
+    }).join('') + `</table>` : `<span class="dim">None of your offers have sold out yet.</span>`, fillFinished);
 
   // ---- what sold from this city's offers since the player last looked ----
   const sales = state.sales || [];
@@ -1381,8 +1444,8 @@ function renderMarket() {
       .map(([k, n]) => `${n} ${esc(R[k])}`).join(', ');
     setHTML($('salesBody'),
       kv([['Sales', sales.length], ['You received', `<span class="good">${total('want', 'want_qty')}</span>`], ['You sold', total('give', 'give_qty')]]) +
-      sales.slice().reverse().map(s => `<div class="opt small"><span class="dim">[${clock(s.t)}]</span> <span class="hi">${esc(s.buyer)}</span> bought ` +
-        `${s.give_qty} ${esc(R[s.give])} for ${s.want_qty} ${esc(R[s.want])} <span class="dim">(${s.left ? s.left + ' left on that offer then' : 'sold out'})</span></div>`).join(''));
+      `<div class="list">` + sales.slice().reverse().map(s => `<div class="opt small"><span class="dim">[${clock(s.t)}]</span> <span class="hi">${esc(s.buyer)}</span> bought ` +
+        `${s.give_qty} ${esc(R[s.give])} for ${s.want_qty} ${esc(R[s.want])} <span class="dim">(${s.left ? s.left + ' left on that offer then' : 'sold out'})</span></div>`).join('') + `</div>`);
   }
 
   setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
@@ -1536,6 +1599,13 @@ $('advance').onclick = () => act('advance');
 $('leave').onclick = leave;
 $('awayOk').onclick = () => { $('away').hidden = true; act('dismiss_away'); };
 $('reportOk').onclick = () => { $('report').hidden = true; act('report_seen'); };
+// A pop-up also closes from the button at its top, by clicking outside it, or with Escape.
+for (const [id, ok] of [['away', 'awayOk'], ['report', 'reportOk']])
+  $(id).addEventListener('click', e => { if (e.target === $(id) || e.target.dataset.close) $(ok).click(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('report').hidden) $('reportOk').click(); else if (!$('away').hidden) $('awayOk').click();
+});
 $('tab-beast').onclick = e => {
   if ('deliver' in e.target.dataset) act('mission_deliver');
   else if (e.target.dataset.beastActive) act('beast_active', { beast: +e.target.dataset.beastActive });
@@ -1612,12 +1682,34 @@ $('slaughterForm').onsubmit = e => {
 $('resSearch').oninput = () => renderResearch();
 for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { if (view && !visiting) renderMarket(); };
 $('offers').addEventListener('input', e => {
-  if (e.target.dataset.lots) lotInput.set(+e.target.dataset.lots, e.target.value);
+  if (e.target.dataset.amount) { lotInput.set(+e.target.dataset.amount, e.target.value); fillOffers(); }
+});
+$('offers').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset.amount) $('offers').querySelector(`[data-accept="${e.target.dataset.amount}"]`).click();
 });
 $('finished').onclick = e => {
-  if (e.target.dataset.reactivate) act('offer_reactivate', { offer: +e.target.dataset.reactivate });
-  else if (e.target.dataset.forget) act('offer_forget', { offer: +e.target.dataset.forget });
+  const d = e.target.dataset;
+  if (d.reactivate) act('offer_reactivate', { offer: +d.reactivate });
+  else if (d.forget) act('offer_forget', { offer: +d.forget });
+  else if (d.scale) {
+    const f = (view.state.finished || []).find(x => x.id === +d.scale);
+    const [mul, div] = d.by.split('/').map(Number);
+    if (f) act('offer_edit', { offer: f.id, give_qty: f.give_qty * mul / div, want_qty: f.want_qty * mul / div });
+  }
 };
+// Typing in a finished order's amount saves it once the box is left (or Enter is pressed).
+$('finished').addEventListener('input', e => { if (e.target.dataset.fin) finInput.set(e.target.dataset.k, e.target.value); });
+$('finished').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.fin) e.target.blur(); });
+$('finished').addEventListener('change', e => {
+  const d = e.target.dataset;
+  if (!d.fin) return;
+  const f = (view.state.finished || []).find(x => x.id === +d.fin);
+  finInput.delete(d.k);
+  if (!f) return;
+  const now = { give_qty: f.give_qty, want_qty: f.want_qty, [d.side]: Math.floor(+e.target.value) };
+  if (now[d.side] >= 1) act('offer_edit', { offer: f.id, ...now });
+  else { $('msg').textContent = 'Amounts must be whole numbers of 1 or more.'; $('finished')._html = null; renderMarket(); }
+});
 $('salesSeen').onclick = () => act('market_seen');
 $('offerForm').addEventListener('input', lotPreview);
 $('mktFilters').onclick = e => {
@@ -1627,14 +1719,22 @@ $('resFilters').onclick = e => {
   if (e.target.dataset.filter) { resFilter = e.target.dataset.filter; renderResearch(); }
 };
 $('offers').onclick = e => {
+  const id = +(e.target.dataset.accept || e.target.dataset.max), o = view.market.offers.find(x => x.id === id);
+  if (id && !o) return;
   if (e.target.dataset.accept) {
-    // Buy the number of lots typed, or as many as can be afforded if the box is empty.
-    const id = +e.target.dataset.accept, o = view.market.offers.find(x => x.id === id);
-    if (!o) return;
-    const l = lotOf(o), typed = Math.floor(+lotInput.get(id));
-    const lots = typed >= 1 ? typed : Math.min(l.lots, Math.floor(view.state.resources[o.want] / l.want));
+    // Buy the amount typed, rounded down to what the offer's price allows.
+    const R = view.defs.resources, typed = lotInput.get(id) || '', b = buyOf(o, +typed);
+    if (typed === '') { $('msg').textContent = `Type how much ${R[o.give]} to buy, or press Max.`; return; }
+    if (!b.lots) { $('msg').textContent = `The least you can buy from that offer is ${lotOf(o).give} ${R[o.give]}.`; return; }
     lotInput.delete(id);
-    act('offer_accept', { offer: id, lots });
+    act('offer_accept', { offer: id, amount: b.get });
+  }
+  else if (e.target.dataset.max) {
+    // Everything this city can afford from the offer.
+    const max = buyOf(o, 0).max;
+    if (!max) return;
+    lotInput.delete(id);
+    act('offer_accept', { offer: id, amount: max });
   }
   else if (e.target.dataset.cancel) act('offer_cancel', { offer: +e.target.dataset.cancel });
 };
