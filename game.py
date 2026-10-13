@@ -259,9 +259,9 @@ TECH_LEVELS = [
      "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100}},
     {"name": "City", "population": 90, "research": 22, "areas": 4,
      "cost": {"stone": 2000, "ore": 800, "tools": 400, "gold": 1500, "knowledge": 800}},
-    {"name": "Metropolis", "population": 200, "research": 36, "areas": 6,
+    {"name": "Metropolis", "population": 200, "research": 44, "areas": 6,
      "cost": {"stone": 6000, "ore": 2000, "tools": 2000, "gold": 8000, "knowledge": 3000}},
-    {"name": "Megacity", "population": 400, "research": 48, "areas": 9,
+    {"name": "Megacity", "population": 400, "research": 56, "areas": 9,
      "cost": {"tools": 5000, "electronics": 3000, "gold": 30000, "knowledge": 10000}},
 ]
 
@@ -704,6 +704,100 @@ BUILDINGS = {
         "produces": {"knowledge": 30},
         "desc": "Experiments on an industrial scale.",
     },
+    "townhouses": {
+        "name": "Townhouses", "glyph": "b", "tech": 3, "category": "housing",
+        "terrain": ["plains", "forest", "hill", "desert"],
+        "cost": {"wood": 60, "stone": 80, "tools": 10}, "housing": 10,
+        "desc": "Tall narrow homes in a row. Fewer rooms than apartments, but they fit on hills and in forest.",
+    },
+    "city_hall": {
+        "name": "City Hall", "glyph": "c", "tech": 3, "category": "support", "research": "civil_service", "unique": True,
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 300, "tools": 40, "gold": 300}, "housing": 2, "attracts": 2,
+        "speed_aura": {"for": ["trading_post", "department_store", "museum", "school", "university"], "bonus": 0.15},
+        "desc": "A well-run city draws people: two extra arrivals per meal, and shops and places of learning on the 8 surrounding tiles work 15% faster. A city can have one.",
+    },
+    "train_station": {
+        "name": "Train Station", "glyph": "e", "tech": 3, "category": "support", "research": "railways",
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 250, "ore": 120, "tools": 60, "gold": 150}, "explore_speed": 0.3, "attracts": 1,
+        "speed_aura": {"for": ["factory", "steel_mill", "cement_works", "timber_yard", "cannery", "deep_mine", "mine"], "bonus": 0.15},
+        "desc": "Expeditions travel 30% faster, one extra person arrives per meal, and industry on the 8 surrounding tiles works 15% faster with goods wagons at the door. Needs flat ground.",
+    },
+    "ferry_terminal": {
+        "name": "Ferry Terminal", "glyph": "k", "tech": 3, "category": "support", "research": "railways",
+        "terrain": ["river", "lake", "ocean"], "min_temp": 1,
+        "cost": {"wood": 120, "stone": 80, "tools": 30}, "explore_speed": 0.15, "attracts": 1,
+        "desc": "Regular boats on a river, lake or ocean. Expeditions travel 15% faster and one extra person arrives per meal.",
+    },
+    "waterworks": {
+        "name": "Waterworks", "glyph": "r", "tech": 3, "category": "support", "research": "sanitation",
+        "terrain": ["plains", "desert", "hill"], "adjacent": "fresh",
+        "cost": {"stone": 180, "ore": 40, "tools": 30}, "fertility_aura": 30,
+        "desc": "Pumps and pipes beside fresh water. Adds +30 fertility to the 8 surrounding tiles.",
+    },
+    "steel_mill": {
+        "name": "Steel Mill", "glyph": "(", "tech": 3, "category": "materials", "power": 6, "research": "steelmaking",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 200, "ore": 80, "tools": 30, "gold": 80}, "workers": 5, "time": 20 * MIN,
+        "consumes": {"ore": 12}, "produces": {"tools": 10}, "modifiers": ["near_mine"],
+        "desc": "Turns ore straight into tools, with no wood. Faster next to a mine.",
+    },
+    "cement_works": {
+        "name": "Cement Works", "glyph": "σ", "tech": 3, "category": "materials", "power": 4, "research": "concrete",
+        "terrain": ["hill"],
+        "cost": {"stone": 100, "tools": 25, "gold": 40}, "workers": 4, "time": 15 * MIN,
+        "produces": {"stone": 16}, "modifiers": ["height"],
+        "desc": "Burns and crushes rock into building stone on a scale no quarry can match. Faster on higher hills.",
+    },
+    "timber_yard": {
+        "name": "Timber Yard", "glyph": "α", "tech": 3, "category": "materials", "power": 4, "research": "forestry",
+        "terrain": ["forest"],
+        "cost": {"wood": 80, "stone": 60, "tools": 25}, "workers": 4, "time": 12 * MIN,
+        "produces": {"wood": 20}, "modifiers": ["deep_forest"],
+        "desc": "Powered saws and managed woodland. Faster with more forest around it.",
+    },
+    "cannery": {
+        "name": "Cannery", "glyph": "β", "tech": 3, "category": "food", "power": 3, "research": "canning",
+        "terrain": ["plains", "desert"],
+        "cost": {"stone": 100, "ore": 40, "tools": 20}, "workers": 3, "time": 15 * MIN,
+        "consumes": {"livestock": 2}, "produces": {"food": 34, "gold": 6},
+        "desc": "Tins meat so none of it spoils: 2 livestock become far more food than a butcher gets, with gold from what is sold on.",
+    },
+    "coal_plant": {
+        "name": "Coal Power Station", "glyph": "δ", "tech": 3, "category": "power", "research": "steam_turbines",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 200, "ore": 80, "tools": 40}, "workers": 4, "generates": 32,
+        "time": 15 * MIN, "consumes": {"ore": 5},
+        "desc": "Burns ore from the mines for more power than a wood-fired plant, and can stand on hills.",
+    },
+    "tidal_generator": {
+        "name": "Tidal Generator", "glyph": "λ", "tech": 3, "category": "power", "research": "steam_turbines",
+        "terrain": ["ocean"],
+        "cost": {"stone": 150, "ore": 40, "tools": 30}, "workers": 1, "generates": 9,
+        "desc": "Power from the tide, with no fuel. Only on the ocean.",
+    },
+    "department_store": {
+        "name": "Department Store", "glyph": "μ", "tech": 3, "category": "trade", "power": 3,
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 150, "tools": 30, "gold": 120}, "workers": 4, "time": 20 * MIN,
+        "produces": {"gold": 22}, "modifiers": ["customers"],
+        "desc": "Several floors of shopping. Needs flat ground; faster with homes next to it.",
+    },
+    "stadium": {
+        "name": "Stadium", "glyph": "π", "tech": 3, "category": "trade", "power": 4, "unique": True,
+        "terrain": ["plains", "desert"], "max_height": 2,
+        "cost": {"stone": 400, "tools": 60, "gold": 250}, "workers": 5, "time": 20 * MIN,
+        "produces": {"gold": 34}, "attracts": 1, "modifiers": ["customers"],
+        "desc": "Match days fill the tills and the city's name travels: gold, and one extra arrival per meal. Faster with homes next to it. A city can have one.",
+    },
+    "museum": {
+        "name": "Museum", "glyph": "ω", "tech": 3, "category": "knowledge", "power": 2, "research": "public_education",
+        "terrain": ["plains", "desert"],
+        "cost": {"stone": 180, "tools": 20, "gold": 150}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 12, "gold": 8}, "modifiers": ["customers"],
+        "desc": "What the city has learned, on show. Knowledge and gold; faster with homes next to it.",
+    },
     # ---- Metropolis ----
     "high_rise": {
         "name": "High-Rise", "glyph": "\u03a0", "tech": 4, "category": "housing",
@@ -1047,6 +1141,52 @@ RESEARCH = {
         "name": "Scientific Method", "tech": 3, "building": "university", "cost": {"knowledge": 150},
         "desc": "Test everything; trust nothing untested.",
     },
+    "civil_service": {
+        "name": "Civil Service", "tech": 3, "building": "university", "cost": {"knowledge": 120},
+        "desc": "Clerks, records and someone whose job it is.",
+    },
+    "sanitation": {
+        "name": "Sanitation", "tech": 3, "building": "university", "cost": {"knowledge": 110},
+        "desc": "Clean water in, dirty water out.",
+    },
+    "forestry": {
+        "name": "Forestry", "tech": 3, "building": "university", "cost": {"knowledge": 110},
+        "boost": {"lumber_camp": 1.2, "sawmill": 1.15},
+        "desc": "Plant as much as you fell.",
+    },
+    "canning": {
+        "name": "Canning", "tech": 3, "building": "university", "cost": {"knowledge": 120},
+        "boost": {"fishery": 1.15, "butcher": 1.15},
+        "desc": "Food sealed in tin keeps for years.",
+    },
+    "concrete": {
+        "name": "Concrete", "tech": 3, "building": "university", "cost": {"knowledge": 130},
+        "boost": {"quarry": 1.25},
+        "desc": "Stone you can pour.",
+    },
+    "public_education": {
+        "name": "Public Education", "tech": 3, "building": "university", "cost": {"knowledge": 140},
+        "boost": {"school": 1.25, "university": 1.15},
+        "desc": "Every child at a desk.",
+    },
+    "steelmaking": {
+        "name": "Steelmaking", "tech": 3, "building": "university", "cost": {"knowledge": 150},
+        "boost": {"smithy": 1.2},
+        "desc": "Blow air through molten iron and it comes out stronger.",
+    },
+    "steam_turbines": {
+        "name": "Steam Turbines", "tech": 3, "building": "university", "cost": {"knowledge": 160},
+        "desc": "Anything that spins a shaft can light a street.",
+    },
+    "railways": {
+        "name": "Railways", "tech": 3, "building": "university", "cost": {"knowledge": 170},
+        "desc": "Iron roads, and timetables to go with them.",
+    },
+    "telegraph": {
+        "name": "Telegraph", "tech": 3, "building": "university", "cost": {"knowledge": 180},
+        "explore_discount": 0.6, "effect": "expeditions cost 40% less instead of 25% less",
+        "desc": "News that outruns the fastest horse: expeditions carry only what they will need.",
+    },
     # ---- Metropolis ----
     "modern_medicine": {
         "name": "Modern Medicine", "tech": 4, "building": "laboratory", "cost": {"knowledge": 200},
@@ -1182,7 +1322,7 @@ ADDITIONS = {
         "desc": "40% faster. The building must be next to fresh water.",
     },
     "plumbing": {
-        "name": "Plumbing", "for": ["house", "apartments"], "research": "plumbing",
+        "name": "Plumbing", "for": ["house", "apartments", "townhouses"], "research": "plumbing",
         "cost": {"stone": 30, "tools": 5}, "housing": 4,
         "desc": "Houses 4 more people.",
     },
@@ -1267,12 +1407,12 @@ ADDITIONS = {
         "desc": "25% faster.",
     },
     "transformer": {
-        "name": "Transformer", "for": ["wind_turbine", "hydro_dam", "power_plant", "geothermal_plant", "nuclear_plant", "fusion_plant"], "research": "electricity",
+        "name": "Transformer", "for": ["wind_turbine", "hydro_dam", "power_plant", "geothermal_plant", "nuclear_plant", "fusion_plant", "coal_plant", "tidal_generator"], "research": "electricity",
         "cost": {"ore": 30, "tools": 10}, "generates": 4,
         "desc": "+4 power.",
     },
     "assembly_line": {
-        "name": "Assembly Line", "for": ["factory", "glassworks", "smithy", "electronics_plant", "recycling_centre"], "research": "mass_production",
+        "name": "Assembly Line", "for": ["factory", "glassworks", "smithy", "electronics_plant", "recycling_centre", "steel_mill", "cannery"], "research": "mass_production",
         "cost": {"tools": 20, "gold": 30}, "speed": 1.3,
         "desc": "30% faster.",
     },
@@ -1448,7 +1588,7 @@ ADDITIONS = {
         "desc": "20% faster.",
     },
     "labour_saving": {
-        "name": "Labour-Saving Machines", "for": ["sawmill", "smithy", "mine", "deep_mine", "factory", "fishery", "harbor"], "research": "mechanics",
+        "name": "Labour-Saving Machines", "for": ["sawmill", "smithy", "mine", "deep_mine", "factory", "fishery", "harbor", "steel_mill", "cement_works", "timber_yard"], "research": "mechanics",
         "cost": {"ore": 30, "tools": 10}, "workers": -1,
         "desc": "Needs 1 fewer worker.",
     },
@@ -1538,7 +1678,7 @@ ADDITIONS = {
         "desc": "Needs 1 less power.",
     },
     "smart_meters": {
-        "name": "Smart Meters", "for": ["shopping_mall", "greenhouse", "vertical_farm", "data_centre", "research_institute", "drone_port", "factory", "laboratory"], "research": "smart_grid",
+        "name": "Smart Meters", "for": ["shopping_mall", "greenhouse", "vertical_farm", "data_centre", "research_institute", "drone_port", "factory", "laboratory", "steel_mill", "department_store", "stadium"], "research": "smart_grid",
         "cost": {"tools": 40, "gold": 100}, "power": -3,
         "desc": "Needs 3 less power.",
     },
@@ -1628,6 +1768,142 @@ ADDITIONS = {
         "name": "Quiet Grove", "for": ["beast_sanctuary", "incubator"],
         "cost": {"wood": 80, "gold": 60}, "mission_speed": 0.25,
         "desc": "Missions come a further 25% more often.",
+    },
+    # ---- City ----
+    "attic_rooms": {
+        "name": "Attic Rooms", "for": ["townhouses"],
+        "cost": {"wood": 60, "tools": 10}, "housing": 3,
+        "desc": "Houses 3 more people.",
+    },
+    "sewers": {
+        "name": "Sewers", "for": ["townhouses", "apartments", "house"], "research": "sanitation",
+        "cost": {"stone": 80, "tools": 15}, "housing": 5,
+        "desc": "Houses 5 more people.",
+    },
+    "public_square": {
+        "name": "Public Square", "for": ["city_hall"],
+        "cost": {"stone": 200, "gold": 100}, "attracts": 1,
+        "desc": "One more extra arrival per meal.",
+    },
+    "records_office": {
+        "name": "Records Office", "for": ["city_hall"],
+        "cost": {"stone": 120, "tools": 30}, "aura_bonus": 0.1,
+        "desc": "Surrounding shops and places of learning get a further 10% faster.",
+    },
+    "clock_tower": {
+        "name": "Clock Tower", "for": ["city_hall", "train_station"],
+        "cost": {"stone": 100, "tools": 40, "gold": 60}, "aura_bonus": 0.05,
+        "desc": "Everyone is on time: the buildings it speeds up get a further 5% faster.",
+    },
+    "goods_yard": {
+        "name": "Goods Yard", "for": ["train_station"],
+        "cost": {"stone": 120, "ore": 60, "tools": 30}, "aura_bonus": 0.1,
+        "desc": "Surrounding industry gets a further 10% faster.",
+    },
+    "sleeper_cars": {
+        "name": "Sleeper Cars", "for": ["train_station"],
+        "cost": {"wood": 80, "tools": 30, "gold": 80}, "explore_speed": 0.1,
+        "desc": "Expeditions travel a further 10% faster.",
+    },
+    "second_berth": {
+        "name": "Second Berth", "for": ["ferry_terminal"],
+        "cost": {"wood": 100, "stone": 60}, "attracts": 1,
+        "desc": "One more extra arrival per meal.",
+    },
+    "night_crossings": {
+        "name": "Night Crossings", "for": ["ferry_terminal"],
+        "cost": {"tools": 20, "gold": 60}, "explore_speed": 0.1,
+        "desc": "Expeditions travel a further 10% faster.",
+    },
+    "filter_beds": {
+        "name": "Filter Beds", "for": ["waterworks"],
+        "cost": {"stone": 100, "tools": 15}, "fertility_aura": 10,
+        "desc": "A further +10 fertility for the surrounding tiles.",
+    },
+    "water_tower": {
+        "name": "Water Tower", "for": ["waterworks"],
+        "cost": {"stone": 80, "ore": 40, "tools": 20}, "fertility_aura": 15,
+        "desc": "A further +15 fertility for the surrounding tiles.",
+    },
+    "blast_furnace": {
+        "name": "Blast Furnace", "for": ["steel_mill"],
+        "cost": {"stone": 150, "ore": 60, "tools": 30}, "speed": 1.3,
+        "desc": "30% faster.",
+    },
+    "rolling_mill": {
+        "name": "Rolling Mill", "for": ["steel_mill"],
+        "cost": {"ore": 80, "tools": 40, "gold": 60}, "produces": {"tools": 3},
+        "desc": "+3 Tools per cycle.",
+    },
+    "rotary_kiln": {
+        "name": "Rotary Kiln", "for": ["cement_works"],
+        "cost": {"ore": 60, "tools": 30}, "speed": 1.25,
+        "desc": "25% faster.",
+    },
+    "aggregate_pit": {
+        "name": "Aggregate Pit", "for": ["cement_works"],
+        "cost": {"wood": 60, "tools": 20}, "produces": {"stone": 5},
+        "desc": "+5 Stone per cycle.",
+    },
+    "band_saws": {
+        "name": "Band Saws", "for": ["timber_yard", "sawmill"], "research": "forestry",
+        "cost": {"ore": 40, "tools": 25}, "speed": 1.25,
+        "desc": "25% faster.",
+    },
+    "replanting": {
+        "name": "Replanting", "for": ["timber_yard"],
+        "cost": {"food": 100, "wood": 60}, "produces": {"wood": 5},
+        "desc": "+5 Wood per cycle.",
+    },
+    "cold_store": {
+        "name": "Cold Store", "for": ["cannery", "harbor"], "research": "canning",
+        "cost": {"stone": 80, "tools": 25}, "produces": {"food": 6},
+        "desc": "+6 Food per cycle.",
+    },
+    "labelling_line": {
+        "name": "Labelling Line", "for": ["cannery"],
+        "cost": {"tools": 25, "gold": 50}, "produces": {"gold": 5},
+        "desc": "+5 Gold per cycle.",
+    },
+    "tall_chimney": {
+        "name": "Tall Chimney", "for": ["coal_plant", "power_plant"], "research": "steam_turbines",
+        "cost": {"stone": 150, "tools": 20}, "generates": 6,
+        "desc": "+6 power.",
+    },
+    "sea_wall": {
+        "name": "Sea Wall", "for": ["tidal_generator"],
+        "cost": {"stone": 200, "tools": 20}, "generates": 4,
+        "desc": "+4 power.",
+    },
+    "window_displays": {
+        "name": "Window Displays", "for": ["department_store"],
+        "cost": {"wood": 40, "gold": 80}, "produces": {"gold": 6},
+        "desc": "+6 Gold per cycle.",
+    },
+    "delivery_vans": {
+        "name": "Delivery Vans", "for": ["department_store"], "research": "mass_production",
+        "cost": {"tools": 40, "gold": 60}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "extra_stands": {
+        "name": "Extra Stands", "for": ["stadium"],
+        "cost": {"stone": 250, "tools": 40}, "attracts": 1,
+        "desc": "One more extra arrival per meal.",
+    },
+    "floodlights": {
+        "name": "Floodlights", "for": ["stadium"], "research": "electricity",
+        "cost": {"ore": 60, "tools": 40, "gold": 100}, "produces": {"gold": 10}, "power": 2,
+        "desc": "Evening matches: +10 Gold per cycle, for 2 more power.",
+    },
+    "special_exhibits": {
+        "name": "Special Exhibits", "for": ["museum"],
+        "cost": {"gold": 150}, "produces": {"gold": 8},
+        "desc": "+8 Gold per cycle.",
+    },
+    "archive": {
+        "name": "Archive", "for": ["museum"],
+        "cost": {"stone": 100, "tools": 20, "gold": 60}, "produces": {"knowledge": 6},
+        "desc": "+6 Knowledge per cycle.",
     },
 }
 
