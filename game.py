@@ -257,12 +257,12 @@ TECH_LEVELS = [
      "cost": {"food": 100, "wood": 150, "stone": 80, "knowledge": 20}},
     {"name": "Town", "population": 30, "research": 8, "areas": 2,
      "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100}},
-    {"name": "City", "population": 60, "research": 15, "areas": 3,
-     "cost": {"stone": 800, "ore": 300, "tools": 120, "gold": 500, "knowledge": 300}},
-    {"name": "Metropolis", "population": 100, "research": 24, "areas": 4,
-     "cost": {"stone": 1500, "tools": 400, "gold": 1500, "knowledge": 800}},
-    {"name": "Megacity", "population": 180, "research": 36, "areas": 6,
-     "cost": {"tools": 1000, "electronics": 600, "gold": 5000, "knowledge": 2500}},
+    {"name": "City", "population": 90, "research": 22, "areas": 4,
+     "cost": {"stone": 2000, "ore": 800, "tools": 400, "gold": 1500, "knowledge": 800}},
+    {"name": "Metropolis", "population": 200, "research": 36, "areas": 6,
+     "cost": {"stone": 6000, "ore": 2000, "tools": 2000, "gold": 8000, "knowledge": 3000}},
+    {"name": "Megacity", "population": 400, "research": 48, "areas": 9,
+     "cost": {"tools": 5000, "electronics": 3000, "gold": 30000, "knowledge": 10000}},
 ]
 
 # Groups the build menu is divided into, in the order they are shown. Every
