@@ -67,6 +67,9 @@
   .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
   .tile.hl { background: var(--hl); box-shadow: inset 0 0 0 1px var(--accent); }
   .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
+  #areaPick { flex: 1 1 160px; min-width: 0; max-width: 340px; }
+  .areaChips { margin: 8px 0 0; gap: 6px; align-items: center; max-height: 96px; overflow-y: auto; }
+  .chip { padding: 2px 8px; font-size: 13px; }
   #findOut { max-height: 230px; overflow-y: auto; margin-top: 8px; }
   #findOut .row { padding: 5px 4px; border-top: 1px solid var(--line); cursor: pointer; }
   #findOut .row:hover { background: var(--button); color: var(--bright); }
@@ -227,7 +230,7 @@
       <div class="cols">
         <div class="panel">
           <h2>Map</h2>
-          <div id="areas" class="bar" style="margin:0 0 10px"></div>
+          <div id="areas" style="margin:0 0 10px"></div>
           <div id="map"></div>
           <div id="mapKey" class="dim small" style="margin-top:8px"></div>
           <div id="finder">
@@ -1030,10 +1033,24 @@ function render() {
   setHTML($('advanceInfo'), adv ? adv.checks.map(c =>
     `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join('') : '');
 
-  setHTML($('areas'), view.areas.length < 2 ? '' : view.areas.map((a, i) =>
-    `<button data-area="${i}" class="${i === view.area ? 'on' : ''}"` +
-    (a.problems ? ` title="${a.problems} ${a.problems === 1 ? 'building is' : 'buildings are'} not working properly"` : '') +
-    `>${esc(a.name)}${a.problems ? ` <span class="bad">${a.problems}!</span>` : ''}</button>`).join(''));
+  // One menu of every area with arrows either side, then a short row of only the areas worth a look:
+  // the ones holding what the Find box is looking for, or (with no search) the ones with a problem.
+  const hits = (finder.kind && view.found && view.found.areas) || null, n = view.areas.length;
+  const chip = (i, count, cls, title) => `<button data-area="${i}" class="chip ${i === view.area ? 'on' : ''}" title="${title}">` +
+    `${esc(view.areas[i].name)} <span class="${cls}">${count}</span></button>`;
+  const withHits = hits ? view.areas.map((a, i) => i).filter(i => hits[i]) : [];
+  const withProblems = view.areas.map((a, i) => i).filter(i => view.areas[i].problems);
+  setHTML($('areas'), n < 2 ? '' :
+    `<div class="bar" style="margin:0"><button data-area="${(view.area + n - 1) % n}" title="Previous area">&lt;</button>` +
+    `<select id="areaPick" title="Choose an area to view">` + view.areas.map((a, i) =>
+      `<option value="${i}" ${i === view.area ? 'selected' : ''}>${esc(a.name)}` +
+      (hits ? (hits[i] ? ` - ${hits[i]} found` : '') : a.problems ? ` - ${a.problems} not working` : '') + `</option>`).join('') + `</select>` +
+    `<button data-area="${(view.area + 1) % n}" title="Next area">&gt;</button>` +
+    `<span class="dim small">${view.area + 1} of ${n}</span></div>` +
+    (hits ? `<div class="bar areaChips"><span class="dim small">${withHits.length ? 'Found in' : 'Not found in any area'}</span>` +
+        withHits.map(i => chip(i, hits[i], 'good', `${hits[i]} found here`)).join('') + `</div>`
+      : withProblems.length ? `<div class="bar areaChips"><span class="dim small">Needs attention</span>` +
+        withProblems.map(i => chip(i, view.areas[i].problems + '!', 'bad', 'Buildings here are not working properly')).join('') + `</div>` : ''));
   const marked = new Set(((view.found && view.found.results) || []).filter(r => r.area === view.area).map(r => `${r.x},${r.y}`));
   $('areas').hidden = view.areas.length < 2;
 
@@ -1296,7 +1313,9 @@ function renderFinder() {
     setHTML(out, `<span class="dim">${finder.kind === 'problems' ? 'Every building is working properly.' : 'Nothing found in any of your areas.'}</span>`);
     return;
   }
-  setHTML(out, `<div class="dim">${found.total} found` + (found.total > found.results.length ? `, showing the first ${found.results.length}` : '') +
+  const inAreas = Object.keys(found.areas || {}).length;
+  setHTML(out, `<div class="dim">${found.total} found` + (view.areas.length > 1 ? ` in ${inAreas} ${inAreas === 1 ? 'area' : 'areas'}` : '') +
+    (found.total > found.results.length ? `, showing the first ${found.results.length}` : '') +
     (finder.kind === 'sites' ? ', fastest first' : '') + `. Click one to go there.</div>` +
     found.results.map(r => `<div class="row" data-go="${r.area},${r.x},${r.y}">` +
       `<span class="hi">${esc(r.label)}</span> <span class="dim">${esc(view.areas[r.area].name)}, tile ${r.x}, ${r.y}</span>` +
@@ -2057,7 +2076,8 @@ $('findOut').onclick = e => {
   jump = { area, x, y };
   if (area === view.area) { sel = { x, y }; jump = null; render(); } else { areaIdx = area; sel = null; refresh(); }
 };
-$('areas').onclick = e => { if (e.target.dataset.area) showArea(+e.target.dataset.area); };
+$('areas').onclick = e => { const b = e.target.closest('[data-area]'); if (b) showArea(+b.dataset.area); };
+$('areas').onchange = e => { if (e.target.id === 'areaPick') showArea(+e.target.value); };
 $('known').onclick = e => {
   const d = (e.target.closest('[data-view], [data-rename]') || e.target).dataset;
   if (d.view) { tab = 'city'; showArea(+d.view); }

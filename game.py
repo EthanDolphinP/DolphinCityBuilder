@@ -3290,7 +3290,7 @@ FIND_LIMIT = 60     # most results the Find box is given
 
 
 def find(state, kind, what):
-    """Search every area of the city. Returns {"results": [...], "total": n} or
+    """Search every area of the city. Returns {"results": [...], "total": n, "areas": {area: n}} or
     {"locked": research name} if the search needs research the city lacks.
 
     kind is "buildings" (what = a building id, or "" for all), "problems",
@@ -3328,7 +3328,10 @@ def find(state, kind, what):
                     hit(terrain["name"], f"one cycle every {_clock(cycle)}" if cycle else "can be built here",
                         cycle or 0)
     found.sort(key=lambda f: f[0])
-    return {"results": [r for _, r in found[:FIND_LIMIT]], "total": len(found)}
+    per_area = {}       # every match counts here, including those past FIND_LIMIT
+    for _, r in found:
+        per_area[r["area"]] = per_area.get(r["area"], 0) + 1
+    return {"results": [r for _, r in found[:FIND_LIMIT]], "total": len(found), "areas": per_area}
 
 
 def housing_sources(state):
