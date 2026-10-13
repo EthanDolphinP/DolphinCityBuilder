@@ -292,7 +292,7 @@ CATEGORIES = {
 #   wildlife_speed 0.5 = wild animals appear 50% more often (city-wide)
 #   livestock_speed  True - works faster the more livestock the city owns
 #   unique         True - a city can only have one
-#   beast_xp / beast_power / hatch_speed / egg_chance / mission_speed   see beasts.py
+#   beast_xp / beast_power / hatch_speed / egg_chance / mission_speed / nest   see beasts.py
 #   modifiers      names from MODIFIERS that speed up / slow down its cycle here
 #   min_height / max_height / min_fertility / min_temp / max_temp   tile limits
 #   adjacent       terrain that must be next to the tile
@@ -497,6 +497,12 @@ BUILDINGS = {
         "terrain": ["plains", "forest", "hill", "desert"],
         "cost": {"wood": 30, "stone": 30}, "hatch_speed": 1.0, "egg_chance": 0.05,
         "desc": "Warm, turned and watched: eggs hatch twice as fast, and expedition teams who know what to look for are 5 points likelier to bring one home. A city can have one.",
+    },
+    "nesting_ground": {
+        "name": "Nesting Ground", "glyph": "\u03b7", "tech": 1, "category": "support", "research": "incubation", "unique": True,
+        "terrain": ["plains", "forest", "hill"],
+        "cost": {"wood": 60, "food": 80, "livestock": 2}, "nest": 1,
+        "desc": "Sheltered ground where wild beasts come to lay. Every 2 days an egg is left here, usually a common one, unless the city already has 3 eggs waiting to hatch. A city can have one.",
     },
     "tavern": {
         "name": "Tavern", "glyph": "v", "tech": 1, "category": "housing",
@@ -2831,6 +2837,7 @@ def advance(state, now):
     state["tech"] += 1
     _expand_area(state["areas"][0])
     log(state, now, f"*** {state['name']} is now a {nxt['name']}! The home area has grown. ***")
+    beasts.tech_egg(state, now, state["tech"])
     return None
 
 
@@ -2941,6 +2948,7 @@ def tame(state, now, area, x, y):
     _pay(state, tame_cost(tile["animal"]))
     state["resources"]["livestock"] += w["livestock"]
     beasts.note(state, now, "tame")
+    beasts.tame_egg(state, now, random.Random())
     tile["animal"] = None
     log(state, now, f"Tamed {w['name'].lower()} in {area_name(area)}: +{w['livestock']} Livestock.")
     return None

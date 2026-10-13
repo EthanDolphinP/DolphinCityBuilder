@@ -15,7 +15,10 @@ Every beast also has four stats (STATS) and its species has a picture (ART).
 Beasts and eggs can be traded between cities: see the beast offers in
 market.py, which use take() and give() here to move a beast.
 
-More eggs can be found by expeditions; rarer species are likelier far from home.
+More eggs come from expeditions (rarer species are likelier far from home),
+from taming wild animals (a small chance of a nest), from reaching a new tech
+level, from a beast reaching level 5 and level 10, and from a Nesting Ground
+building, which lays one every few days. Presents and trades can bring them too.
 
 Content lives in the tables below: RARITIES, SPECIES and MISSIONS. The
 buildings, research and additions that support beasts are in game.py with the
@@ -45,6 +48,12 @@ EGG_CHANCE = 0.15           # chance an expedition finds an egg...
 EGG_CHANCE_PER_STEP = 0.05  # ...plus this for every step of distance from home
 EGG_CHANCE_MAX = 0.6
 RARER_PER_STEP = 0.25       # how much each step of distance favours the rarer species
+TAME_EGG_CHANCE = 0.06      # chance that taming a wild animal turns up an egg
+TECH_EGGS = ["common", "uncommon", "rare", "epic", "legendary"]   # the egg for reaching Village, Town, ...
+EGG_LEVELS = {5: 0, 10: 1}  # a beast reaching this level brings home an egg this many rarities above its own
+NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often...
+NEST_FULL = 3               # ...unless the city already has this many unhatched eggs
+NEST_WEIGHTS = {"common": 70, "uncommon": 25, "rare": 5}
 
 RARITIES = {    # weight: how often an egg found by an expedition is of this rarity
     "common":    {"name": "Common",    "weight": 60, "color": "#cfd8d3"},
@@ -101,6 +110,45 @@ SPECIES = {
     "sky_serpent": {"name": "Sky Serpent", "rarity": "legendary", "nature": "Sovereign",
                     "bonus": {"speed": {"all": 0.03}, "explore_speed": 0.06, "attracts": 0.2},
                     "desc": "A ribbon of cloud and scale. Cities it favours are spoken of far away."},
+    "burrow_hare": {"name": "Burrow Hare", "rarity": "common", "nature": "Skittish forager",
+                    "bonus": {"wildlife_speed": 0.08, "speed": {"food": 0.01}},
+                    "desc": "Never still, and it knows where every wild thing in the valley sleeps."},
+    "pebble_crab": {"name": "Pebble Crab", "rarity": "common", "nature": "Shore-comber",
+                    "bonus": {"speed": {"materials": 0.015, "trade": 0.01}},
+                    "desc": "It carries home anything it can lift, and sorts it into neat piles."},
+    "ember_newt":  {"name": "Ember Newt", "rarity": "common", "nature": "Warm-blooded",
+                    "bonus": {"power": 0.02},
+                    "desc": "Warm to the touch. It sleeps wherever the city is hottest."},
+    "reed_heron":  {"name": "Reed Heron", "rarity": "common", "nature": "Far-sighted",
+                    "bonus": {"explore_speed": 0.04},
+                    "desc": "It stands very still for hours, then leaves in exactly the right direction."},
+    "ironback_boar": {"name": "Ironback Boar", "rarity": "uncommon", "nature": "Rooter",
+                      "bonus": {"speed": {"materials": 0.035}},
+                      "desc": "Its tusks turn up ore the miners walked straight past."},
+    "lantern_owl": {"name": "Lantern Owl", "rarity": "uncommon", "nature": "Night scholar",
+                    "bonus": {"speed": {"knowledge": 0.035}},
+                    "desc": "Its eyes glow bright enough to read by, and it does not like being ignored."},
+    "marsh_otter": {"name": "Marsh Otter", "rarity": "uncommon", "nature": "Playful dealer",
+                    "bonus": {"speed": {"trade": 0.03, "food": 0.01}},
+                    "desc": "It trades shiny stones with anyone who will play along, and usually comes out ahead."},
+    "thunder_ram": {"name": "Thunder Ram", "rarity": "rare", "nature": "Charged",
+                    "bonus": {"power": 0.05, "speed": {"materials": 0.02}},
+                    "desc": "Its fleece crackles. Stand well back when it shakes itself dry."},
+    "moon_stag":   {"name": "Moon Stag", "rarity": "rare", "nature": "Wayfinder",
+                    "bonus": {"explore_speed": 0.08, "wildlife_speed": 0.1},
+                    "desc": "Other animals follow it, and so do travellers who have lost the road."},
+    "amber_bear":  {"name": "Amber Bear", "rarity": "rare", "nature": "Provider",
+                    "bonus": {"speed": {"food": 0.05}, "housing": 1},
+                    "desc": "Enormous, gentle, and never once seen hungry."},
+    "coral_leviathan": {"name": "Coral Leviathan", "rarity": "epic", "nature": "Tide-bringer",
+                        "bonus": {"speed": {"food": 0.04, "trade": 0.04}},
+                        "desc": "Shoals of fish and whole fleets of traders follow in its wake."},
+    "ember_phoenix": {"name": "Ember Phoenix", "rarity": "epic", "nature": "Ever-burning",
+                      "bonus": {"power": 0.08, "speed": {"all": 0.01}},
+                      "desc": "It has burned out and come back more times than the city has had rulers."},
+    "elder_dragon": {"name": "Elder Dragon", "rarity": "legendary", "nature": "Hoard-keeper",
+                     "bonus": {"speed": {"trade": 0.08, "all": 0.02}, "housing": 3},
+                     "desc": "It has decided that this city is part of its hoard, and guards it accordingly."},
 }
 
 # Every beast has four stats of its own. They are for show and for trading:
@@ -122,6 +170,19 @@ BASE_STATS = {      # (health, attack, defense, speed)
     "world_turtle": (160, 20, 40, 4),
     "frost_wyrm":   (110, 38, 24, 18),
     "sky_serpent":  (150, 45, 30, 36),
+    "burrow_hare":  (40, 9, 7, 20),
+    "pebble_crab":  (55, 10, 20, 5),
+    "ember_newt":   (45, 14, 9, 12),
+    "reed_heron":   (42, 12, 8, 16),
+    "ironback_boar": (85, 17, 18, 9),
+    "lantern_owl":  (50, 15, 10, 22),
+    "marsh_otter":  (58, 14, 11, 19),
+    "thunder_ram":  (80, 25, 18, 16),
+    "moon_stag":    (72, 20, 15, 26),
+    "amber_bear":   (105, 24, 20, 9),
+    "coral_leviathan": (150, 30, 30, 10),
+    "ember_phoenix": (95, 40, 18, 30),
+    "elder_dragon": (170, 44, 34, 24),
 }
 
 # A small picture of each species, drawn in text.
@@ -204,6 +265,84 @@ ART = {
         r" ~~~ \_v_/   \__",
         r"  ~~~~~~~~~~\___)",
     ],
+    "burrow_hare": [
+        r"   (\ /)",
+        r"   ( . .)",
+        r"  c(_)(_)",
+    ],
+    "pebble_crab": [
+        r" (\/)    (\/)",
+        r"   \_o__o_/",
+        r"   /|____|\ ",
+        r"  ^ ^    ^ ^",
+    ],
+    "ember_newt": [
+        r"     __  ^^",
+        r"  ~~/ o\_____",
+        r"    \__  __  \~~~",
+        r"      ^^   ^^",
+    ],
+    "reed_heron": [
+        r"      _",
+        r"     (o>",
+        r"  \\_// \ ",
+        r"   \___/ )",
+        r"     | |",
+    ],
+    "ironback_boar": [
+        r"    _^^^^^_",
+        r"  <(o      )~",
+        r"   ^(__  __)",
+        r"     ||  ||",
+    ],
+    "lantern_owl": [
+        r"   ,___,",
+        r"   (O,O)",
+        r"   /)_)",
+        r"   -^-^-",
+    ],
+    "marsh_otter": [
+        r"    .--.",
+        r"   ( oo )____",
+        r"    \__/     \~",
+        r"   ~~ ~~~~~ ~~",
+    ],
+    "thunder_ram": [
+        r"  @)  (@    /",
+        r"  (o__o)  _/",
+        r"  /    \ /_",
+        r"  |_||_|  /",
+    ],
+    "moon_stag": [
+        r"  \|/ \|/",
+        r"   (o o)    )",
+        r"    \_/____/",
+        r"     ||  ||",
+    ],
+    "amber_bear": [
+        r"  (\___/)",
+        r"  ( o o )",
+        r"  (  v  )___",
+        r"  (___)____)",
+    ],
+    "coral_leviathan": [
+        r"        __/\__",
+        r"  ~~~~~/ o    \~~~",
+        r"  ~~~ <__  ____>~~",
+        r"  ~~~~~~ \/ ~~~~~~",
+    ],
+    "ember_phoenix": [
+        r"    \ ^ /",
+        r"  ---(o>---",
+        r"   /// \\\ ",
+        r"    // \\ ",
+    ],
+    "elder_dragon": [
+        r"   /\_/\    /|",
+        r"  ( o o )__/ |__",
+        r"   \ v /   ___  \>",
+        r"    VVV___/   \__\ ",
+    ],
 }
 
 # ---- Duels ----
@@ -216,6 +355,10 @@ LIKES = {
     "trailhound": "food", "herdmother": "livestock", "sunscale": "ore",
     "hearth_lynx": "wood", "stormcrest": "livestock", "goldmaw": "gold",
     "world_turtle": "stone", "frost_wyrm": "tools", "sky_serpent": "electronics",
+    "burrow_hare": "food", "pebble_crab": "stone", "ember_newt": "ore", "reed_heron": "livestock",
+    "ironback_boar": "wood", "lantern_owl": "tools", "marsh_otter": "gold",
+    "thunder_ram": "ore", "moon_stag": "wood", "amber_bear": "food",
+    "coral_leviathan": "livestock", "ember_phoenix": "tools", "elder_dragon": "gold",
 }
 DUEL = {
     "per": 50,       # every doubling past this much of the liked material...
@@ -440,6 +583,11 @@ def give_xp(state, now, beast, amount):
         beast["xp"] -= xp_needed(beast["level"])
         beast["level"] += 1
         game.log(state, now, f"*** {title(beast)} has grown to level {beast['level']}. ***")
+        if beast["level"] in EGG_LEVELS:
+            names = list(RARITIES)
+            rarity = names[min(len(names) - 1, names.index(SPECIES[beast["species"]]["rarity"]) + EGG_LEVELS[beast["level"]])]
+            new_egg(state, now, random_species(random.Random(), rarity=rarity))
+            game.log(state, now, f"{title(beast)} has brought home a {RARITIES[rarity]['name'].lower()} egg.")
     if beast["level"] >= MAX_LEVEL:
         beast["xp"] = 0
 
@@ -534,6 +682,7 @@ def tick(state, now):
             species = SPECIES[beast["species"]]
             game.log(state, now, f"*** The egg has hatched: a {species['name']} "
                                  f"({RARITIES[species['rarity']]['name'].lower()}), {species['nature'].lower()}. ***")
+    _nest(state, now)
     _pick_active(state)
     beast = active(state)
     if not beast or beast["stage"] == "egg":
@@ -544,6 +693,47 @@ def tick(state, now):
         state["mission_at"] += mission_period(state)
         if state["mission_at"] <= now:
             state["mission_at"] = now + mission_period(state)
+
+
+# ------------------------------------------------------- other egg sources --
+
+def tame_egg(state, now, rng):
+    """Maybe find an egg in the nest of a wild animal that was just tamed. Returns the egg or None."""
+    if rng.random() >= TAME_EGG_CHANCE + game.city_stat(state, "egg_chance"):
+        return None
+    egg = new_egg(state, now, random_species(rng))
+    game.log(state, now, f"There was a {view_name(egg)} hidden in the animal's nest. See the Beast tab.")
+    return egg
+
+
+def tech_egg(state, now, tech):
+    """The egg a city is given for reaching tech level `tech` (1 = Village)."""
+    rarity = TECH_EGGS[min(len(TECH_EGGS), tech) - 1]
+    egg = new_egg(state, now, random_species(random.Random(), rarity=rarity))
+    game.log(state, now, f"Travellers drawn by the news left a gift: a {view_name(egg)}. See the Beast tab.")
+    return egg
+
+
+def view_name(beast):
+    return f"{RARITIES[SPECIES[beast['species']]['rarity']]['name'].lower()} egg"
+
+
+def _nest(state, now):
+    """A Nesting Ground lays an egg every NEST_TIME, while the city is not already full of eggs."""
+    if not game.city_stat(state, "nest"):
+        state.pop("nest_at", None)
+        return
+    if "nest_at" not in state:
+        state["nest_at"] = now + NEST_TIME
+    if now < state["nest_at"]:
+        return
+    state["nest_at"] = now + NEST_TIME
+    if sum(1 for b in state["beasts"] if b["stage"] == "egg") >= NEST_FULL:
+        return
+    rng = random.Random()
+    rarity = rng.choices(list(NEST_WEIGHTS), weights=list(NEST_WEIGHTS.values()))[0]
+    egg = new_egg(state, now, random_species(rng, rarity=rarity))
+    game.log(state, now, f"A {view_name(egg)} has been laid at the Nesting Ground. See the Beast tab.")
 
 
 # ------------------------------------------------------------ expeditions --
@@ -610,5 +800,8 @@ def view(state, now):
         "stats": STATS,
         "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"]} for k, s in SPECIES.items()},
         "duel": DUEL,
+        "nest_at": state.get("nest_at"), "nest_time": NEST_TIME, "nest_full": NEST_FULL,
+        "tame_egg": round((TAME_EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
+        "species_count": len(SPECIES),
         "duels": state.get("duels", []),
     }

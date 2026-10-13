@@ -980,6 +980,7 @@ function render() {
   // Countdown timers, advanced locally between server updates by tick().
   timers = { meal: { cycle: status.meal_time, progress: state.meal, speed: 1, waiting: [] } };
   const bv = view.beast;
+  if (bv.nest_at) timers.nest = { cycle: bv.nest_time, progress: bv.nest_time - (bv.nest_at - view.now), speed: 1, waiting: [] };
   timers.mission = { cycle: bv.mission_period, progress: bv.mission_period - (bv.mission_at - view.now), speed: 1, waiting: [] };
   for (const b of bv.beasts) {
     if (b.egg && b.warm < b.warm_needed) timers['hatch' + b.id] = { cycle: b.warm_needed, progress: b.warm, speed: 1, waiting: [] };
@@ -1115,6 +1116,7 @@ function buildingRows(b, cycle, produces, live) {
   if (b.beast_xp) rows.push(['Beast', `missions give ${Math.round(b.beast_xp * 100)}% more experience`]);
   if (b.beast_power) rows.push(['Beast', `its bonus is ${Math.round(b.beast_power * 100)}% stronger`]);
   if (b.hatch_speed) rows.push(['Eggs', `hatch ${Math.round(b.hatch_speed * 100)}% faster`]);
+  if (b.nest) rows.push(['Eggs', 'one is laid here every 2 days']);
   if (b.egg_chance) rows.push(['Eggs', `expeditions ${Math.round(b.egg_chance * 100)} points likelier to find one`]);
   if (b.mission_speed) rows.push(['Missions', `come ${Math.round(b.mission_speed * 100)}% more often`]);
   if (b.explore_speed) rows.push(['Expeditions', `travel ${Math.round(b.explore_speed * 100)}% faster`]);
@@ -1435,7 +1437,16 @@ function renderBeast() {
       ? `<div class="dim small" style="margin-bottom:8px">${count(eggs.map(b => b.name)).map(([name, n]) => esc(name) + (n > 1 ? ' x' + n : '')).join(', ')}</div>` +
         `<div class="areaCards">` + eggs.map(b => `<div class="areaCard"><div class="info">${eggCard(b)}</div></div>`).join('') + `</div>`
       : `<p class="dim" style="margin:0">No eggs waiting to hatch.</p>`) +
-    `<p class="dim small" style="margin-bottom:0">Each expedition has about a ${bv.egg_chance}% chance of finding an egg one area from home, and more further out.</p>`, fillTrade);
+    (bv.nest_at ? `<div class="opt">Nesting Ground: next egg in <span class="hi" data-timer="nest"></span>` +
+      (eggs.length >= bv.nest_full ? ` <span class="bad small">- none will be laid while you have ${bv.nest_full} or more eggs waiting</span>` : '') + `</div>` : '') +
+    `<details class="fold" data-fold="egg:ways" ${isOpen('egg:ways', !eggs.length) ? 'open' : ''}><summary>Ways to get eggs</summary><div>` +
+      `<div>Expeditions: about a ${bv.egg_chance}% chance one area from home, more further out, where rarer eggs are likelier too.</div>` +
+      `<div>Taming a wild animal: a ${bv.tame_egg}% chance of an egg in its nest.</div>` +
+      `<div>Reaching a new tech level: one egg each time, rarer at the higher levels.</div>` +
+      `<div>A beast reaching level 5 brings home an egg as rare as it is; at level 10, one rarer still.</div>` +
+      `<div>A Nesting Ground (Village, needs Incubation) is left an egg every ${duration(bv.nest_time)}.</div>` +
+      `<div>Trading with other cities, below, and presents.</div>` +
+      `<div class="dim">There are ${bv.species_count} kinds of beast to find.</div></div></details>`, fillTrade);
 
   // ---- hatched beasts, one section per species ----
   const rarityRank = Object.values(bv.rarities).map(r => r.name);
