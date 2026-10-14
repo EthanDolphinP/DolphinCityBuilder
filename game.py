@@ -34,6 +34,7 @@ from contextlib import contextmanager
 import re
 
 import beasts
+import ideology
 
 MIN = 60  # seconds
 
@@ -2239,6 +2240,7 @@ def new_game(name, now, seed=None):
     }
     state["banned"] = []     # cities that may not view this one or propose bills to it
     beasts.setup(state, now, rng)
+    ideology.setup(state)
     _remember_seen(state, now)
     log(state, now, f"The tribe of {name} settles a new land.")
     return state
@@ -2277,6 +2279,7 @@ def migrate(state, now):
                     tile.update(terrain="lake", fish=50)
                 tile.setdefault("fish", 0)
     beasts.migrate(state, now)
+    ideology.setup(state)
     return state
 
 
@@ -2448,6 +2451,10 @@ def tile_cycle(state, area, x, y, bid):
     favour = beasts.speed_bonus(state, b.get("category"))
     if favour:
         factors.append(favour)
+    # The city's ideology and the perks it has taken.
+    belief = ideology.speed_bonus(state, b.get("category"))
+    if belief:
+        factors.append(belief)
     # Researched techniques.
     for rid in state["research"]:
         if bid in RESEARCH[rid].get("boost", {}):
@@ -2529,8 +2536,9 @@ def work_plan(state):
 
 def _work_plan(state):
     free = state["population"]
-    housing, needed, herd_room, jobs = BASE_HOUSING + int(beasts.bonus(state, "housing")), 0, 0, []
-    beast_power = 1 + beasts.bonus(state, "power")
+    housing = BASE_HOUSING + int(beasts.bonus(state, "housing")) + int(ideology.value(state, "housing"))
+    needed, herd_room, jobs = 0, 0, []
+    beast_power = 1 + beasts.bonus(state, "power") + ideology.value(state, "power")     # generators give more
     for ai, area in enumerate(state["areas"]):
         for y, row in enumerate(area["tiles"]):
             for x, tile in enumerate(row):
@@ -2652,9 +2660,10 @@ def city_stat(state, field):
     if _STAT_CACHE is not None:
         key = (id(state), field)
         if key not in _STAT_CACHE:
-            _STAT_CACHE[key] = sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
+            _STAT_CACHE[key] = (sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
+                                + ideology.value(state, field))
         return _STAT_CACHE[key]
-    return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
+    return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"]) + ideology.value(state, field)
 
 
 def city_attracts(state):
@@ -3018,7 +3027,7 @@ def destinations(state):
 def expedition_cost(state, rx, ry):
     """Supplies for the team: depends on the land it is heading into and how far it is."""
     distance = abs(rx) + abs(ry)
-    discount = min(_researched(state, "explore_discount"), default=1)
+    discount = min(_researched(state, "explore_discount"), default=1) * (1 - min(0.6, ideology.value(state, "explore_cost")))
     base = ENVIRONMENTS[region_env(state, rx, ry)]["cost"]
     return {k: math.ceil(v * distance * discount) for k, v in base.items()}
 
@@ -3100,6 +3109,10 @@ def apply_action(state, now, action, data):
     """Run one player action. Returns an error message, or None on success."""
     if action == "advance":
         return advance(state, now)
+    if action == "ideology_choose":
+        return ideology.choose(state, now, data.get("ideology"))
+    if action == "perk_take":
+        return ideology.take(state, now, data.get("perk"))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "mission_deliver":
@@ -3194,6 +3207,7 @@ def defs():
             "slaughter_food": SLAUGHTER_FOOD,
             "environments": ENVIRONMENTS,
             "wildlife": WILDLIFE,
+            "ideologies": ideology.defs(),
         }
     return DEFS
 
@@ -3316,6 +3330,7 @@ def _view(state, ai, detail):
                       "affordable": not _missing(state, r["cost"])}
                      for rid, r in RESEARCH.items()],
         "beast": beasts.view(state, state["updated"]),
+        "ideology": ideology.view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -3412,6 +3427,8 @@ def housing_sources(state):
     out = {"Starting camp": BASE_HOUSING}
     if int(beasts.bonus(state, "housing")):
         out[beasts.title(beasts.active(state))] = int(beasts.bonus(state, "housing"))
+    if int(ideology.value(state, "housing")):
+        out[ideology.chosen(state)["name"]] = int(ideology.value(state, "housing"))
     for tile in all_tiles(state):
         if tile["building"] and tile_housing(tile):
             name = BUILDINGS[tile["building"]]["name"]
@@ -3438,6 +3455,7 @@ def summary(state):
         "name": state["name"],
         "tech": state["tech"],
         "tech_name": TECH_LEVELS[state["tech"]]["name"],
+        "ideology": ideology.chosen(state)["name"] if ideology.chosen(state) else None,
         "population": state["population"],
         "research": len(state["research"]),
         "beast": max((b["level"] for b in state["beasts"]), default=0),

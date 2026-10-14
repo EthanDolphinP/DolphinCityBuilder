@@ -7,6 +7,7 @@ browser. It is plain Python (standard library only) plus one HTML page.
 |---|---|
 | `game.py` | All the rules and content: terrain, buildings, research, additions, wildlife, exploring, power. New content is normally one entry in a table at the top. |
 | `market.py` | Trades, beast trades and bills between cities. |
+| `ideology.py` | Ideologies chosen at Village, and the perks each tech level's point buys. |
 | `beasts.py` | Beasts: eggs, missions, levelling, stats, pictures and the bonuses they give. |
 | `server.py` | The web server, sign-in and saving. Run this to host the game from your own computer. |
 | `wsgi.py` | Lets a web host (PythonAnywhere) run the same game. |
