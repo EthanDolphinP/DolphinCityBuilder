@@ -175,6 +175,145 @@
   .buy input, .fin input { width: 110px; }
   .fin { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   #away .gain span { display: inline-block; margin-right: 16px; white-space: nowrap; }
+
+  /* Lightweight visual interface: original inline SVG artwork, no downloads. */
+  :root { --font: system-ui, "Segoe UI", sans-serif; }
+  main { padding: 24px; }
+  h1 { font-size: 24px; letter-spacing: -.6px; }
+  h2 { font-weight: 600; }
+  .panel { border-radius: 14px; padding: 16px; }
+  button, input, select { border-radius: 8px; min-height: 36px; }
+  button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .stat { border-radius: 9px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
+  .stat .k { display: flex; gap: 4px; font-size: 11px; align-items: center; text-transform: none; letter-spacing: 0; }
+  .ui-icon { width: 20px; height: 20px; flex: none; vertical-align: middle; pointer-events: none; }
+  .stats { grid-template-columns: repeat(auto-fit,minmax(96px,1fr)); gap: 6px; }
+  .stat .k .ui-icon { width: 14px; height: 14px; }
+  .resource-panel { padding: 12px; }
+  .resource-head { margin-bottom: 8px; }
+  #resourceToggle { display: none; font-size: 12px; }
+  .mobile #resourceToggle { display: block; }
+  .tabs { gap: 4px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .tabs button { background: transparent; border-color: transparent; }
+  .tabs button.on { background: var(--inset); border-color: var(--accent); }
+  #map { padding: 6px; background: #101614; border-radius: 10px; }
+  .tile { border-radius: 5px; border: 1px solid #ffffff18; background: var(--terrain); }
+  .tile:hover { filter: brightness(1.15); }
+  .tile .ui-icon { width: 75%; height: 75%; color: #f7f4df; filter: drop-shadow(0 1px 1px #0008); }
+  .tile .stop { color: #ffb4a3; }
+  .tile .off { opacity: .45; }
+  .tile .animal { color: #ffd3ef; }
+  .tile.sel { outline-width: 3px; }
+  .tile.hl { box-shadow: inset 0 0 0 2px var(--accent); background: var(--terrain); }
+  .tile .warning { position: absolute; top: 1px; left: 2px; background: #772e20; color: white; border-radius: 3px; font: bold 10px system-ui; padding: 0 3px; }
+  .tile u { color: #fff; background: #101614b0; border-radius: 3px; }
+  #tile .card { background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 8px; }
+  #tile .card .head > .hi { display: flex; align-items: center; gap: 8px; }
+  #tile .card [data-build] { background: var(--accent); color: var(--bg); font-weight: 600; }
+  #tile .card [data-build]:disabled { background: var(--button); color: var(--dim); }
+  #tile .kv { font-variant-numeric: tabular-nums; margin: 10px 0; }
+  #msg:empty { display: none; }
+  #inspectorClose { display: none; }
+  .mobile button, .mobile select, .mobile input { min-height: 44px; }
+  .mobile main { padding-bottom: 20px; }
+  .mobile .resource-panel:not(.expanded) .resource-extra { display: none; }
+  .mobile .resource-panel:not(.expanded) .resource-shortage { display: block; }
+  .mobile .tabs { top: 0; border-radius: 0; }
+  .mobile .stat .k { font-size: 12px; }
+  .mobile .stat .v { font-size: 17px; }
+  .mobile .stat .ui-icon { width: 16px; height: 16px; }
+  .mobile .inspector { display: none; }
+  .mobile .inspector.selected { display: flex; flex-direction: column; position: fixed; bottom: 0; left: 0; right: 0; z-index: 8; max-height: 65dvh; margin: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -8px 32px #0005; }
+  .mobile .inspector.selected #tile { overflow-y: auto; min-height: 0; }
+  .mobile #inspectorClose { display: block; }
+  .mobile .tile { min-height: 0; }
+
+
+  /* Visual ownership and requirement language. */
+  :root { --page: 1240px; }
+  .resource-panel { margin-top: 10px; }
+  #resources .stat { position: relative; padding: 10px; }
+  #resources .stat .k { font-size: 12px; flex-wrap: wrap; overflow-wrap: normal; }
+  #resources .stat .v { font-size: 22px; font-weight: 650; margin-top: 4px; }
+  #resources .stat .k .ui-icon { width: 22px; height: 22px; color: var(--accent); }
+  #resources .stat.zero { background: transparent; border-style: dashed; }
+  .owned-badge, .state-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; font-size: 11px; padding: 3px 6px; font-weight: 600; }
+  .owned-badge { color: var(--good); background: var(--inset); }
+  .state-badge.missing { color: var(--dim); border: 1px dashed var(--line); }
+  .state-badge.locked { color: var(--dim); background: var(--button); }
+  .state-badge .ui-icon { width: 13px; height: 13px; }
+  .requirement-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 8px; margin-top: 12px; }
+  .requirement { background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .requirement .ui-icon { color: var(--accent); width: 22px; height: 22px; }
+  .requirement .amount { display: block; font-variant-numeric: tabular-nums; margin-top: 6px; font-size: 18px; font-weight: 600; color: var(--bright); }
+  .requirement .amount small { color: var(--dim); font-size: 12px; font-weight: 400; }
+  .requirement .track { height: 4px; border-radius: 4px; background: var(--line); margin-top: 7px; overflow: hidden; }
+  .requirement .track span { display: block; height: 100%; background: var(--accent); }
+  .requirement.complete .track span { background: var(--good); }
+  #advanceInfo { display: contents; }
+  #advanceInfo > span { margin: 0; }
+  #advanceInfo .requirement-grid span { margin: 0; }
+  #advanceInfo .requirement-grid .requirement { display: block; }
+  .cost-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .cost-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; background: var(--button); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .cost-pill .ui-icon { width: 17px; height: 17px; }
+  .cost-pill.short { border-color: var(--bad); color: var(--bad); }
+  .cost-pill.enough { color: var(--good); }
+  .cost-pill small { color: var(--dim); }
+  .collection-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; margin-top: 12px; }
+  .building-card { display: flex; flex-direction: column; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; gap: 7px; }
+  .building-card.owned { border-color: var(--good); }
+  .building-card.missing { border-style: dashed; }
+  .building-card.locked { border-style: dashed; }
+  .building-art { background: var(--button); border-radius: 10px; display: flex; align-items: center; justify-content: center; height: 70px; color: var(--accent); }
+  .building-art .ui-icon { height: 48px; width: 48px; stroke-width: 1.4; }
+  .building-card.owned .building-art { color: var(--good); }
+  .building-card.locked .building-art { color: var(--dim); }
+  .building-card strong { color: var(--bright); font-size: 14px; }
+  .building-card .cost-pills { margin: 0; }
+  .building-card .cost-pill { border: 0; background: none; padding: 0; }
+  .building-card button { margin-top: auto; font-size: 12px; }
+  .collection-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .collection-filters button { font-size: 12px; }
+  .tile { height: var(--tw,44px); }
+  .tile .ui-icon { width: 64%; height: 64%; }
+  .tile.occupied { box-shadow: inset 0 0 0 1px #fff6; }
+  .tile .tile-name { position: absolute; bottom: 5px; left: 1px; right: 1px; font: 9px/1.1 system-ui; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  .tile.occupied .ui-icon { margin-top: -8px; }
+  .tile .tile-owned { position: absolute; top: 2px; left: 3px; font: bold 10px system-ui; color: #fff; pointer-events: none; }
+  .tile.sel { box-shadow: inset 0 0 0 3px var(--accent); }
+  .inspector-empty { padding: 24px 8px; text-align: center; }
+  .inspector-empty > .ui-icon { width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px; }
+  .inspector-empty strong { display: block; color: var(--bright); font-size: 18px; }
+  .inspector-empty p { font-size: 13px; }
+  #tile .building-hero { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+  #tile .building-hero > .ui-icon { width: 48px; height: 48px; color: var(--good); }
+  .tile-facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .tile-facts span { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); padding: 5px 7px; border-radius: 6px; font-size: 12px; }
+  .tile-facts .ui-icon { width: 16px; height: 16px; }
+  .tabs button { display: inline-flex; align-items: center; gap: 5px; }
+  .tabs .ui-icon { width: 17px; height: 17px; }
+  .tabs .nav-badge { background: var(--accent); color: var(--bg); font-size: 10px; font-weight: bold; border-radius: 5px; padding: 1px 4px; }
+  #tutorial { margin-bottom: 0; }
+  .mobile .collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .mobile .building-card { padding: 10px; }
+  .mobile .building-card button { font-size: 12px; }
+  .mobile .requirement-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  .mobile .requirement { padding: 8px; }
+  .mobile .requirement .amount { font-size: 16px; }
+  .mobile #resources .stat .v { font-size: 20px; }
+  .mobile #resources .stat .k { font-size: 11px; }
+  .mobile #resources .stat .k .ui-icon { width: 18px; height: 18px; }
+  .mobile .tile .tile-name { font-size: 8px; }
+  .mobile .tile.occupied .ui-icon { margin-top: -5px; }
+  @media (max-width:380px) { .tile .tile-name { display: none; } }
+
+
+  .building-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; }
+  .building-fact { background: var(--panel); padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+  .building-fact .dim { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
+  .building-fact .ui-icon { width: 16px; height: 16px; }
+  #resources .stat.zero .v, #resources .stat.zero .k .ui-icon { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -199,7 +338,8 @@
     <h1 id="title"></h1>
     <div id="status" class="dim"></div>
 
-    <div class="panel">
+    <div class="panel resource-panel" id="resourcePanel">
+      <div class="head resource-head"><h2 style="margin:0">City resources</h2><button id="resourceToggle" aria-expanded="false">All resources</button></div>
       <div id="resources" class="stats"></div>
       <div id="people" class="stats" style="margin-top:8px"></div>
       <div id="msg" class="bad"></div>
@@ -220,14 +360,6 @@
 
     <!-- City -->
     <div id="tab-city">
-      <div class="panel" id="tutorial" style="border-color:var(--accent)" hidden><div id="tutorialBody"></div></div>
-      <div class="panel">
-        <div class="head">
-          <span id="advanceTitle" class="hi"></span>
-          <button id="advance"></button>
-        </div>
-        <div id="advanceInfo" class="checks"></div>
-      </div>
       <div class="cols">
         <div class="panel">
           <h2>Map</h2>
@@ -251,15 +383,25 @@
             <div id="findOut" class="small"></div>
           </div>
         </div>
-        <div class="panel">
-          <h2>Tile</h2>
+        <div class="panel inspector" id="inspector">
+          <div class="head"><h2>Selected tile</h2><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
           <div id="tile" class="dim"></div>
         </div>
       </div>
-      <div class="panel">
-        <h2>Chronicle</h2>
-        <div id="log" class="dim"></div>
+      <div class="panel" id="collectionPanel">
+        <div class="head"><div><h2 style="margin-bottom:4px">Building collection</h2><span class="dim small" id="collectionSummary"></span></div><input id="collectionSearch" type="search" placeholder="Find a building" aria-label="Find a building"></div>
+        <div id="collectionFilters" class="collection-filters"></div>
+        <div id="collection" class="collection-grid"></div>
       </div>
+      <div class="panel" id="tutorial" style="border-color:var(--accent)" hidden><div id="tutorialBody"></div></div>
+      <div class="panel">
+        <div class="head">
+          <span id="advanceTitle" class="hi"></span>
+          <button id="advance"></button>
+        </div>
+        <div id="advanceInfo" class="checks"></div>
+      </div>
+      <details class="panel"><summary class="cat" style="margin:0">Recent activity</summary><div id="log" class="dim" style="margin-top:12px"></div></details>
     </div>
 
     <!-- Beast -->
@@ -668,7 +810,7 @@ const FONTS = {
   serif:   ['Serif', 'Georgia, Cambria, "Times New Roman", serif'],
   rounded: ['Rounded', '"Trebuchet MS", "Lucida Grande", Verdana, sans-serif'],
 };
-const DEFAULT_SETTINGS = { theme: 'forest', accent: '', font: 'mono', zoom: 100, tile: 'medium', width: 'normal', layout: 'auto',
+const DEFAULT_SETTINGS = { theme: 'forest', accent: '', font: 'sans', zoom: 100, tile: 'medium', width: 'normal', layout: 'auto',
                            rate: 'hour', clock: 'auto', abbreviate: false, separators: true,
                            poll: 5, startTab: 'city', tutorial: true, away: true, reports: true, confirmDemolish: false, mapKey: true };
 let settings = { ...DEFAULT_SETTINGS };
@@ -679,7 +821,7 @@ function applySettings() {
   for (const [k, v] of Object.entries(theme.vars)) root.setProperty('--' + k, v);
   if (settings.accent) root.setProperty('--accent', settings.accent);
   root.setProperty('--font', (FONTS[settings.font] || FONTS.mono)[1]);
-  root.setProperty('--page', { narrow: '860px', normal: '1050px', wide: '1400px', full: '100%' }[settings.width] || '1050px');
+  root.setProperty('--page', { narrow: '860px', normal: '1240px', wide: '1400px', full: '100%' }[settings.width] || '1240px');
   root.setProperty('--tscale', { small: 0.8, medium: 1, large: 1.25, huge: 1.5 }[settings.tile] || 1);
   document.body.style.zoom = (Number(settings.zoom) || 100) / 100;
   applyLayout();
@@ -698,13 +840,73 @@ function fitMap() {
   const map = $('map'), room = map.parentElement.clientWidth, size = view.state.areas[view.area].size;
   if (!room) return;                       // the City tab is not showing
   const scale = { small: 0.8, medium: 1, large: 1.25, huge: 1.5 }[settings.tile] || 1;
-  const wanted = (size > 9 ? 34 : 44) * scale;
-  const fits = Math.floor((room - 2 * (size - 1)) / size);      // 2px gaps between tiles
+  const wanted = (size > 9 ? 44 : 80) * scale;
+  const fits = Math.floor((room - 12 - 2 * (size - 1)) / size);      // 2px gaps between tiles
   map.style.setProperty('--tw', Math.max(14, Math.min(wanted, fits)) + 'px');
 }
 window.addEventListener('resize', () => { applyLayout(); fitMap(); });
 
 // Numbers the way the player asked for them.
+
+// Original, reusable vector artwork. Unknown content keeps a generic icon.
+const ICON_PATHS = {
+ minus: 'M5 12h14', alert: 'M12 3 2 21h20ZM12 9v5M12 17v1',
+ check: 'm5 12 4 4L19 6', lock: 'M6 10h12v12H6ZM8 10V6a4 4 0 0 1 8 0v4',
+ people: 'M9 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 21v-5q0-5 6-5t6 5v5M17 4a3 3 0 0 1 0 6M18 12q4 0 4 5v4',
+ clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM12 6v6l4 2',
+ pin: 'M12 22S4 13 4 9a8 8 0 0 1 16 0c0 4-8 13-8 13ZM12 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
+ farm: 'M3 11 12 4l9 7M5 10v11h14V10M9 21v-7h6v7M2 3v4M0 5h4',
+ dock: 'M2 16h20M4 16v6M10 16v6M17 3v13M17 3h4v5h-4M3 11q3-3 6 0',
+ lumber: 'M3 22V12M3 12 0 9h6ZM10 20l9-9M8 18l4 4M12 7h8v7M14 5l8 8',
+ quarry: 'm2 20 5-9 6 3 5-7 4 13ZM7 11l4-7 7 3M4 16l9-2 3 6',
+ shaman: 'M3 21h18L12 6ZM12 6V2M9 3h6M10 21v-5h4v5M5 16h14',
+ hunting: 'M4 21V11l8-7 8 7v10ZM9 21v-7h6v7M5 3l14 6M19 3 5 9',
+ pasture: 'M2 16h20M2 21V11M8 21V11M16 21V11M22 21V11M9 7h6l2 5H7ZM9 7 7 3M15 7l2-4',
+ well: 'M4 21V9M20 21V9M2 9l10-7 10 7M6 21v-7h12v7ZM12 9v6',
+ school: 'M3 21V9l9-6 9 6v12ZM9 21v-7h6v7M6 10h2M16 10h2M12 7v3',
+ factory: 'M2 22V10l7 4V8l7 6V3h5v19ZM5 18h2M11 18h2M17 18h2',
+ mine: 'M2 21 6 8l6-5 6 5 4 13ZM7 21v-7a5 5 0 0 1 10 0v7M10 14h4M10 18h4',
+ egg: 'M12 2C7 2 3 12 3 16a9 6 0 0 0 18 0c0-4-4-14-9-14ZM8 12l3 3 3-3',
+
+ house: 'M3 11 12 3l9 8M5 10v11h14V10M10 21v-7h4v7',
+ tree: 'M12 2 5 10h3l-5 7h7v5h4v-5h7l-5-7h3Z',
+ hill: 'm2 20 8-14 5 8 3-5 4 11ZM7 11l3 2 3-2',
+ water: 'M2 7q3-4 6 0t6 0 8 0M2 13q3-4 6 0t6 0 8 0M2 19q3-4 6 0t6 0 8 0',
+ food: 'M12 22V4M12 8Q3 8 4 2q8 0 8 6ZM12 14q-9 0-8-6 8 0 8 6ZM12 11q9 0 8-6-8 0-8 6ZM12 18q9 0 8-6-8 0-8 6',
+ materials: 'm3 8 9-5 9 5v9l-9 5-9-5ZM3 8l9 5 9-5M12 13v9',
+ knowledge: 'M12 5Q6 1 2 4v16q5-3 10 0 5-3 10 0V4q-4-3-10 1ZM12 5v15',
+ power: 'm13 2-9 12h7l-1 8 10-13h-8Z',
+ trade: 'M3 7h17l-4-4M21 17H4l4 4',
+ support: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z',
+ animal: 'M5 11 3 4l6 3h6l6-3-2 7v6l-7 5-7-5ZM8 13h1M15 13h1M10 17h4',
+ desert: 'M2 19q6-10 12-3 4-5 8 3M18 3v4M16 5h4',
+ plains: 'M3 19h18M6 19l-2-6M10 19l1-9M17 19l3-7',
+};
+function icon(kind, cls = '') {
+  return `<svg class="ui-icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICON_PATHS[kind] || ICON_PATHS.materials}"/></svg>`;
+}
+function terrainIcon(t) {
+  const groups = t.groups || [];
+  return groups.includes('water') ? 'water' : groups.includes('forest') || /forest|jungle|taiga/i.test(t.name) ? 'tree' : /hill|mountain|volcan/i.test(t.name) ? 'hill' : /desert|sand/i.test(t.name) ? 'desert' : 'plains';
+}
+function buildingIcon(b) {
+ const name = b.name.toLowerCase();
+ if (/shaman/.test(name)) return 'shaman';
+ if (/hunt/.test(name)) return 'hunting';
+ if (/fish|dock/.test(name)) return 'dock';
+ if (/lumber|sawmill/.test(name)) return 'lumber';
+ if (/quarry/.test(name)) return 'quarry';
+ if (/mine/.test(name)) return 'mine';
+ if (/farm/.test(name)) return 'farm';
+ if (/pasture|ranch/.test(name)) return 'pasture';
+ if (/well/.test(name)) return 'well';
+ if (/school|university/.test(name)) return 'school';
+ if (/factory|plant|mill/.test(name)) return 'factory';
+ if (/incubator|nest/.test(name)) return 'egg';
+ return b.category === 'housing' ? 'house' : b.category;
+}
+const RESOURCE_ICONS = { food: 'food', wood: 'tree', stone: 'hill', ore: 'materials', tools: 'support', gold: 'trade', electronics: 'power', livestock: 'animal', knowledge: 'knowledge' };
+
 function num(n) {
   if (typeof n !== 'number' || !isFinite(n)) return n;
   const size = Math.abs(n);
@@ -839,10 +1041,10 @@ function renderTutorial() {
   if (!show) return;
   setHTML($('tutorialBody'),
     `<div class="head"><h2 style="margin:0">Getting started <span class="dim">(${n} of ${TUTORIAL.length})</span></h2><button data-tutorial-hide>Hide</button></div>` +
-    TUTORIAL.map(([title, text], i) => i === next
-      ? `<div class="opt"><span class="hi">[ ] ${esc(title)}</span><div class="small" style="margin:3px 0 0 30px">${esc(text)}</div></div>`
-      : `<div class="opt small ${done[i] ? 'good' : 'dim'}">[${done[i] ? 'x' : ' '}] ${esc(title)}</div>`).join('') +
-    `<p class="dim small" style="margin-bottom:0">Hide turns this list off; Settings can bring it back. The Guide tab has more.</p>`);
+    `<div class="opt"><strong class="hi">${esc(TUTORIAL[next][0])}</strong><div class="small" style="margin-top:4px">${esc(TUTORIAL[next][1])}</div></div>` +
+    fold('tutorialSteps', 'All getting started steps', TUTORIAL.map(([title], i) =>
+      `<span class="${done[i] ? 'good' : 'dim'}">${done[i] ? '&#10003;' : '&#9675;'} ${esc(title)}</span>`)));
+
 }
 
 // Presents sent by the person running the game.
@@ -1007,9 +1209,10 @@ async function refresh() {
 }
 
 function goods(cost) {
-  const R = view.defs.resources, have = view.state.resources;
-  return Object.entries(cost).map(([k, v]) =>
-    `<span class="${have[k] >= v ? '' : 'bad'}">${num(v)} ${esc(R[k])}</span>`).join(', ');
+ return `<div class="cost-pills">` + Object.entries(cost).map(([k,v]) => {
+  const have = view.state.resources[k], enough = have >= v;
+  return `<span class="cost-pill ${enough ? 'enough' : 'short'}" title="${esc(view.defs.resources[k])}: ${num(have)} owned, ${num(v)} needed">${icon(RESOURCE_ICONS[k])}<span>${esc(view.defs.resources[k])} <b>${num(have)}</b> / ${num(v)}</span>${icon(enough ? 'check' : 'alert')}</span>`;
+ }).join('') + `</div>`;
 }
 function plain(cost) {
   return Object.entries(cost).map(([k, v]) => `${num(v)} ${esc(view.defs.resources[k])}`).join(', ');
@@ -1051,9 +1254,15 @@ function render() {
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
     const d = status.rates[k];
-    return stat(esc(label), num(state.resources[k]),
-      d ? `<span class="${d > 0 ? 'good' : 'bad'}">${rateText(d)}</span>` : '');
+    return stat(icon(RESOURCE_ICONS[k]) + esc(label), num(state.resources[k]),
+      d ? `<span class="${d > 0 ? 'good' : 'bad'}">${rateText(d)}</span>` : (state.resources[k] > 0 ? 'In storage' : 'None owned'));
   }).join(''));
+  [...$('resources').children].forEach((el, i) => {
+    const key = Object.keys(defs.resources)[i];
+    el.classList.toggle('zero', state.resources[key] <= 0);
+    el.classList.toggle('resource-extra', !['food', 'wood', 'stone'].includes(key));
+    el.classList.toggle('resource-shortage', status.rates[key] < 0);
+  });
   const pop = state.population, working = pop - status.idle, unfilled = Math.max(0, status.jobs - working);
   const short = status.power.supply < status.power.demand;
   setHTML($('people'),
@@ -1070,19 +1279,18 @@ function render() {
   // a beast mission, or an egg's own mission, is waiting
   const todo = !visiting && ((view.beast.mission && !view.beast.mission.complete) || view.beast.beasts.some(b => b.egg && b.task && !b.task.complete));
   const challenged = !visiting && (view.market.duels || []).some(d => d.to === state.name);
-  setHTML(document.querySelector('[data-tab=beast]'), 'Beast' + (challenged ? ' <span class="hi">(duel)</span>' : todo ? ' <span class="good">(mission)</span>' : ''));
+  setHTML(document.querySelector('[data-tab=beast]'), icon('animal') + 'Beast' + (challenged ? ' <span class="nav-badge">Duel</span>' : todo ? ' <span class="nav-badge">Mission</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
-  setHTML(document.querySelector('[data-tab=market]'), 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
+  setHTML(document.querySelector('[data-tab=market]'), icon('trade') + 'Market' + (unseen ? ` <span class="nav-badge">${unseen}</span>` : ''));
   const mailNew = visiting ? 0 : (state.messages || []).filter(m => !m.read).length;
-  setHTML(document.querySelector('[data-tab=social]'), 'Social' + (mailNew ? ` <span class="good">(${mailNew} new)</span>` : ''));
+  setHTML(document.querySelector('[data-tab=social]'), icon('people') + 'Social' + (mailNew ? ` <span class="nav-badge">${mailNew}</span>` : ''));
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'market', 'social', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
   $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
   $('advance').hidden = !adv;
   if (adv) { $('advance').textContent = `Advance to ${adv.name}`; $('advance').disabled = !adv.ready; }
-  setHTML($('advanceInfo'), adv ? adv.checks.map(c =>
-    `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join('') : '');
+  setHTML($('advanceInfo'), adv ? `<div class="requirement-grid">${adv.checks.map(requirementCard).join('')}</div>` : '');
 
   // One menu of every area with arrows either side, then a short row of only the areas worth a look:
   // the ones holding what the Find box is looking for, or (with no search) the ones with a problem.
@@ -1109,30 +1317,30 @@ function render() {
   fitMap();
   setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
     const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
-    const on = (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' : '');
+    const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' : '');
     const info = view.tiles[y][x];
     const state_ = !('need' in info) ? '' : info.priority < 0 ? 'off' : info.status === 'working' ? '' : 'stop';
     const bar = timers[`${x},${y}`] ? `<i data-bar="${x},${y}"></i>` : '';
     const adds = t.additions.map(a => defs.additions[a].name);
-    return `<button class="tile${on}" style="color:${esc(defs.terrains[t.terrain].color)}" data-x="${x}" data-y="${y}" ` +
-      `title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">` +
-      (b ? `${g}<b class="${state_}">${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
+    return `<button class="tile${on}" style="--terrain:${esc(defs.terrains[t.terrain].color)}80" data-x="${x}" data-y="${y}" ` +
+      `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">` +
+      (b ? icon(buildingIcon(b), state_) : t.animal ? icon('animal', 'animal') : icon(terrainIcon(defs.terrains[t.terrain]))) + (state_ === 'stop' ? '<span class="warning">!</span>' : '') + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + (b ? `<span class="tile-owned" aria-hidden="true">&#10003;</span><span class="tile-name" aria-hidden="true">${esc(b.name)}</span>` : '') + bar + `</button>`;
   }).join('')).join(''));
 
-  setHTML($('mapKey'), `Second letter: <b class="hi">white</b> working building, <span class="bad">red</span> something wrong, ` +
-    `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results.`);
+  setHTML($('mapKey'), `<div class="tile-facts"><span>${icon('check')}Built</span><span class="animal">${icon('animal')}Wildlife</span><span class="bad">${icon('alert')}Needs attention</span><span>${icon('pin')}Selected / found</span></div>`);
   renderFinder();
   renderTile();
-  renderPeople();
-  renderBeast();
-  renderGuide();
-  renderSettings();
+  if (tab === 'city') renderCollection();
+  if (tab === 'people') renderPeople();
+  if (tab === 'beast') renderBeast();
+  if (tab === 'guide') renderGuide();
+  if (tab === 'settings') renderSettings();
   $('mapKey').hidden = !settings.mapKey;
   fitMap();
-  renderResearch();
-  renderExplore();
-  if (!visiting) renderMarket();
-  if (!visiting) renderSocial();
+  if (tab === 'research') renderResearch();
+  if (tab === 'explore') renderExplore();
+  if (!visiting && tab === 'market') renderMarket();
+  if (!visiting && tab === 'social') renderSocial();
 
   const text = state.log.slice().reverse().map(e => `[${clock(e.t)}] ${e.text}`).join('\n');
   if ($('log').textContent !== text) $('log').textContent = text;
@@ -1188,9 +1396,50 @@ function buildingRows(b, cycle, produces, live) {
   return rows;
 }
 
+
+let collectionFilter = 'all';
+function buildingCount(id) {
+ return view.state.areas.reduce((n,a) => n + a.tiles.flat().filter(t => t.building === id).length, 0);
+}
+function requirementCard(c) {
+ const match = c.text.match(/([\d,.]+) of ([\d,.]+) (.+)/);
+ if (!match) return `<div class="requirement ${c.ok ? 'complete' : ''}">${icon(c.ok ? 'check' : 'minus')}<div class="small">${esc(c.text)}</div></div>`;
+ const [,have,need,label] = match;
+ const key = Object.keys(view.defs.resources).find(k => view.defs.resources[k].toLowerCase() === label.toLowerCase());
+ const kind = key ? RESOURCE_ICONS[key] : /population/i.test(label) ? 'people' : 'knowledge';
+ const ratio = Math.min(100,Math.max(0,Number(have.replace(/,/g,''))/Number(need.replace(/,/g,''))*100));
+ return `<div class="requirement ${c.ok ? 'complete' : ''}"><div class="head">${icon(kind)}${icon(c.ok ? 'check' : 'minus',c.ok ? 'good' : 'dim')}</div><span class="amount">${esc(have)} <small>/ ${esc(need)}</small></span><div class="small dim">${esc(label)}</div><div class="track"><span style="width:${ratio}%"></span></div></div>`;
+}
+function renderCollection() {
+ const {state,defs} = view, counts = {};
+ state.areas.forEach(a => a.tiles.flat().forEach(t => { if(t.building) counts[t.building] = (counts[t.building] || 0) + 1; }));
+ const unlocked = b => b.tech <= state.tech && (!b.research || state.research.includes(b.research));
+ const entries = Object.entries(defs.buildings);
+ const owned = entries.filter(([id]) => counts[id]);
+ const missing = entries.filter(([id,b]) => !counts[id] && unlocked(b));
+ const locked = entries.filter(([,b]) => !unlocked(b));
+ const filters = {all:['This era',entries.filter(([,b]) => b.tech <= state.tech)],owned:['Owned',owned],missing:['Not built',missing],locked:['Locked',locked]};
+ $('collectionSummary').textContent = `${Object.values(counts).reduce((a,b)=>a+b,0)} buildings / ${owned.length} kinds owned`;
+ setHTML($('collectionFilters'),Object.entries(filters).map(([k,[label,list]]) => `<button data-collection-filter="${k}" aria-pressed="${collectionFilter === k}" class="${collectionFilter === k ? 'on' : ''}">${icon(k === 'owned' ? 'check' : k === 'locked' ? 'lock' : 'house')}${label} <span class="dim">${list.length}</span></button>`).join(''));
+ const search = $('collectionSearch').value.toLowerCase().trim();
+ const list = filters[collectionFilter][1].filter(([,b]) => (b.name+' '+defs.categories[b.category]).toLowerCase().includes(search));
+ setHTML($('collection'),list.map(([id,b]) => {
+  const count = counts[id] || 0, ready = unlocked(b), kind = count ? 'owned' : ready ? 'missing' : 'locked';
+  const label = count ? `${count} ${visiting ? 'built' : 'owned'}` : ready ? 'Not built yet' : 'Locked';
+  return `<div class="building-card ${kind}"><div class="building-art">${icon(buildingIcon(b))}</div><strong>${esc(b.name)}</strong><span class="${count ? 'owned-badge' : 'state-badge '+kind}">${icon(count ? 'check' : ready ? 'house' : 'lock')}${label}</span>` +
+   (count ? `<button data-locate-building="${esc(id)}">${icon('pin')}Locate</button>` : ready ? goods(b.cost)+`<button data-choose-site="${esc(id)}">${icon('pin')}Find a site</button>` : `<span class="small dim">${esc(b.tech > state.tech ? defs.tech[b.tech].name : (defs.research[b.research]?.name || 'Research required'))}</span>`) + `</div>`;
+ }).join('') || '<p class="dim">No buildings match this view.</p>');
+}
+function buildingFacts(rows, key) {
+ const kinds = {Houses:'house',Makes:'materials',Workers:'people',Every:'clock',Generates:'power',Needs:'power',Status:'clock'};
+ const primary = rows.filter(([label]) => kinds[label]);
+ const other = rows.filter(([label]) => !kinds[label]);
+ return `<div class="building-facts">${primary.map(([label,value]) => `<div class="building-fact"><div class="dim small">${icon(kinds[label])}${label}</div><div class="hi">${value}</div></div>`).join('')}</div>` + fold('buildingFacts:' + key, 'More effects', other.map(([label,value]) => `${label}: ${value}`));
+}
 function renderTile() {
   const box = $('tile');
-  if (!sel) { setHTML(box, '<span class="dim">Select a tile on the map.</span>'); return; }
+  $('inspector').classList.toggle('selected', !!sel);
+  if (!sel) { setHTML(box, `<div class="inspector-empty">${icon('pin')}<strong>Your city, tile by tile</strong><p>Select a building to manage it.<br>Select empty land to see what fits.</p><div class="owned-badge">${icon('check')} Built</div> <span class="state-badge missing">Empty land</span></div>`); return; }
   const { state, defs } = view;
   const t = state.areas[view.area].tiles[sel.y][sel.x], info = view.tiles[sel.y][sel.x], status = view.status;
   const terr = defs.terrains[t.terrain];
@@ -1199,10 +1448,8 @@ function renderTile() {
   // ---- the ground ----
   let html = `<div class="head"><span class="big" style="color:${esc(terr.color)}">${esc(terr.name)}</span>` +
     `<span class="dim small">tile ${sel.x}, ${sel.y}</span></div>` +
-    kv([['Height', t.height], ['Temperature', `${t.temp}C`],
-        water ? ['Fish', `${t.fish}%`]
-              : ['Fertility', `${info.fertility}%` + (info.fertility !== t.fertility ? ` <span class="good">(${t.fertility}% before nearby buildings)</span>` : '')]]) +
-    (terr.desc ? `<div class="dim small">${esc(terr.desc)}</div>` : '') +
+    `<div class="tile-facts"><span title="Height">${icon('hill')}${t.height}</span><span title="Temperature">${t.temp}&deg;C</span><span>${icon(water ? 'water' : 'food')}${water ? t.fish : info.fertility}% ${water ? 'fish' : 'fertility'}</span></div>` +
+    (terr.desc ? fold('terrain', 'Terrain details', [esc(terr.desc)]) : '') +
     (info.locked ? `<div class="bad small">Nothing can be built here until you research ${esc(info.locked)}.</div>` : '');
 
   // ---- wildlife ----
@@ -1221,7 +1468,7 @@ function renderTile() {
     const rows = buildingRows(b, info.cycle, info.produces, info);
     if (info.cycle) rows.push(['Status', `<span class="hi" data-timer="${sel.x},${sel.y}"></span>`]);
     html += section('building', 'Building', true) + `<div class="card"><div class="head"><span class="hi big">${esc(b.name)}</span>` +
-      `<button data-demolish>Demolish</button></div><div class="desc">${esc(b.desc)}</div>` + kv(rows);
+      `<span class="owned-badge">${icon('check')}${visiting ? 'Built here' : 'You own this'}</span></div><div class="building-hero">${icon(buildingIcon(b))}<div><strong class="hi">${esc(b.name)}</strong><div class="small">${esc(b.desc)}</div></div></div>` + buildingFacts(rows,t.building) + `<details class="fold"><summary>Remove building</summary><div><button data-demolish>Demolish</button></div></details>`;
     if (info.power_in && status.power.supply < status.power.demand) html += `<div class="bad small">Short of power: ` +
       `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs.</div>`;
     if (info.need && !visiting) html += `<div class="bar" style="margin-top:6px"><span class="dim">Staffing</span>` +
@@ -1234,7 +1481,7 @@ function renderTile() {
     const A = defs.additions;
     if (t.additions.length || info.additions.length) {
       html += section('additions', `Additions: ${t.additions.length} of ${defs.max_additions} attached`, true);
-      for (const a of t.additions) html += `<div class="card"><span class="good">${esc(A[a].name)}</span> <span class="dim small">attached</span>` +
+      for (const a of t.additions) html += `<div class="card"><span class="good">${esc(A[a].name)}</span> <span class="owned-badge">${icon('check')}Owned</span>` +
         `<div class="desc">${esc(A[a].desc)}</div></div>`;
       const can = visiting ? [] : info.additions.filter(o => !o.problem), cannot = visiting ? [] : info.additions.filter(o => o.problem);
       for (const o of can) html += `<div class="card"><div class="head"><span class="hi">${esc(A[o.id].name)}</span>` +
@@ -1255,10 +1502,10 @@ function renderTile() {
       html += section('build:' + cat, `Build: ${esc(label)} (${options.length})`, can.length <= 3);
       for (const o of options) {
         const b = defs.buildings[o.id];
-        html += `<div class="card"><div class="head"><span class="hi">${esc(b.name)}</span>` +
+        html += `<div class="card"><div class="head"><span class="hi">${icon(buildingIcon(b))}${esc(b.name)}</span>` +
           `<button data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Build</button></div>` +
-          kv([['Cost', goods(b.cost)], ...buildingRows(b, o.cycle, b.produces)]) +
-          `<div class="desc">${esc(b.desc)}</div>` +
+          `<span class="state-badge missing">${buildingCount(o.id) ? `${buildingCount(o.id)} owned in city` : 'Not built yet'}</span>` + goods(b.cost) + buildingFacts(buildingRows(b, o.cycle, b.produces),o.id) +
+          fold('description:' + o.id, 'About this building', [esc(b.desc)]) +
           fold('speed:' + o.id, 'What changes its speed here', (o.notes || []).map(esc)) + `</div>`;
       }
       html += `</details>`;
@@ -1310,15 +1557,14 @@ function renderResearch() {
     return (searching ? section('resfind:' + i, title, true) : section('res:' + i, title, i === state.tech)) +
       items.map(r => {
         const d = R[r.id], locked = i > state.tech;
-        const right = r.done ? `<span class="good">Researched</span>`
+        const right = r.done ? `<span class="owned-badge">${icon('check')}Unlocked</span>`
           : `<button data-research="${esc(r.id)}" ${r.problem || !r.affordable ? 'disabled' : ''}>Research</button>`;
         const rows = [];
         if (!r.done) rows.push(['Cost', goods(d.cost)]);
-        if (!r.done) rows.push([r.problem ? 'Blocked' : 'Needs', r.problem ? `<span class="bad">${esc(r.problem)}</span>`
-          : `a ${esc(defs.buildings[d.building].name)} <span class="dim">(you have one)</span>`]);
+        if (!r.done) rows.push(['Required building', `<span class="${buildingCount(d.building) ? 'owned-badge' : 'state-badge missing'}">${icon(buildingCount(d.building) ? 'check' : 'lock')}${esc(defs.buildings[d.building].name)} &middot; ${buildingCount(d.building) ? 'Owned' : 'Not built'}</span>` + (r.problem ? `<div class="bad small">${esc(r.problem)}</div>` : '')]);
         rows.push(['Gives', `<span class="${r.done ? 'good' : ''}">${gives(r.id)}</span>`]);
         return `<div class="card ${locked ? 'dim' : ''}"><div class="head"><span class="${locked ? '' : 'hi'}">${esc(d.name)}</span>${right}</div>` +
-          `<div class="desc">${esc(d.desc)}</div>` + kv(rows) + `</div>`;
+          fold('researchDesc:' + r.id, 'Details', [esc(d.desc)]) + kv(rows) + `</div>`;
       }).join('') + `</details>`;
   }).join('');
   setHTML($('research'), html || `<p class="dim">Nothing matches.</p>`);
@@ -2240,6 +2486,35 @@ document.querySelector('.tabs').onclick = e => {
   render();
   if (tab === 'board') loadBoard();
 };
+
+$('collectionFilters').onclick = e => { const b = e.target.closest('[data-collection-filter]'); if(b) { collectionFilter = b.dataset.collectionFilter; renderCollection(); } };
+$('collectionSearch').oninput = () => { if(view) renderCollection(); };
+$('collection').onclick = e => {
+ const locate = e.target.closest('[data-locate-building]'), site = e.target.closest('[data-choose-site]');
+ if(site) {
+  finder = {kind:'sites',what:site.dataset.chooseSite};
+  $('findKind').value = 'sites'; findChoices(); finder.what=site.dataset.chooseSite; $('findWhat').value=finder.what; refresh(); $('map').scrollIntoView({block:'center'}); return;
+ }
+ if(locate) {
+  for(let ai=0;ai<view.state.areas.length;ai++) {
+   const a = view.state.areas[ai];
+   for(let y=0;y<a.tiles.length;y++) for(let x=0;x<a.tiles[y].length;x++) if(a.tiles[y][x].building === locate.dataset.locateBuilding) {
+    if(ai === view.area) { sel={x,y}; render(); } else { jump={area:ai,x,y}; areaIdx=ai; refresh(); }
+    $('map').scrollIntoView({block:'center'}); return;
+   }
+  }
+ }
+};
+for(const [id,kind] of Object.entries({city:'house',people:'people',explore:'pin',research:'knowledge',board:'trade',guide:'knowledge',settings:'support'})) {
+ const button=document.querySelector(`[data-tab=${id}]`); button.innerHTML=icon(kind)+button.textContent;
+}
+$('resourceToggle').onclick = () => {
+  const expanded = $('resourcePanel').classList.toggle('expanded');
+  $('resourceToggle').setAttribute('aria-expanded', String(expanded));
+  $('resourceToggle').textContent = expanded ? 'Fewer resources' : 'All resources';
+};
+$('inspectorClose').onclick = () => { sel = null; render(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && sel) { sel = null; render(); } });
 $('map').onclick = e => {
   const b = e.target.closest('.tile');
   if (b) { sel = { x: +b.dataset.x, y: +b.dataset.y }; render(); }

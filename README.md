@@ -19,6 +19,21 @@ the live game's saves must not be overwritten when the code is updated.
 
 ## Run it on your own computer
 
+### Preview UI changes with the real hosted game
+
+Double-click `preview-ui.bat`, or run `python preview_ui.py`, then open
+`http://127.0.0.1:18744`. This serves your local `index.html` and forwards API
+requests to `https://mangoclaw119.pythonanywhere.com`. Sign in with your existing
+city name and password. Actions affect your real city; no local game saves are
+created. The hosted server code is unchanged. Stop the preview with Ctrl+C.
+
+If the port is busy, use `python preview_ui.py --port 18745` and open the printed
+address. The preview needs no extra Python packages. Signing in here does not
+reuse your hosted site's browser session, because each address has separate
+browser storage.
+
+### Run a separate local game
+
 ```
 python server.py
 ```
