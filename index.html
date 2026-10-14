@@ -195,7 +195,11 @@
   .ideoCard.on { border-color: var(--accent); }
   .ideoCard .name { color: var(--bright); font-size: 16px; }
   .ideoCard button { margin-top: auto; align-self: flex-start; }
-  .perk.taken { border-color: var(--good); }
+  .perk.taken { border-color: var(--ideo, var(--good)); }
+  .ideoArt, .perkArt { margin: 0 0 4px; line-height: 1.15; font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-weight: bold; }
+  .ideoArt { font-size: 15px; color: var(--ideo); }
+  .perkArt { font-size: 14px; color: #474d4a; transition: color .4s, text-shadow .4s; }      /* dark grey until taken */
+  .perkArt.lit { color: var(--ideo); text-shadow: 0 0 6px var(--ideo); }                  /* then lit in the ideology's colour */
   .perk.locked { opacity: .6; border-style: dashed; }
   #awayBody, #reportBody, #presentBody, #ideologyPickBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; padding-right: 6px; }
   #away .bar, #report .bar, #present .bar, #ideologyPick .bar { flex: none; }
@@ -2143,7 +2147,8 @@ let ideologyLater = false;    // "Decide later" pressed: the choice window waits
 function ideologyCards(chooseable) {
   const I = view.defs.ideologies;
   return `<div class="ideoCards">` + Object.entries(I).map(([id, i]) =>
-    `<div class="ideoCard"><span class="name">${esc(i.name)}</span><span class="dim small">${esc(i.desc)}</span>` +
+    `<div class="ideoCard" style="--ideo:${esc(i.color)}"><pre class="ideoArt">${esc(i.art)}</pre>` +
+    `<span class="name" style="color:${esc(i.color)}">${esc(i.name)}</span><span class="dim small">${esc(i.desc)}</span>` +
     `<div class="small good">${i.text.map(esc).join('<br>')}</div>` +
     `<div class="small dim">Perks: ${esc(i.perk_plural.toLowerCase())}, such as ${esc(Object.values(i.perks).slice(0, 2).map(p => p.name).join(' and '))}.</div>` +
     (chooseable ? `<button data-ideology-choose="${id}">Choose ${esc(i.name)}</button>` : '') + `</div>`).join('') + `</div>`;
@@ -2172,18 +2177,20 @@ function renderIdeology() {
   const perks = Object.entries(i.perks);
   const tiers = [...new Set(perks.map(([, p]) => p.tier))].sort((a, b) => a - b);
   setHTML(box,
-    `<div class="panel"><h2>Ideology</h2><div class="head"><span class="big hi">${esc(i.name)}</span>` +
+    `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Ideology</h2><pre class="ideoArt">${esc(i.art)}</pre>` +
+      `<div class="head"><span class="big" style="color:${esc(i.color)}">${esc(i.name)}</span>` +
       (own ? `<span class="${iv.points ? 'good' : 'dim'}">${iv.points} ${iv.points === 1 ? 'point' : 'points'} to spend</span>` : '') + `</div>` +
       `<div class="dim small">${esc(i.desc)}</div>` +
       `<div class="cat">Everything it gives the city now</div>` + iv.total.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
       `<p class="dim small" style="margin-bottom:0">Every tech level from Village up earns one point (five in all, by Megacity). ` +
       `Each tier opens at its tech level. There are ${perks.length} ${esc(i.perk_plural.toLowerCase())} and only five points, so choose carefully.</p></div>` +
-    `<div class="panel"><h2>${esc(i.perk_plural)}</h2>` + tiers.map(tier => {
+    `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.perk_plural)}</h2>` + tiers.map(tier => {
       const open = tier <= state.tech;
       return `<div class="cat">${esc(defs.tech[tier].name)} ${open ? '' : `<span class="dim">- opens when your city is a ${esc(defs.tech[tier].name)}</span>`}</div>` +
         `<div class="ideoCards" style="margin-top:8px">` + perks.filter(([, p]) => p.tier === tier).map(([id, p]) => {
           const taken = iv.perks.includes(id);
-          return `<div class="ideoCard perk ${taken ? 'taken' : open ? '' : 'locked'}"><span class="name">${esc(p.name)}</span>` +
+          return `<div class="ideoCard perk ${taken ? 'taken' : open ? '' : 'locked'}"><pre class="perkArt ${taken ? 'lit' : ''}">${esc(p.art)}</pre>` +
+            `<span class="name" ${taken ? `style="color:${esc(i.color)}"` : ''}>${esc(p.name)}</span>` +
             `<span class="dim small">${esc(i.perk_word)}. ${esc(p.desc)}</span><div class="small good">${p.text.map(esc).join('<br>')}</div>` +
             (taken ? `<span class="good small">Yours</span>`
               : own && open ? `<button data-perk-take="${id}" ${iv.points ? '' : 'disabled'} title="${iv.points ? '' : 'Reach the next tech level for another point'}">Take this ${esc(i.perk_word.toLowerCase())}</button>` : '') +

@@ -191,6 +191,124 @@ IDEOLOGIES = {
 }
 
 
+# ---- Pictures, drawn in text like the beasts. Each ideology has a colour; its
+# perks are drawn in dark grey until taken, then lit up in that colour.
+COLOURS = {"faith": "#e6c35c", "progress": "#5ad0d8", "commerce": "#f0a05a",
+           "wild": "#7fc97f", "wayfarers": "#7fb8ff", "community": "#e58fd0"}
+
+ART = {
+    "faith": [
+        r"       /\       ",
+        r"     _/__\_     ",
+        r"    | |  | |    ",
+        r"    | |  | |    ",
+        r"   /________\   ",
+    ],
+    "progress": [
+        r"    _  _  _     ",
+        r"   ( \/ \/ )    ",
+        r"  --(  ()  )--  ",
+        r"   (_/\_/\_)    ",
+        r"      ||        ",
+    ],
+    "commerce": [
+        r"      _|_       ",
+        r"    _/ | \_     ",
+        r"   (___|___)    ",
+        r"    $  |  $     ",
+        r"     __|__      ",
+    ],
+    "wild": [
+        r"     .-''-.     ",
+        r"    ( (  ) )    ",
+        r"     `-||-'     ",
+        r"  o o  ||  o o  ",
+        r"   O   ||   O   ",
+    ],
+    "wayfarers": [
+        r"       N        ",
+        r"       ^        ",
+        r"   W <-+-> E    ",
+        r"       v        ",
+        r"       S        ",
+    ],
+    "community": [
+        r"   /\    /\     ",
+        r"  /  \  /  \    ",
+        r"  |[]|__|[]|    ",
+        r"  |  |[]|  |    ",
+    ],
+}
+
+PERK_ART = {
+    # The Old Faith
+    "harvest_mother": [r" \ | / ", r"  \|/  ", r" __|__ "],
+    "hearth_keeper":  [r"  ( )  ", r" (   ) ", r" \___/ "],
+    "wanderer":       [r"  .  . ", r" .  .  ", r"======="],
+    "beast_mother":   [r" o o o ", r"o (_) o", r"  ' '  "],
+    "sun_father":     [r" \ | / ", r"-( o )-", r" / | \ "],
+    "plenty":         [r"  ___  ", r" (o o)\_", r"  \___/ "],
+    "stone_father":   [r"  /\   ", r" /  \/\ ", r"/______\ "],
+    "coin_god":       [r" .--.  ", r"( $$ ) ", r" '--'  "],
+    "night_owl":      [r" ,_,   ", r"(o,o)  ", r"/)_)   "],
+    "many_armed":     [r"\ \|/ /", r" -(o)- ", r"/ /|\ \ "],
+    # Progress
+    "parts":          [r" [==]  ", r"  ||   ", r"  ||   "],
+    "movable_type":   [r" ____  ", r"|ABC | ", r"|____| "],
+    "steam":          [r"  ~ ~  ", r" _|=|_ ", r"(o___o)"],
+    "instruments":    [r"    __ ", r" __/ / ", r"/_/    "],
+    "assembly":       [r"[]-[]-[]", r"========", r" o  o  o"],
+    "thinking_machine": [r" _____ ", r"|01010|", r"|_____|"],
+    "crop_rotation":  [r"|| || ||", r"## .. ##", r"========"],
+    "vaccination":    [r"   |   ", r" [===]>", r"   |   "],
+    "refrigeration":  [r" \ * / ", r"* -*- *", r" / * \ "],
+    "superconductors": [r"(~~~~~)", r" >>>>> ", r"(~~~~~)"],
+    # Commerce
+    "guild":          [r" ____  ", r"|GILD| ", r"|____| "],
+    "caravan":        [r"  _  _  ", r" / \/ \_", r" |  |  |"],
+    "bank":           [r" _____ ", r" | | | ", r"_|_|_|_"],
+    "bazaar":         [r"  /\   ", r" /  \  ", r"/_||_\ "],
+    "shipping":       [r"   |\  ", r"   | \ ", r"\_____/"],
+    "golden_age":     [r"\/\/\/ ", r"|****| ", r"|____| "],
+    "mining":         [r" __/\_ ", r"   /   ", r"  /    "],
+    "exploration":    [r" _____ ", r"| X ~ |", r"|_~___|"],
+    "menagerie":      [r" _____ ", r"|o|o|o|", r"|_|_|_|"],
+    "free_port":      [r"  _o_  ", r"   |   ", r" \_|_/ "],
+    # Kinship with the Wild
+    "herd":           [r" ^__^  ", r" (oo)\_", r" (__)  "],
+    "nest":           [r" o O o ", r"\_____/"],
+    "fang":           [r" /\/\  ", r" \  /  ", r"  \/   "],
+    "seasons":        [r"* . o  ", r" ~ * ~ ", r"o . *  "],
+    "deep_woods":     [r"  ^  ^ ", r" /^\/^\ ", r"  |  | "],
+    "heart":          [r" _  _  ", r"( \/ ) ", r" \  /  ", r"  \/   "],
+    "swift":          [r"_    _ ", r" \/\/  "],
+    "burrow":         [r"  ___  ", r" / o \ ", r"/_____\ "],
+    "river":          [r"~~~~~~~", r" ~~~~~~", r"~~~~~~~"],
+    "migration":      [r"> > >  ", r" > > > ", r"> > >  "],
+    # The Wayfarers
+    "star_charts":    [r" .  *  ", r"   *  .", r"*  .   "],
+    "strange_seeds":  [r"  ,  , ", r" (.)(.)", r"  '  ' "],
+    "lost_library":   [r" ____  ", r"|=||=| ", r"|=||=| "],
+    "far_nests":      [r" .--.  ", r"( () ) ", r" `--'  "],
+    "light_packs":    [r"  __   ", r" [==]  ", r" |__|  "],
+    "far_horizons":   [r" \|/   ", r"-(_)-  ", r"~~~~~~~"],
+    "ore_veins":      [r"/\/\/\ ", r"\*/\*/ ", r"/\/\/\ "],
+    "trade_winds":    [r"  |\   ", r"  |~\  ", r"__|__\ "],
+    "map_of_everything": [r" _____ ", r"|~/\~ |", r"|_~_/_|"],
+    "wonders":        [r"   /\   ", r"  /  \  ", r" /____\ "],
+    # Community
+    "festivals":      [r" * o * ", r"\o/ \o/", r" |   | "],
+    "hearths":        [r"  ( )  ", r" __|__ ", r"|_____|"],
+    "fields":         [r" \|/\|/", r" ||| ||", r"======="],
+    "guild_halls":    [r"  /\   ", r" /[]\  ", r" |__|  "],
+    "elders":         [r" o  o  ", r"/|\/|\ ", r"/ \/ \ "],
+    "golden_generation": [r"\o/\o/ ", r" |  |  ", r"/ \/ \ "],
+    "barn_raising":   [r"  /\   ", r" /||\  ", r"/_||_\ "],
+    "market_day":     [r"_/\_/\_", r"|$| |@|", r"-------"],
+    "storytellers":   [r"  o    ", r" /|\ ~ ", r" / \ ~ "],
+    "open_gates":     [r"|\   /|", r"| \ / |", r"|  .  |"],
+}
+
 def setup(state):
     state.setdefault("ideology", None)
     state.setdefault("perks", [])
@@ -295,8 +413,9 @@ def describe(eff):
 def defs():
     """The ideologies as the page shows them, with their effects in words."""
     return {iid: {"name": i["name"], "desc": i["desc"], "perk_word": i["perk_word"], "perk_plural": i["perk_plural"],
-                  "text": describe(i["effects"]),
-                  "perks": {pid: {"name": p["name"], "tier": p["tier"], "desc": p["desc"], "text": describe(p["effects"])}
+                  "text": describe(i["effects"]), "color": COLOURS[iid], "art": "\n".join(ART[iid]),
+                  "perks": {pid: {"name": p["name"], "tier": p["tier"], "desc": p["desc"], "text": describe(p["effects"]),
+                                  "art": "\n".join(PERK_ART[pid])}
                             for pid, p in i["perks"].items()}}
             for iid, i in IDEOLOGIES.items()}
 
