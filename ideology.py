@@ -4,8 +4,8 @@ Each ideology gives a bonus straight away, and then has perks of its own that
 fit it: the Old Faith's perks are blessings from its gods, Progress's are great
 inventions, and so on. Every tech level from Village up earns one point, spent
 on a perk whenever the player likes (Village earns 1, Megacity 5 in all). Each
-ideology has six perks in five tiers; a perk can be taken once the city has
-reached its tier, so a city ends up with five of the six.
+ideology has ten perks, two in each of five tiers; a perk can be taken once the
+city has reached its tier, so a city ends up with five of the ten.
 
 Effects, added up over the ideology and its perks taken:
 
@@ -42,6 +42,14 @@ IDEOLOGIES = {
                                "desc": "Every fire burns a little hotter."},
             "plenty":         {"name": "Miracle of Plenty", "tier": 5, "effects": {"speed": {"all": 0.08}},
                                "desc": "Nobody can explain it. Nobody complains."},
+            "stone_father":   {"name": "Blessing of the Stone Father", "tier": 2, "effects": {"speed": {"materials": 0.12}},
+                               "desc": "Seams of ore open where the miners pray."},
+            "coin_god":       {"name": "Blessing of the Two-Faced Coin", "tier": 3, "effects": {"speed": {"trade": 0.15}},
+                               "desc": "The god of bargains smiles on honest weights."},
+            "night_owl":      {"name": "Blessing of the Night Owl", "tier": 4, "effects": {"speed": {"knowledge": 0.20}},
+                               "desc": "The goddess of wisdom keeps the scholars' lamps burning."},
+            "many_armed":     {"name": "Blessing of the Many-Armed", "tier": 5, "effects": {"housing": 60, "attracts": 1},
+                               "desc": "Pilgrims come from every land, and the temple finds them all a bed."},
         },
     },
     "progress": {
@@ -61,6 +69,14 @@ IDEOLOGIES = {
                             "desc": "Every task timed, every step improved."},
             "thinking_machine": {"name": "The Thinking Machine", "tier": 5, "effects": {"speed": {"all": 0.10}},
                                  "desc": "It plans the city's work better than any council could."},
+            "crop_rotation": {"name": "Crop Rotation", "tier": 2, "effects": {"speed": {"food": 0.15}},
+                              "desc": "Rest the soil, feed the soil, and it feeds you back."},
+            "vaccination":   {"name": "Vaccination", "tier": 3, "effects": {"housing": 40, "attracts": 1},
+                              "desc": "Fewer fevers, bigger families, and word spreads."},
+            "refrigeration": {"name": "Refrigeration", "tier": 4, "effects": {"speed": {"food": 0.12, "trade": 0.08}},
+                              "desc": "Nothing spoils, so everything can be sold."},
+            "superconductors": {"name": "Superconductors", "tier": 5, "effects": {"power": 0.35},
+                                "desc": "Power carried across the city without losing a spark."},
         },
     },
     "commerce": {
@@ -80,6 +96,14 @@ IDEOLOGIES = {
                          "desc": "Whatever the city needs arrives by the boatload."},
             "golden_age": {"name": "Golden Age", "tier": 5, "effects": {"speed": {"all": 0.08}, "attracts": 1},
                            "desc": "Everyone is doing well, and everyone wants to live here."},
+            "mining":     {"name": "Mining Charter", "tier": 2, "effects": {"speed": {"materials": 0.12}},
+                           "desc": "Claims sold to whoever will dig fastest."},
+            "exploration": {"name": "Exploration Charter", "tier": 3, "effects": {"explore_speed": 0.25, "egg_chance": 0.05},
+                            "desc": "Investors pay for the expedition, and want rare things brought home."},
+            "menagerie":  {"name": "Menagerie Charter", "tier": 4, "effects": {"beast_power": 0.25, "beast_xp": 0.25},
+                           "desc": "Crowds pay to see your beast, and it rather likes the attention."},
+            "free_port":  {"name": "Free Port Charter", "tier": 5, "effects": {"speed": {"trade": 0.20}, "explore_cost": 0.20},
+                           "desc": "No tolls, no tariffs, and ships from everywhere."},
         },
     },
     "wild": {
@@ -99,6 +123,15 @@ IDEOLOGIES = {
                            "desc": "The forest gives up its timber and stone without a fight."},
             "heart":   {"name": "Heart of the Wild", "tier": 5, "effects": {"beast_power": 0.30, "beast_xp": 0.50},
                         "desc": "The city and its beast are one creature now."},
+            "swift":   {"name": "Pact of the Swift", "tier": 2, "effects": {"explore_speed": 0.25},
+                        "desc": "Birds show the expeditions the quickest way."},
+            "burrow":  {"name": "Pact of the Burrow", "tier": 3, "effects": {"housing": 35},
+                        "desc": "Homes dug into the hillsides, warm in winter and cool in summer."},
+            "river":   {"name": "Pact of the River", "tier": 4, "effects": {"speed": {"food": 0.15}},
+                        "desc": "The river floods only where the fields want water."},
+            "migration": {"name": "Pact of the Great Migration", "tier": 5,
+                          "effects": {"wildlife_speed": 1.0, "attracts": 1, "mission_speed": 0.25},
+                          "desc": "Every spring the herds pass through, and people follow them."},
         },
     },
     "wayfarers": {
@@ -118,6 +151,14 @@ IDEOLOGIES = {
                               "desc": "Expeditions live off the land and carry half as much."},
             "far_horizons":  {"name": "Far Horizons", "tier": 5, "effects": {"speed": {"all": 0.06}, "attracts": 1},
                               "desc": "Travellers from every land settle in the city that found them."},
+            "ore_veins":     {"name": "Foreign Ore Veins", "tier": 2, "effects": {"speed": {"materials": 0.12}},
+                              "desc": "Prospectors came back with better ways to find stone and ore."},
+            "trade_winds":   {"name": "The Trade Winds", "tier": 3, "effects": {"speed": {"trade": 0.15}},
+                              "desc": "Winds that carry ships to market and back again."},
+            "map_of_everything": {"name": "The Map of Everything", "tier": 4, "effects": {"explore_speed": 0.30, "explore_cost": 0.15},
+                                  "desc": "Every road, river and pass, drawn on one enormous sheet."},
+            "wonders":       {"name": "Wonders of the World", "tier": 5, "effects": {"beast_power": 0.25, "speed": {"knowledge": 0.15}},
+                              "desc": "Ancient ruins full of beasts and secrets."},
         },
     },
     "community": {
@@ -137,6 +178,14 @@ IDEOLOGIES = {
                            "desc": "Old heads, long memories, good advice."},
             "golden_generation": {"name": "The Golden Generation", "tier": 5, "effects": {"speed": {"all": 0.06}, "attracts": 1},
                                   "desc": "Children raised by the whole city, ready for anything."},
+            "barn_raising": {"name": "Barn Raising", "tier": 2, "effects": {"speed": {"materials": 0.12}},
+                             "desc": "The whole street turns out to build, and it is done by supper."},
+            "market_day":   {"name": "Market Day", "tier": 3, "effects": {"speed": {"trade": 0.15}},
+                             "desc": "Once a week the square fills with stalls from end to end."},
+            "storytellers": {"name": "Storytellers", "tier": 4, "effects": {"beast_xp": 0.30, "mission_speed": 0.25},
+                             "desc": "Every child knows the tales of your beast, and it tries to live up to them."},
+            "open_gates":   {"name": "Open Gates", "tier": 5, "effects": {"housing": 60, "attracts": 2},
+                             "desc": "Anyone who asks is welcome, and many ask."},
         },
     },
 }

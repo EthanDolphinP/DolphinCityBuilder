@@ -2177,7 +2177,7 @@ function renderIdeology() {
       `<div class="dim small">${esc(i.desc)}</div>` +
       `<div class="cat">Everything it gives the city now</div>` + iv.total.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
       `<p class="dim small" style="margin-bottom:0">Every tech level from Village up earns one point (five in all, by Megacity). ` +
-      `Each tier opens at its tech level; there are six ${esc(i.perk_plural.toLowerCase())}, so you will have to leave one out.</p></div>` +
+      `Each tier opens at its tech level. There are ${perks.length} ${esc(i.perk_plural.toLowerCase())} and only five points, so choose carefully.</p></div>` +
     `<div class="panel"><h2>${esc(i.perk_plural)}</h2>` + tiers.map(tier => {
       const open = tier <= state.tech;
       return `<div class="cat">${esc(defs.tech[tier].name)} ${open ? '' : `<span class="dim">- opens when your city is a ${esc(defs.tech[tier].name)}</span>`}</div>` +
