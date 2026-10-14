@@ -3302,7 +3302,7 @@ def _view(state, ai, detail):
         "area": ai,
         "areas": [{"name": area_name(a), "env": a["env"], "size": a["size"],
                    "renamed": bool(a.get("label")), "default_name": default_area_name(a),
-                   "where": where(a["rx"], a["ry"]),
+                   "where": where(a["rx"], a["ry"]), "distance": abs(a["rx"]) + abs(a["ry"]),
                    "buildings": sum(1 for row in a["tiles"] for t in row if t["building"]),
                    "animals": sum(1 for row in a["tiles"] for t in row if t["animal"]),
                    # buildings that are not working properly

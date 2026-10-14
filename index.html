@@ -561,16 +561,35 @@
     <!-- Explore -->
     <div id="tab-explore" hidden>
       <div class="panel">
-        <h2>Your areas</h2>
-        <div id="known" class="scroll"></div>
+        <h2>Explore</h2>
+        <div id="expViews" class="bar" style="margin-top:0"></div>
       </div>
-      <div class="panel">
+      <div class="panel" data-exp="areas">
+        <h2>Your areas <span id="areasCount" class="count"></span></h2>
+        <div class="bar" style="margin-top:0">
+          <input id="areaSearch" type="search" placeholder="Search areas by name, land or direction" style="flex:1 1 200px">
+          <select id="areaKind" title="Kind of land"></select>
+          <select id="areaSort" title="Order">
+            <option value="found">In the order found</option><option value="closest">Closest first</option>
+            <option value="buildings">Most buildings</option><option value="name">A to Z</option></select>
+          <select id="areaLook" title="How to show them"><option value="cards">Cards with maps</option><option value="list">Short list</option></select>
+        </div>
+        <div id="areaFilters" class="bar"></div>
+        <div id="known" class="scroll" style="margin-top:10px"></div>
+      </div>
+      <div class="panel" data-exp="send">
         <h2>Send an expedition</h2>
         <p class="dim">An expedition team maps one new area next to land you already know. The supplies it
           needs depend on the kind of land it is heading into and how far that is from home.
           People, materials and research are shared by all your areas.</p>
         <div id="trip"></div>
-        <div id="explore" class="scroll"></div>
+        <div class="bar">
+          <select id="destKind" title="Kind of land"></select>
+          <select id="destSort" title="Order">
+            <option value="closest">Closest first</option><option value="cheapest">Fewest supplies</option><option value="name">By kind of land</option></select>
+          <span id="destFilters" class="bar" style="margin:0"></span>
+        </div>
+        <div id="explore" class="scroll" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -1853,35 +1872,82 @@ function renderResearch() {
   setHTML($('research'), html || `<p class="dim">Nothing matches.</p>`);
 }
 
+let expView = settings.expView || 'send';   // which part of the Explore tab shows (remembered)
+let areaFilter = 'all', destFilter = 'all';
 function renderExplore() {
-  const { defs, explore } = view, E = defs.environments;
-  // One card per area: a small picture of the land, then the facts.
-  const T = defs.terrains;
-  setHTML($('known'), `<div class="areaCards">` + view.areas.map((a, i) => {
-    const tiles = view.state.areas[i].tiles;
-    const mini = `<div class="mini" data-view="${i}" title="Open this area" style="--c:${Math.max(3, Math.min(9, Math.floor(76 / a.size)))}px;grid-template-columns:repeat(${a.size}, var(--c))">` +
-      tiles.map(row => row.map(t => `<i class="${t.building ? 'b' : t.animal ? 'a' : ''}" style="background:${esc(T[t.terrain].color)}"></i>`).join('')).join('') + `</div>`;
-    return `<div class="areaCard ${i === view.area ? 'on' : ''}">${mini}<div class="info">` +
-      `<div class="name">${esc(a.name)}</div>` +
-      `<div class="dim small">${a.renamed ? esc(a.default_name) : esc(E[a.env].name) + (a.where === 'Home' ? '' : ', ' + esc(a.where) + ' of home')}</div>` +
-      `<div class="small" style="margin-top:4px">${a.size} x ${a.size} <span class="dim">&middot;</span> ${a.buildings} ${a.buildings === 1 ? 'building' : 'buildings'}` +
-      (a.problems ? ` <span class="bad">(${a.problems} not working)</span>` : '') +
-      ` <span class="dim">&middot;</span> ${a.animals} wildlife</div>` +
-      `<div class="bar" style="margin-top:6px"><button data-view="${i}">${i === view.area ? 'Viewing' : 'View'}</button>` +
-      `<button data-rename="${i}">Rename</button></div></div></div>`;
-  }).join('') + `</div><p class="dim small">In the small maps a white outline is a building and a pink one is wildlife. ` +
-    `Renaming only changes what an area is called.</p>`);
-
+  const { defs, explore, state } = view, E = defs.environments, T = defs.terrains;
   const trip = explore.expedition;
+  const sendable = explore.destinations.filter(d => !d.problem && d.affordable).length;
+  const attention = view.areas.filter(a => a.problems).length;
+
+  // ---- the two parts of the tab ----
+  const parts = { send: ['Send an expedition', trip ? 'one on its way' : `${sendable} you can afford`],
+                  areas: ['Your areas', `${view.areas.length}` + (attention ? `, <span class="bad">${attention} need attention</span>` : '')],
+                  all: ['Both', ''] };
+  setHTML($('expViews'), Object.entries(parts).map(([k, [label, note]]) =>
+    `<button data-exp-view="${k}" class="${expView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
+  for (const panel of document.querySelectorAll('#tab-explore [data-exp]')) panel.hidden = expView !== 'all' && panel.dataset.exp !== expView;
+
+  // ---- your areas: search, kind of land, order, cards or a short list ----
+  const fillKinds = (el, envs, any) => {
+    const html = `<option value="">${any}</option>` + [...new Set(envs)].sort((a, b) => E[a].name.localeCompare(E[b].name))
+      .map(k => `<option value="${esc(k)}">${esc(E[k].name)}</option>`).join('');
+    if (el._html !== html) { const was = el.value; setHTML(el, html); el.value = [...el.options].some(o => o.value === was) ? was : ''; }
+  };
+  fillKinds($('areaKind'), view.areas.map(a => a.env), 'Any land');
+  const words = $('areaSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean), kind = $('areaKind').value;
+  const areas = view.areas.map((a, i) => ({ ...a, i })).filter(a => (!kind || a.env === kind) &&
+    words.every(w => `${a.name} ${a.default_name} ${E[a.env].name} ${a.where}`.toLowerCase().includes(w)));
+  const afilters = { all: ['All', () => true], attention: ['Needs attention', a => a.problems], empty: ['Nothing built yet', a => !a.buildings],
+                     wildlife: ['Has wildlife', a => a.animals] };
+  setHTML($('areaFilters'), Object.entries(afilters).map(([k, [label, test]]) =>
+    `<button data-area-filter="${k}" class="${areaFilter === k ? 'on' : ''}">${label} (${areas.filter(test).length})</button>`).join(''));
+  const order = { found: (a, b) => a.i - b.i, closest: (a, b) => a.distance - b.distance || a.i - b.i,
+                  buildings: (a, b) => b.buildings - a.buildings, name: (a, b) => a.name.localeCompare(b.name) }[$('areaSort').value];
+  const shown = areas.filter(afilters[areaFilter][1]).sort(order);
+  $('areasCount').textContent = `(${shown.length === view.areas.length ? view.areas.length : shown.length + ' of ' + view.areas.length})`;
+  const facts = a => `${a.size} x ${a.size} <span class="dim">&middot;</span> ${a.buildings} ${a.buildings === 1 ? 'building' : 'buildings'}` +
+    (a.problems ? ` <span class="bad">(${a.problems} not working)</span>` : '') + ` <span class="dim">&middot;</span> ${a.animals} wildlife`;
+  const kindWhere = a => a.renamed ? esc(a.default_name) : esc(E[a.env].name) + (a.where === 'Home' ? '' : ', ' + esc(a.where) + ' of home');
+  const buttons = a => `<button data-view="${a.i}">${a.i === view.area ? 'Viewing' : 'View'}</button><button data-rename="${a.i}">Rename</button>`;
+  if (!shown.length) setHTML($('known'), `<p class="dim">No areas match.</p>`);
+  else if ($('areaLook').value === 'list') {
+    setHTML($('known'), `<table><tr><th>Area</th><th>Land and where</th><th>Buildings</th><th>Wildlife</th><th></th></tr>` + shown.map(a =>
+      `<tr class="${a.i === view.area ? 'me' : ''}"><td class="hi">${esc(a.name)}</td><td class="dim">${kindWhere(a)}</td>` +
+      `<td>${a.buildings}${a.problems ? ` <span class="bad">(${a.problems}!)</span>` : ''}</td><td>${a.animals}</td><td>${buttons(a)}</td></tr>`).join('') + `</table>`);
+  } else {
+    // One card per area: a small picture of the land, then the facts.
+    setHTML($('known'), `<div class="areaCards">` + shown.map(a => {
+      const tiles = state.areas[a.i].tiles;
+      const mini = `<div class="mini" data-view="${a.i}" title="Open this area" style="--c:${Math.max(3, Math.min(9, Math.floor(76 / a.size)))}px;grid-template-columns:repeat(${a.size}, var(--c))">` +
+        tiles.map(row => row.map(t => `<i class="${t.building ? 'b' : t.animal ? 'a' : ''}" style="background:${esc(T[t.terrain].color)}"></i>`).join('')).join('') + `</div>`;
+      return `<div class="areaCard ${a.i === view.area ? 'on' : ''}">${mini}<div class="info">` +
+        `<div class="name">${esc(a.name)}</div><div class="dim small">${kindWhere(a)}</div>` +
+        `<div class="small" style="margin-top:4px">${facts(a)}</div><div class="bar" style="margin-top:6px">${buttons(a)}</div></div></div>`;
+    }).join('') + `</div><p class="dim small">In the small maps a white outline is a building and a pink one is wildlife. ` +
+      `Renaming only changes what an area is called.</p>`);
+  }
+
+  // ---- where an expedition can go ----
   setHTML($('trip'), trip ? `<p class="hi">An expedition is on its way to the ${esc(E[trip.env].name.toLowerCase())} ` +
     `${esc(trip.where)} of home. It arrives in <span data-timer="trip"></span>.</p>` : '');
-
-  setHTML($('explore'), `<table><tr><th>Where</th><th>Land</th><th class="n">Distance</th><th>Supplies needed</th><th>Travel time</th><th></th></tr>` +
-    explore.destinations.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}</td>` +
-      `<td class="n">${d.distance}</td><td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>` +
-      (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
-        : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>Send expedition</button>`) +
-      `</td></tr>`).join('') + `</table>`);
+  fillKinds($('destKind'), explore.destinations.map(d => d.env), 'Any land');
+  const dkind = $('destKind').value;
+  const dests = explore.destinations.filter(d => !dkind || d.env === dkind);
+  const dfilters = { all: ['All', () => true], afford: ['I can afford', d => !d.problem && d.affordable] };
+  setHTML($('destFilters'), Object.entries(dfilters).map(([k, [label, test]]) =>
+    `<button data-dest-filter="${k}" class="${destFilter === k ? 'on' : ''}">${label} (${dests.filter(test).length})</button>`).join(''));
+  const supplies = d => Object.values(d.cost).reduce((a, b) => a + b, 0);
+  const dorder = { closest: (a, b) => a.distance - b.distance || supplies(a) - supplies(b), cheapest: (a, b) => supplies(a) - supplies(b),
+                   name: (a, b) => E[a.env].name.localeCompare(E[b.env].name) || a.distance - b.distance }[$('destSort').value];
+  const list = dests.filter(dfilters[destFilter][1]).sort(dorder);
+  setHTML($('explore'), !list.length ? `<p class="dim">No destinations match.</p>`
+    : `<table><tr><th>Where</th><th>Land</th><th class="n">Distance</th><th>Supplies needed</th><th>Travel time</th><th></th></tr>` +
+      list.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}</td>` +
+        `<td class="n">${d.distance}</td><td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>` +
+        (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
+          : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>Send expedition</button>`) +
+        `</td></tr>`).join('') + `</table>`);
 }
 
 function renderFinder() {
@@ -2964,6 +3030,16 @@ $('known').onclick = e => {
     if (name !== null) act('rename_area', { target: +d.rename, name });
   }
 };
+$('expViews').onclick = e => {
+  const b = e.target.closest('[data-exp-view]');
+  if (b) { expView = settings.expView = b.dataset.expView; saveSettings(); renderExplore(); }
+};
+$('areaFilters').onclick = e => { const b = e.target.closest('[data-area-filter]'); if (b) { areaFilter = b.dataset.areaFilter; renderExplore(); } };
+$('destFilters').onclick = e => { const b = e.target.closest('[data-dest-filter]'); if (b) { destFilter = b.dataset.destFilter; renderExplore(); } };
+$('areaSearch').oninput = () => { if (view) renderExplore(); };
+for (const id of ['areaKind', 'areaSort', 'destKind', 'destSort']) $(id).onchange = () => { if (view) renderExplore(); };
+$('areaLook').onchange = () => { settings.areaLook = $('areaLook').value; saveSettings(); if (view) renderExplore(); };
+$('areaLook').value = settings.areaLook || 'cards';
 $('explore').onclick = e => {
   if (!e.target.dataset.send) return;
   const [rx, ry] = e.target.dataset.send.split(',').map(Number);
