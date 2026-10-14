@@ -624,6 +624,9 @@
     <!-- Settings -->
     <div id="tab-settings" hidden>
       <div class="panel">
+        <p class="dim small" style="margin-top:0">Everything here changes only how the game looks and behaves for you, in this
+          browser; nothing in your city changes. Try a setting and change it back whenever you like, or use
+          "Put every setting back to normal" at the bottom of Behaviour.</p>
         <h2>Display</h2>
         <div class="setGrid">
           <label><span class="k">Theme</span><select data-setting="theme"></select></label>
@@ -1084,6 +1087,11 @@ const HOWTO = [
 const TUTORIAL = [
   ['Look at a tile', 'Click any tile on the map below. The panel beside it describes the land and lists what you can build there.',
     c => sel !== null || c.built > 0],
+  ['Make it yours', 'Open the Settings tab (the last tab). Visuals switches between this text look and one with icons and cards. ' +
+    'You can also change the colours, font and size of everything, the size of the map tiles, and the phone or computer layout; ' +
+    'show income per hour, per meal or per minute, and shorten big numbers; and choose which pop-up windows appear, whether this list ' +
+    'and the Building collection show, and how often the game checks for news. Settings are saved in this browser only.',
+    () => settings.visitedSettings],
   ['Get wood', 'Click a forest tile and build a Lumber Camp. Nearly everything is built from Wood. Buildings then work by themselves, even while you are away.',
     c => c.has('lumber_camp')],
   ['Grow food', 'Build a Farm on plains, a Hunting Lodge in forest or a Fishing Dock on water. Each person eats 1 Food every 15 minutes.',
@@ -2594,6 +2602,7 @@ document.querySelector('.tabs').onclick = e => {
   if (!button) return;
   tab = button.dataset.tab;
   $('msg').textContent = '';
+  if (tab === 'settings' && !settings.visitedSettings) { settings.visitedSettings = true; saveSettings(); }   // ticks off "Make it yours"
   render();
   if (tab === 'board') loadBoard();
 };
@@ -2793,7 +2802,7 @@ $('tab-settings').addEventListener('input', e => {
   applySettings();
   if (view) render();
 });
-$('resetSettings').onclick = () => { settings = { ...DEFAULT_SETTINGS }; saveSettings(); applySettings(); if (view) render(); };
+$('resetSettings').onclick = () => { settings = { ...DEFAULT_SETTINGS, visitedSettings: true }; saveSettings(); applySettings(); if (view) render(); };
 $('banList').onclick = e => { if (e.target.dataset.unban) act('unban', { target: e.target.dataset.unban }); };
 $('banForm').onsubmit = e => {
   e.preventDefault();
