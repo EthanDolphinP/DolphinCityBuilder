@@ -81,6 +81,15 @@
   .tile u { position: absolute; right: 2px; top: 2px; display: flex; gap: 1px; font-size: calc(var(--tw, 44px) * 0.24); line-height: 1;
             text-decoration: none; color: var(--accent); }
   /* One small square per addition, sized with the tile so it stays in the corner clear of the letters. */
+  .brow { padding: 8px 0; border-top: 1px solid var(--line); }
+  /* the search and the kinds stay in view while the list scrolls under them */
+  #buildTools { position: sticky; top: 0; z-index: 1; background: var(--panel); padding-bottom: 6px; }
+  .mobile #buildTools { position: static; }
+  .brow .head { align-items: center; }
+  .brow.cant .hi { color: var(--dim); }
+  .brow .sum { font-size: 13px; color: var(--text); margin-top: 2px; }
+  .brow details.fold { margin-top: 2px; }
+  #buildCats .chip.on, #buildRecent .chip { border-color: var(--accent); }
   .tile u s { display: block; width: max(3px, calc(var(--tw, 44px) * 0.1)); height: max(3px, calc(var(--tw, 44px) * 0.1)); background: var(--accent); }
   .opt { border-top: 1px solid var(--line); padding: 7px 0; }
   .opt button { float: right; margin-left: 8px; }
@@ -439,7 +448,21 @@
         </div>
         <div class="panel inspector" id="inspector">
           <div class="head"><h2 id="tileTitle">Tile</h2><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
-          <div id="tile" class="dim"></div>
+          <div id="tile" class="dim">
+            <div id="tileInfo"></div>
+            <div id="buildTools" hidden>
+              <div class="cat">Build here <span id="buildCount" class="count"></span></div>
+              <div class="bar" style="margin-top:6px">
+                <input id="buildSearch" type="search" placeholder="Find: a name, or what it makes" autocomplete="off" style="flex:1 1 150px">
+                <select id="buildSort" title="Order of the list">
+                  <option value="newest">Newest first</option><option value="fastest">Fastest here</option>
+                  <option value="cheapest">Cheapest</option><option value="name">A to Z</option></select>
+              </div>
+              <div id="buildCats" class="bar areaChips"></div>
+              <div id="buildRecent" class="bar areaChips"></div>
+            </div>
+            <div id="buildList"></div>
+          </div>
         </div>
       </div>
       <div class="panel" id="collectionPanel">
@@ -1108,7 +1131,7 @@ const HOWTO = [
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
-  ['Shortcuts', 'The number keys 1 to 0 open the tabs in order. On the City tab the arrow keys move round the map, [ and ] go to the previous or next area, and Escape lets go of the tile. After you build something, the next empty tile you pick offers to build another one at the top of its list. In Settings you can have the game open on whichever tab you left it on.'],
+  ['Shortcuts', 'The number keys 1 to 0 open the tabs in order. On the City tab the arrow keys move round the map, [ and ] go to the previous or next area, and Escape lets go of the tile. When you pick an empty tile, the build list can be searched by name or by what a building makes, narrowed to one kind of building, and sorted; the kinds you built last are at the top, one click each. In Settings you can have the game open on whichever tab you left it on.'],
   ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
 ];
 // Getting started: [title, how to do it, done?]
@@ -1606,8 +1629,71 @@ function buildingFacts(rows, key) {
  const other = rows.filter(([label]) => !kinds[label]);
  return `<div class="building-facts">${primary.map(([label,value]) => `<div class="building-fact"><div class="dim small">${icon(kinds[label])}${label}</div><div class="hi">${value}</div></div>`).join('')}</div>` + fold('buildingFacts:' + key, 'More effects', other.map(([label,value]) => `${label}: ${value}`));
 }
+// ---- The build menu: search, kinds of building, recently built, and one line per building.
+const buildState = { q: '', cat: 'all' };
+function buildCost(cost) { return Object.values(cost).reduce((a, b) => a + b, 0); }
+function renderBuildList(info) {
+  const { defs, state } = view, B = defs.buildings, R = defs.resources;
+  const can = info.build.filter(o => !o.problem), cannot = info.build.filter(o => o.problem);
+  const words = buildState.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const about = o => { const b = B[o.id];
+    return `${b.name} ${b.desc} ${defs.categories[b.category]} ${defs.tech[b.tech].name} ${plain(b.produces || {})} ${plain(b.consumes || {})} ` +
+      `${b.housing ? 'housing houses people home' : ''} ${b.generates ? 'power generator' : ''}`.toLowerCase(); };
+  const found = can.filter(o => words.every(w => about(o).includes(w)));
+  // Kinds of building, each with how many fit here.
+  const cats = Object.entries(defs.categories).filter(([cat]) => found.some(o => B[o.id].category === cat));
+  if (buildState.cat !== 'all' && !cats.some(([cat]) => cat === buildState.cat)) buildState.cat = 'all';
+  setHTML($('buildCats'), found.length < 2 ? '' :
+    [['all', 'All', found.length], ...cats.map(([cat, label]) => [cat, label, found.filter(o => B[o.id].category === cat).length])]
+      .map(([cat, label, n]) => `<button class="chip ${buildState.cat === cat ? 'on' : ''}" data-build-cat="${cat}">${esc(label)} <span class="dim">${n}</span></button>`).join(''));
+  // The last few kinds built that fit here, one click each.
+  const recent = (settings.recentBuilt || []).map(id => can.find(o => o.id === id)).filter(Boolean).slice(0, 5);
+  setHTML($('buildRecent'), recent.length ? `<span class="dim small">Build again</span>` + recent.map(o =>
+    `<button class="chip" data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'} title="Build another ${esc(B[o.id].name)} here: ${plain(B[o.id].cost)}">${esc(B[o.id].name)}</button>`).join('') : '');
+
+  const shown = found.filter(o => buildState.cat === 'all' || B[o.id].category === buildState.cat);
+  const order = {
+    newest: (a, b) => B[b.id].tech - B[a.id].tech,
+    fastest: (a, b) => (a.cycle ? a.cycle / B[a.id].time : 9) - (b.cycle ? b.cycle / B[b.id].time : 9),
+    cheapest: (a, b) => buildCost(B[a.id].cost) - buildCost(B[b.id].cost),
+    name: () => 0,
+  }[settings.buildSort || 'newest'] || (() => 0);
+  shown.sort((a, b) => (b.affordable - a.affordable) || order(a, b) || B[a.id].name.localeCompare(B[b.id].name));
+  $('buildCount').textContent = can.length ? `(${shown.length === can.length ? can.length : shown.length + ' of ' + can.length} fit)` : '';
+
+  // One line per building: what it does here and what it costs; the rest folds away.
+  const summary = (b, o) => {
+    const bits = [];
+    if (o.cycle && b.produces) bits.push(`<span class="good">+${plain(b.produces)}</span>` + (b.consumes ? ` from ${plain(b.consumes)}` : '') +
+      ` every <span class="${o.cycle < b.time ? 'good' : o.cycle > b.time ? 'bad' : ''}">${duration(o.cycle)}</span>`);
+    if (b.herd) bits.push(`keeps ${b.herd} livestock`);
+    if (b.housing) bits.push(`houses ${b.housing}`);
+    if (b.generates) bits.push(`<span class="good">${b.generates} power</span>`);
+    if (b.attracts) bits.push(`+${b.attracts} ${b.attracts === 1 ? 'arrival' : 'arrivals'} per meal`);
+    if (b.power) bits.push(`needs ${b.power} power`);
+    if (b.workers) bits.push(`${b.workers} workers`);
+    if (!bits.length) bits.push(esc(b.desc.split('. ')[0]));
+    return bits.join(' &middot; ');
+  };
+  setHTML($('buildList'), (!can.length ? `<div class="card dim">Nothing you know how to build fits this tile.</div>`
+    : !shown.length ? `<p class="dim">Nothing that fits here matches "${esc(buildState.q)}".</p>`
+    : shown.map(o => {
+        const b = B[o.id];
+        return `<div class="brow ${o.affordable ? '' : 'cant'}"><div class="head"><span class="hi">${gfx() ? icon(buildingIcon(b)) : ''}${esc(b.name)} ` +
+          `<span class="dim small">${esc(defs.tech[b.tech].name)}${buildingCount(o.id) ? `, ${buildingCount(o.id)} built` : ''}</span></span>` +
+          `<button data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'} title="${o.affordable ? 'Build it here' : 'Not enough materials'}">Build</button></div>` +
+          `<div class="sum">${summary(b, o)}</div><div class="small">${goods(b.cost)}</div>` +
+          `<details class="fold" data-fold="bd:${esc(o.id)}" ${isOpen('bd:' + o.id, false) ? 'open' : ''}><summary>More about it</summary><div>` +
+            kv(buildingRows(b, o.cycle, b.produces)) + `<div class="dim">${esc(b.desc)}</div>` +
+            ((o.notes || []).length ? `<div class="dim">Speed here: ${o.notes.map(esc).join(', ')}</div>` : '') + `</div></details></div>`;
+      }).join('')) +
+    fold('nobuild', "Can't be built on this tile", cannot.map(o => `${esc(B[o.id].name)}: ${esc(o.problem)}`)));
+}
 function renderTile() {
-  const box = $('tile');
+  const box = $('tileInfo');
+  const building = sel && !visiting && view.state.areas[view.area].tiles[sel.y][sel.x].building === null;
+  $('buildTools').hidden = !building;
+  if (!building) setHTML($('buildList'), '');
   $('inspector').classList.toggle('selected', !!sel);
   if (!sel && !gfx()) { setHTML(box, '<span class="dim">Select a tile on the map.</span>'); return; }
   if (!sel) { setHTML(box, `<div class="inspector-empty">${icon('pin')}<strong>Your city, tile by tile</strong><p>Select a building to manage it.<br>Select empty land to see what fits.</p><div class="owned-badge">${icon('check')} Built</div> <span class="state-badge missing">Empty land</span></div>`); return; }
@@ -1673,35 +1759,11 @@ function renderTile() {
       html += `</details>`;
     }
   } else if (!visiting) {
-    // ---- what can be built here, by category ----
-    if (waiting) { setHTML(box, html + `<p class="dim">Loading what can be built here...</p>`); return; }
-    const can = info.build.filter(o => !o.problem), cannot = info.build.filter(o => o.problem);
-    if (!can.length) html += `<div class="cat">Build</div><div class="card dim">Nothing you know how to build fits this tile.</div>`;
-    // The last thing built, at the top, when it fits here too: building rows of farms or houses is one click each.
-    const again = !visiting && lastBuilt && can.find(o => o.id === lastBuilt);
-    if (again) html += `<div class="cat">Build again</div><div class="card"><div class="head"><span class="hi">${gfx() ? icon(buildingIcon(defs.buildings[again.id])) : ''}` +
-      `Another ${esc(defs.buildings[again.id].name)}</span><button data-build="${esc(again.id)}" ${again.affordable ? '' : 'disabled'}>Build</button></div>` +
-      `<div class="small dim">${plain(defs.buildings[again.id].cost)}${again.cycle ? ` &middot; one cycle every ${duration(again.cycle)} here` : ''}</div></div>`;
-    for (const [cat, label] of Object.entries(defs.categories)) {
-      const options = can.filter(o => defs.buildings[o.id].category === cat);
-      if (!options.length) continue;
-      // With only a few options there is nothing to hide; otherwise start closed.
-      html += section('build:' + cat, `Build: ${esc(label)} (${options.length})`, can.length <= 3);
-      for (const o of options) {
-        const b = defs.buildings[o.id];
-        html += `<div class="card"><div class="head"><span class="hi">${gfx() ? icon(buildingIcon(b)) : ''}${esc(b.name)}</span>` +
-          `<button data-build="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Build</button></div>` +
-          (gfx()
-            ? `<span class="state-badge missing">${buildingCount(o.id) ? `${buildingCount(o.id)} owned in city` : 'Not built yet'}</span>` + goods(b.cost) + buildingFacts(buildingRows(b, o.cycle, b.produces),o.id) +
-              fold('description:' + o.id, 'About this building', [esc(b.desc)])
-            : kv([['Cost', goods(b.cost)], ...buildingRows(b, o.cycle, b.produces)]) +
-              `<div class="desc">${esc(b.desc)}</div>`) +
-          fold('speed:' + o.id, 'What changes its speed here', (o.notes || []).map(esc)) + `</div>`;
-      }
-      html += `</details>`;
-    }
-    html += fold('nobuild', "Can't be built on this tile", cannot.map(o =>
-      `${esc(defs.buildings[o.id].name)}: ${esc(o.problem)}`));
+    // ---- what can be built here ----
+    setHTML(box, html);
+    if (waiting) { setHTML($('buildList'), `<p class="dim">Loading what can be built here...</p>`); return; }
+    renderBuildList(info);
+    return;
   }
   setHTML(box, html);
 }
@@ -2088,8 +2150,8 @@ function renderArena() {
 }
 
 let socFilter = 'known';    // which cities the Social tab lists
-let readSent = '';
-let lastBuilt = null;       // the building last built, offered first on the next empty tile          // the last conversation this page told the server it has read
+let readSent = '';          // the last conversation this page told the server it has read
+let lastBuilt = null;       // the building last built, offered first on the next empty tile
 const SOC_KINDS = { trade: ['trade', 'trades'], beast: ['beast trade', 'beast trades'], bill: ['bill event', 'bill events'],
                     duel: ['duel event', 'duel events'], ban: ['ban', 'bans'] };
 function renderSocial() {
@@ -2801,6 +2863,9 @@ document.addEventListener('keydown', e => {
     showArea((view.area + (e.key === ']' ? 1 : view.areas.length - 1)) % view.areas.length);
   }
 });
+$('buildSearch').oninput = () => { buildState.q = $('buildSearch').value; if (view) renderTile(); };
+$('buildSort').onchange = () => { settings.buildSort = $('buildSort').value; saveSettings(); if (view) renderTile(); };
+$('buildSort').value = settings.buildSort || 'newest';
 $('map').onclick = e => {
   const b = e.target.closest('.tile');
   if (b) { sel = { x: +b.dataset.x, y: +b.dataset.y }; render(); }
@@ -2810,7 +2875,15 @@ $('tile').addEventListener('toggle', e => {   // remember which sections are ope
   if (key) foldState.set(key, e.target.open);
 }, true);
 $('tile').onclick = e => {
-  if (e.target.dataset.build) { lastBuilt = e.target.dataset.build; act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build }); }
+  const pick = e.target.closest('[data-build-cat]');
+  if (pick) { buildState.cat = pick.dataset.buildCat; renderTile(); return; }
+  if (e.target.dataset.build) {
+    lastBuilt = e.target.dataset.build;
+    // remembered in this browser, newest first, for the "Build again" row
+    settings.recentBuilt = [lastBuilt, ...(settings.recentBuilt || []).filter(id => id !== lastBuilt)].slice(0, 8);
+    saveSettings();
+    act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build });
+  }
   else if (e.target.dataset.add) act('add', { x: sel.x, y: sel.y, addition: e.target.dataset.add });
   else if ('tame' in e.target.dataset) act('tame', { x: sel.x, y: sel.y });
   else if (e.target.dataset.priority) act('priority', { x: sel.x, y: sel.y, priority: +e.target.dataset.priority });
@@ -2827,7 +2900,7 @@ $('findOut').onclick = e => {
   if (!row) return;
   const [area, x, y] = row.dataset.go.split(',').map(Number);
   // Open the right part of the build menu when the search was for a place to build.
-  if (finder.kind === 'sites') foldState.set('build:' + view.defs.buildings[finder.what].category, true);
+  if (finder.kind === 'sites') { buildState.q = view.defs.buildings[finder.what].name; buildState.cat = 'all'; $('buildSearch').value = buildState.q; }
   jump = { area, x, y };
   if (area === view.area) { sel = { x, y }; jump = null; render(); } else { areaIdx = area; sel = null; refresh(); }
 };
