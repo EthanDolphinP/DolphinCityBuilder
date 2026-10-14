@@ -12,10 +12,31 @@ browser. It is plain Python (standard library only) plus one HTML page.
 | `wsgi.py` | Lets a web host (PythonAnywhere) run the same game. |
 | `index.html` | The page players see. |
 | `start.bat` | Double-click on Windows to start the game on your own network. |
+| `desktop/` | The downloadable desktop app (`DolphinCityBuilder.exe`) and how it is built. |
 
 Cities are saved in `saves/` and the market in `market.json`. Both are left out
 of git on purpose (see `.gitignore`): they hold each city's password hash, and
 the live game's saves must not be overwritten when the code is updated.
+
+## The desktop app
+
+`desktop/DolphinCityBuilder.exe` is a small Windows program that opens the
+hosted game in a window of its own, with no tabs or address bar. Everyone who
+runs it plays in the same world as the website, and nothing else needs
+installing: it uses Microsoft Edge (on every Windows 10 and 11 computer) or
+Google Chrome behind the scenes, or the default browser if neither is there.
+Players stay signed in between runs; the app keeps its own sign-in, separate
+from their browser's.
+
+To share it, give people the `.exe` file. The easiest place is a GitHub
+release: on the repository's page choose **Releases**, **Create a new
+release**, attach `DolphinCityBuilder.exe`, and publish. Because the program is
+not signed, Windows may say it "protected your PC" the first time; choose
+**More info** and **Run anyway**.
+
+To rebuild it after changing `desktop/Launcher.cs` (for example if the game
+moves to a new address), double-click `desktop/build.bat`. It uses the C#
+compiler that comes with Windows. `desktop/make_icon.py` redraws the icon.
 
 ## Run it on your own computer
 
