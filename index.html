@@ -65,7 +65,6 @@
   /* Map tiles stay dark in every theme: the terrain colours are chosen for a dark background. */
   .tile { position: relative; width: var(--tw, 44px); height: calc(var(--tw, 44px) * 0.91); padding: 0; min-height: 0;
           font-size: calc(var(--tw, 44px) * 0.39); font-weight: bold; background: #101614; color-scheme: dark; overflow: hidden; }
-  #map { max-width: 100%; }
   .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
   .tile.hl { background: var(--hl); box-shadow: inset 0 0 0 1px var(--accent); }
   .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
@@ -79,7 +78,10 @@
   .tile b { color: #ffffff; }
   .tile i { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
   .tile i.stuck { background: var(--bad); width: 100%; }
-  .tile u { position: absolute; right: 2px; top: 0; font-size: 10px; text-decoration: none; color: var(--accent); }
+  .tile u { position: absolute; right: 2px; top: 2px; display: flex; gap: 1px; font-size: calc(var(--tw, 44px) * 0.24); line-height: 1;
+            text-decoration: none; color: var(--accent); }
+  /* One small square per addition, sized with the tile so it stays in the corner clear of the letters. */
+  .tile u s { display: block; width: max(3px, calc(var(--tw, 44px) * 0.1)); height: max(3px, calc(var(--tw, 44px) * 0.1)); background: var(--accent); }
   .opt { border-top: 1px solid var(--line); padding: 7px 0; }
   .opt button { float: right; margin-left: 8px; }
   #log { max-height: 180px; overflow-y: auto; white-space: pre-wrap; }
@@ -108,20 +110,28 @@
   details.panel[open] > summary.cat { margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
   details.panel > summary.cat:hover { color: var(--bright); }
   details.panel > summary .count { color: var(--dim); }
-  .areaCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .areaCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
   .areaCard { border: 1px solid var(--line); background: var(--inset); padding: 10px; display: flex; gap: 12px; }
   .areaCard.on { border-color: var(--accent); }
   .areaCard .info { flex: 1; min-width: 0; }
   .areaCard .name { color: var(--bright); font-size: 16px; overflow-wrap: anywhere; }
   .mini { display: grid; gap: 1px; align-self: flex-start; cursor: pointer; flex: none; }
-  .mini i { width: 9px; height: 9px; display: block; opacity: .75; }
-  .mini i.b { opacity: 1; box-shadow: inset 0 0 0 2px #ffffff; }
-  .mini i.a { opacity: 1; box-shadow: inset 0 0 0 2px #e58fd0; }
+  .mini i { width: var(--c, 9px); height: var(--c, 9px); display: block; opacity: .75; }      /* --c: a big area gets smaller squares */
+  .mini i.b { opacity: 1; box-shadow: inset 0 0 0 calc(var(--c, 9px) / 4.5) #ffffff; }
+  .mini i.a { opacity: 1; box-shadow: inset 0 0 0 calc(var(--c, 9px) / 4.5) #e58fd0; }
+  .areaCard button, td button, .head button, .opt button, .chip { white-space: nowrap; }
+  /* A number and the menu or words that go with it stay on one line when a form wraps. */
+  .pair { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; max-width: 100%; min-width: 0; }
+  .pair > select, .pair > input { min-width: 0; }
+  /* The City tab: the map gets the larger share, so a 13x13 home area has room. */
+  #tab-city > .cols > .panel:first-child { flex: 3 1 380px; }
+  #tab-city > .cols > #inspector { flex: 2 1 300px; }
   .setGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px 24px; }
   .setGrid label { display: block; }
   .setGrid .k { display: block; color: var(--dim); font-size: 13px; margin-bottom: 3px; }
   .setGrid select, .setGrid input[type=range] { width: 100%; }
   label.check { display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
+  .setGrid label.check { grid-column: 1 / -1; }      /* tick boxes get a row each, under the menus */
   .visiting .own { display: none; }
 
   /* Phone layout: set on <html> by applyLayout(), automatically or from Settings. */
@@ -143,12 +153,20 @@
   .mobile .stat .k { font-size: 10px; letter-spacing: 0; }
   .mobile .stat .v { font-size: 14px; }
   .mobile .stat .r { font-size: 11px; }
+  .mobile #people { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mobile .checks span { display: block; margin: 5px 0 0; font-size: 14px; }
   .mobile .cols { gap: 0; }
   .mobile .cols > .panel { flex: 1 1 100%; }
   .mobile #tile { max-height: none; overflow: visible; padding-right: 0; }   /* the page scrolls instead of a box inside it */
   .mobile #findOut { max-height: 40vh; }
   .mobile .kv { gap: 2px 8px; }
-  .mobile th, .mobile td { padding: 7px 10px 7px 0; }
+  /* Tables become lists on a phone: one block per row, each value on its own line beside its column's name. */
+  .mobile table, .mobile tbody { display: block; }
+  .mobile tr { display: block; padding: 7px 0; border-top: 1px solid var(--line); }
+  .mobile tr:first-child { display: none; }                  /* the heading row; its names are shown beside each value */
+  .mobile td { display: block; padding: 2px 0; border: 0; white-space: normal; text-align: left; }
+  .mobile td[data-th]:not([data-th=""])::before { content: attr(data-th); display: inline-block; width: 32%; min-width: 92px; color: var(--dim); font-size: 13px; }
+  .mobile td:empty { display: none; }
   .mobile .areaCards { grid-template-columns: 1fr; }
   .mobile .setGrid { grid-template-columns: 1fr; }
   .mobile .bar { gap: 6px; }
@@ -387,7 +405,7 @@
         <div class="panel">
           <h2>Map</h2>
           <div id="areas" style="margin:0 0 10px"></div>
-          <div id="map"></div>
+          <div class="scroll"><div id="map"></div></div>
           <div id="mapKey" class="dim small" style="margin-top:8px"></div>
           <div id="finder">
             <div class="cat">Find</div>
@@ -453,9 +471,9 @@
           experience. Level does not matter in the fight: a beast fights harder the more is bet on it, and much
           harder when the bet is the material it likes.</p>
         <form id="duelForm" class="bar" style="margin-top:0">
-          Send <select id="duelBeast"></select>
-          against <input id="duelTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px">
-          and bet <input id="duelBetQty" type="number" min="1" step="1" value="50" style="width:100px"> <select id="duelBetRes"></select>
+          <span class="pair">Send <select id="duelBeast"></select></span>
+          <span class="pair">against <input id="duelTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px"></span>
+          <span class="pair">and bet <input id="duelBetQty" type="number" min="1" step="1" value="50" style="width:100px"> <select id="duelBetRes"></select></span>
           <button>Send challenge</button>
         </form>
         <p id="duelPreview" class="small hi" style="margin:4px 0 10px"></p>
@@ -494,7 +512,7 @@
       <div class="cols">
         <div class="panel"><h2>Food</h2><div id="pplFood"></div>
           <form id="slaughterForm" class="bar" hidden>
-            Slaughter <input id="slaughterN" type="number" min="1" step="1" value="1"> livestock
+            <span class="pair">Slaughter <input id="slaughterN" type="number" min="1" step="1" value="1"> livestock</span>
             <button>Slaughter</button>
             <span id="slaughterNote" class="dim small"></span>
           </form>
@@ -560,8 +578,8 @@
       <details class="panel" open>
         <summary class="cat">Post an offer</summary>
         <form id="offerForm" class="bar" style="margin-top:0">
-          I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select>
-          and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select>
+          <span class="pair">I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select></span>
+          <span class="pair">and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select></span>
           <button>Post offer</button>
         </form>
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
@@ -584,10 +602,10 @@
         <div id="bills" class="scroll"></div>
         <div class="cat">Propose a bill</div>
         <form id="billForm" class="bar">
-          Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours I send
-          <input id="billGiveQty" type="number" min="1" step="1" value="10"> <select id="billGiveRes"></select>
-          to <input id="billTo" list="cityList" maxlength="24" placeholder="city name">
-          and receive <input id="billWantQty" type="number" min="1" step="1" value="20"> <select id="billWantRes"></select>
+          <span class="pair">Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours</span>
+          <span class="pair">I send <input id="billGiveQty" type="number" min="1" step="1" value="10"> <select id="billGiveRes"></select></span>
+          <span class="pair">to <input id="billTo" list="cityList" maxlength="24" placeholder="city name"></span>
+          <span class="pair">and receive <input id="billWantQty" type="number" min="1" step="1" value="20"> <select id="billWantRes"></select></span>
           <button>Propose bill</button>
         </form>
         <datalist id="cityList"></datalist>
@@ -618,7 +636,7 @@
           <label><span class="k">Map tile size</span><select data-setting="tile">
             <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="huge">Extra large</option></select></label>
           <label><span class="k">Layout</span><select data-setting="layout">
-            <option value="auto">Automatic (phone layout on small screens)</option><option value="desktop">Computer</option><option value="mobile">Phone</option></select></label>
+            <option value="auto">Automatic</option><option value="desktop">Computer</option><option value="mobile">Phone</option></select></label>
           <label><span class="k">Page width</span><select data-setting="width">
             <option value="narrow">Narrow</option><option value="normal">Normal</option><option value="wide">Wide</option><option value="full">Full window</option></select></label>
         </div>
@@ -697,8 +715,8 @@
         <summary class="cat">Reading the map</summary>
         <p class="dim" style="margin:0">Each tile shows its terrain symbol. If something is on it, the second character
           is the building (white when working, red when something is wrong, grey when switched off) or the
-          wild animal (pink). The bar under a building shows how far through its cycle it is, and a + in the
-          corner is an addition. Click any tile for its details.</p>
+          wild animal (pink). The bar under a building shows how far through its cycle it is, and each small
+          square in the corner is an addition. Click any tile for its details.</p>
       </details>
       <details class="panel" id="gSecHowto" open>
         <summary class="cat">How to play <span id="gCountHowto" class="count"></span></summary>
@@ -873,12 +891,13 @@ function applyLayout() {
 // Make the map's tiles as big as the setting asks, but never wider than the room there is.
 function fitMap() {
   if (!view) return;
-  const map = $('map'), room = map.parentElement.clientWidth, size = view.state.areas[view.area].size;
-  if (!room) return;                       // the City tab is not showing
+  const map = $('map'), box = map.parentElement, pad = getComputedStyle(box), size = view.state.areas[view.area].size;
+  if (!box.clientWidth) return;            // the City tab is not showing
+  const room = box.clientWidth - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight);     // the space inside the panel's padding
   const scale = { small: 0.8, medium: 1, large: 1.25, huge: 1.5 }[settings.tile] || 1;
-  const wanted = (gfx() ? (size > 9 ? 44 : 80) : (size > 9 ? 34 : 44)) * scale;      // picture tiles are bigger
+  const wanted = (gfx() ? (size > 9 ? 44 : 80) : (size > 9 ? 40 : 44)) * scale;      // picture tiles are bigger
   const fits = Math.floor((room - (gfx() ? 12 : 0) - 2 * (size - 1)) / size);      // 2px gaps between tiles
-  map.style.setProperty('--tw', Math.max(14, Math.min(wanted, fits)) + 'px');
+  map.style.setProperty('--tw', Math.max(isMobile ? 30 : 14, Math.min(wanted, fits)) + 'px');
 }
 window.addEventListener('resize', () => { applyLayout(); fitMap(); });
 
@@ -961,7 +980,24 @@ function rateText(perHour) {
   return `${v > 0 ? '+' : ''}${shown} / ${unit}`;
 }
 // Only touch the DOM when something changed, so buttons aren't replaced mid-click.
-function setHTML(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; } }
+function setHTML(el, html) {
+  if (el._html === html) return;
+  el.innerHTML = html;
+  el._html = html;
+  if (html.includes('<table')) labelTables(el);
+}
+// Give every table cell the name of its column, so the phone layout can show a table as a list
+// of labelled lines (see ".mobile td" in the styles) instead of making it scroll sideways.
+function labelTables(el) {
+  for (const table of el.querySelectorAll('table')) {
+    if (!table.rows.length) continue;
+    const heads = [...table.rows[0].cells].map(c => c.textContent.trim());
+    for (const row of [...table.rows].slice(1)) {
+      if (row.cells.length !== heads.length) continue;       // a row that spans columns, such as a form
+      [...row.cells].forEach((cell, i) => { cell.dataset.th = heads[i]; });
+    }
+  }
+}
 
 let city = null, view = null, sel = null, tab = 'city', areaIdx = 0;
 let visiting = null;   // name of another city being viewed read-only
@@ -1377,7 +1413,7 @@ function render() {
     const adds = t.additions.map(a => defs.additions[a].name);
     const label = `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">`;
     if (!gfx()) return `<button class="tile${on}" style="color:${esc(defs.terrains[t.terrain].color)}" data-x="${x}" data-y="${y}" ` + label +
-      (b ? `${g}<b class="${state_}">${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
+      (b ? `${g}<b class="${state_}">${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'<s></s>'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
     return `<button class="tile${on}" style="--terrain:${esc(defs.terrains[t.terrain].color)}80" data-x="${x}" data-y="${y}" ` +
       `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">` +
       (b ? icon(buildingIcon(b), state_) : t.animal ? icon('animal', 'animal') : icon(terrainIcon(defs.terrains[t.terrain]))) + (state_ === 'stop' ? '<span class="warning">!</span>' : '') + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + (b ? `<span class="tile-owned" aria-hidden="true">&#10003;</span><span class="tile-name" aria-hidden="true">${esc(b.name)}</span>` : '') + bar + `</button>`;
@@ -1650,13 +1686,14 @@ function renderExplore() {
   const T = defs.terrains;
   setHTML($('known'), `<div class="areaCards">` + view.areas.map((a, i) => {
     const tiles = view.state.areas[i].tiles;
-    const mini = `<div class="mini" data-view="${i}" title="Open this area" style="grid-template-columns:repeat(${a.size}, 9px)">` +
+    const mini = `<div class="mini" data-view="${i}" title="Open this area" style="--c:${Math.max(3, Math.min(9, Math.floor(76 / a.size)))}px;grid-template-columns:repeat(${a.size}, var(--c))">` +
       tiles.map(row => row.map(t => `<i class="${t.building ? 'b' : t.animal ? 'a' : ''}" style="background:${esc(T[t.terrain].color)}"></i>`).join('')).join('') + `</div>`;
     return `<div class="areaCard ${i === view.area ? 'on' : ''}">${mini}<div class="info">` +
       `<div class="name">${esc(a.name)}</div>` +
       `<div class="dim small">${a.renamed ? esc(a.default_name) : esc(E[a.env].name) + (a.where === 'Home' ? '' : ', ' + esc(a.where) + ' of home')}</div>` +
-      kv([['Size', `${a.size} x ${a.size}`], ['Buildings', a.buildings + (a.problems ? ` <span class="bad">(${a.problems} not working)</span>` : '')],
-          ['Wildlife', a.animals]]) +
+      `<div class="small" style="margin-top:4px">${a.size} x ${a.size} <span class="dim">&middot;</span> ${a.buildings} ${a.buildings === 1 ? 'building' : 'buildings'}` +
+      (a.problems ? ` <span class="bad">(${a.problems} not working)</span>` : '') +
+      ` <span class="dim">&middot;</span> ${a.animals} wildlife</div>` +
       `<div class="bar" style="margin-top:6px"><button data-view="${i}">${i === view.area ? 'Viewing' : 'View'}</button>` +
       `<button data-rename="${i}">Rename</button></div></div></div>`;
   }).join('') + `</div><p class="dim small">In the small maps a white outline is a building and a pink one is wildlife. ` +
