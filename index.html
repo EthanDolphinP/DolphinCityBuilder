@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Text City Builder</title>
+<title>Dolphin City Builder</title>
 <style>
   :root {
     --bg: #0d1110; --panel: #141a18; --line: #2a3531; --text: #cfd8d3; --dim: #7d8a84;
@@ -595,6 +595,8 @@
         <summary class="cat">Post an offer</summary>
         <form id="offerForm" class="bar" style="margin-top:0">
           <span class="pair">I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select></span>
+          <button type="button" id="giveAll" title="Offer everything you have of it">All</button>
+          <button type="button" id="swapSides" title="Swap what you give and what you want">&lt;&gt;</button>
           <span class="pair">and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select></span>
           <button>Post offer</button>
         </form>
@@ -678,7 +680,9 @@
           <label><span class="k">Check the server for changes</span><select data-setting="poll">
             <option value="3">Every 3 seconds</option><option value="5">Every 5 seconds</option><option value="10">Every 10 seconds</option><option value="20">Every 20 seconds</option></select></label>
           <label><span class="k">Open the game on</span><select data-setting="startTab">
-            <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="market">Market</option><option value="social">Social</option></select></label>
+            <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="explore">Explore</option><option value="research">Research</option><option value="ideology">Ideology</option><option value="market">Market</option><option value="social">Social</option><option value="last">Wherever I left off</option></select></label>
+          <p class="dim small" style="grid-column:1/-1;margin:0">Keyboard: the number keys 1 to 0 open the tabs in order. On the City tab
+            the arrow keys move round the map, [ and ] go to the previous or next area, and Escape lets go of the tile.</p>
           <label class="check"><input data-setting="tutorial" type="checkbox"> Show the Getting started list on the City tab</label>
           <label class="check"><input data-setting="collection" type="checkbox"> Show the Building collection on the City tab</label>
           <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
@@ -1104,6 +1108,7 @@ const HOWTO = [
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
+  ['Shortcuts', 'The number keys 1 to 0 open the tabs in order. On the City tab the arrow keys move round the map, [ and ] go to the previous or next area, and Escape lets go of the tile. After you build something, the next empty tile you pick offers to build another one at the top of its list. In Settings you can have the game open on whichever tab you left it on.'],
   ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
 ];
 // Getting started: [title, how to do it, done?]
@@ -1296,17 +1301,31 @@ function showAway(a) {
   $('away').hidden = false;
 }
 
-function visit(name) { visiting = name; areaIdx = 0; sel = null; tab = 'city'; $('msg').textContent = ''; refresh(); }
+function visit(name) { visiting = name; areaIdx = 0; sel = null; tab = 'city'; say(''); refresh(); }
 function leave() { visiting = null; areaIdx = 0; sel = null; refresh(); }
 
+let msgTimer = null;
+// The line under the figures: red for a problem, green to confirm what just happened. It clears itself.
+function say(text, good) {
+  $('msg').textContent = text || '';
+  $('msg').className = good ? 'good' : 'bad';
+  clearTimeout(msgTimer);
+  if (text) msgTimer = setTimeout(() => { $('msg').textContent = ''; }, good ? 6000 : 12000);
+}
 async function act(action, extra) {
   if (visiting) return;
+  const log = view ? view.state.log : [], last = log.length ? log[log.length - 1] : null;
   let data;
   try { data = await api(action, extra); }
-  catch { $('msg').textContent = 'Lost contact with the server.'; return; }
+  catch { say('Lost contact with the server.'); return; }
   if (data.auth) return signOut(data.error);
   if (data.state) accept(data);
-  $('msg').textContent = data.error || '';
+  if (data.error) say(data.error);
+  else if (data.state) {
+    // What the action did, in the city's own words: the newest line it added to the Chronicle.
+    const added = data.state.log.filter(e => !last || e.t > last.t || (e.t === last.t && e.text !== last.text));
+    say(added.length ? added[added.length - 1].text.replace(/^\*+ | \*+$/g, '') : '', true);
+  }
   if (tab === 'board') loadBoard();
 }
 
@@ -1317,7 +1336,7 @@ async function refresh() {
     const data = await api();
     if (data.auth) return signOut(data.error);
     if (data.state) accept(data);
-    else if (visiting) { visiting = null; $('msg').textContent = data.error || ''; refresh(); }
+    else if (visiting) { visiting = null; say(data.error || ''); refresh(); }
     if (tab === 'board') loadBoard();
   } catch {}
 }
@@ -1376,7 +1395,9 @@ function render() {
   setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
     const d = status.rates[k];
     return stat((gfx() ? icon(RESOURCE_ICONS[k]) : '') + esc(label), num(state.resources[k]),
-      d ? `<span class="${d > 0 ? 'good' : 'bad'}">${rateText(d)}</span>` : gfx() ? (state.resources[k] > 0 ? 'In storage' : 'None owned') : '');
+      (d ? `<span class="${d > 0 ? 'good' : 'bad'}">${rateText(d)}</span>` : gfx() ? (state.resources[k] > 0 ? 'In storage' : 'None owned') : '') +
+      // a store that is shrinking says when it runs out
+      (d < 0 && state.resources[k] > 0 ? ` <span class="bad" title="At this rate">&middot; empty in ${duration(state.resources[k] / -d * 3600)}</span>` : ''));
   }).join(''));
   [...$('resources').children].forEach((el, i) => {
     const key = Object.keys(defs.resources)[i];
@@ -1411,10 +1432,17 @@ function render() {
   setHTML(document.querySelector('[data-tab=social]'), gfx()
     ? icon('people') + 'Social' + (mailNew ? ` <span class="nav-badge">${mailNew}</span>` : '')
     : 'Social' + (mailNew ? ` <span class="good">(${mailNew} new)</span>` : ''));
+  const ready = !visiting && status.advance && status.advance.ready;
+  setHTML(document.querySelector('[data-tab=city]'), (gfx() ? icon('house') : '') + 'City' +
+    (ready ? (gfx() ? ' <span class="nav-badge">Ready</span>' : ' <span class="good">(ready)</span>') : ''));
   const iv = view.ideology, ideoTodo = !visiting && state.tech >= 1 && (!iv.id || iv.points > 0);
   setHTML(document.querySelector('[data-tab=ideology]'), (gfx() ? icon('shaman') : '') + 'Ideology' +
     (!ideoTodo ? '' : gfx() ? ` <span class="nav-badge">${iv.id ? iv.points : 'Choose'}</span>`
       : ` <span class="good">(${iv.id ? iv.points + (iv.points === 1 ? ' point' : ' points') : 'choose'})</span>`));
+  // The browser tab's title: the city, and how many things are waiting, so it shows from another tab.
+  const waitingCount = visiting ? 0 : (state.messages || []).filter(m => !m.read).length + (state.sales || []).length +
+    (view.market.duels || []).filter(d => d.to === state.name).length + (ready ? 1 : 0) + (ideoTodo ? 1 : 0) + (todo ? 1 : 0);
+  document.title = (waitingCount ? `(${waitingCount}) ` : '') + (visiting ? `${state.name} (visiting)` : state.name) + ' - Dolphin City Builder';
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'market', 'social', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
@@ -1649,6 +1677,11 @@ function renderTile() {
     if (waiting) { setHTML(box, html + `<p class="dim">Loading what can be built here...</p>`); return; }
     const can = info.build.filter(o => !o.problem), cannot = info.build.filter(o => o.problem);
     if (!can.length) html += `<div class="cat">Build</div><div class="card dim">Nothing you know how to build fits this tile.</div>`;
+    // The last thing built, at the top, when it fits here too: building rows of farms or houses is one click each.
+    const again = !visiting && lastBuilt && can.find(o => o.id === lastBuilt);
+    if (again) html += `<div class="cat">Build again</div><div class="card"><div class="head"><span class="hi">${gfx() ? icon(buildingIcon(defs.buildings[again.id])) : ''}` +
+      `Another ${esc(defs.buildings[again.id].name)}</span><button data-build="${esc(again.id)}" ${again.affordable ? '' : 'disabled'}>Build</button></div>` +
+      `<div class="small dim">${plain(defs.buildings[again.id].cost)}${again.cycle ? ` &middot; one cycle every ${duration(again.cycle)} here` : ''}</div></div>`;
     for (const [cat, label] of Object.entries(defs.categories)) {
       const options = can.filter(o => defs.buildings[o.id].category === cat);
       if (!options.length) continue;
@@ -2055,7 +2088,8 @@ function renderArena() {
 }
 
 let socFilter = 'known';    // which cities the Social tab lists
-let readSent = '';          // the last conversation this page told the server it has read
+let readSent = '';
+let lastBuilt = null;       // the building last built, offered first on the next empty tile          // the last conversation this page told the server it has read
 const SOC_KINDS = { trade: ['trade', 'trades'], beast: ['beast trade', 'beast trades'], bill: ['bill event', 'bill events'],
                     duel: ['duel event', 'duel events'], ban: ['ban', 'bans'] };
 function renderSocial() {
@@ -2551,13 +2585,13 @@ function tick() {
 
 async function enter(name) {
   city = name; view = null; sel = null; board = null; areaIdx = 0; visiting = null;
-  tab = settings.startTab || 'city';
+  tab = settings.startTab === 'last' ? (settings.lastTab || 'city') : (settings.startTab || 'city');
   let data;
   try { data = await api(); } catch { data = { error: 'Could not reach the server.' }; }
   if (!data.state) return signOut(data.error);
   remember(name);
   $('login').hidden = true; $('game').hidden = false;
-  $('msg').textContent = '';
+  say('');
   accept(data);
 }
 
@@ -2573,13 +2607,13 @@ $('loginForm').onsubmit = async e => {
   token = data.token;
   $('cityPass').value = ''; $('loginMsg').textContent = '';
   await enter(name);
-  if (data.claimed) $('msg').textContent = 'This city had no password. It now uses the one you just entered.';
+  if (data.claimed) say('This city had no password. It now uses the one you just entered.', true);
 };
 $('changePass').onclick = () => { $('passForm').hidden = !$('passForm').hidden; };
 $('passForm').onsubmit = async e => {
   e.preventDefault();
   await act('set_password', { password: $('newPass').value });
-  if (!$('msg').textContent) { $('newPass').value = ''; $('passForm').hidden = true; $('msg').textContent = 'Password changed.'; }
+  if (!$('msg').textContent || $('msg').className === 'good') { $('newPass').value = ''; $('passForm').hidden = true; say('Password changed.', true); }
 };
 $('advance').onclick = () => act('advance');
 $('leave').onclick = leave;
@@ -2648,7 +2682,7 @@ $('msgTo').oninput = () => { if (view && !visiting) renderSocial(); };
 $('msgForm').onsubmit = async e => {
   e.preventDefault();
   const to = $('msgTo').value.trim(), text = $('msgText').value.trim();
-  if (!to || !text) { $('msg').textContent = 'Type a city name and a message.'; return; }
+  if (!to || !text) { say('Type a city name and a message.'); return; }
   const sent = (view.state.messages || []).length;
   await act('message_send', { to, text });
   if ((view.state.messages || []).length > sent || !$('msg').textContent) { $('msgText').value = ''; $('socThread').scrollTop = $('socThread').scrollHeight; }
@@ -2669,7 +2703,7 @@ $('beastSearch').oninput = () => { if (view) renderBeast(); };
 $('duelForm').addEventListener('input', () => { if (view) fillDuels(); });
 $('duelForm').onsubmit = e => {
   e.preventDefault();
-  if (!$('duelBeast').value) { $('msg').textContent = 'Pick which beast to send.'; return; }
+  if (!$('duelBeast').value) { say('Pick which beast to send.'); return; }
   act('duel_post', { beast: +$('duelBeast').value, to: $('duelTo').value.trim(),
                      bet: { res: $('duelBetRes').value, qty: Math.floor(+$('duelBetQty').value) } });
 };
@@ -2694,7 +2728,7 @@ $('duels').onclick = async e => {
       foldState.set('duel:' + last.id, true);
       for (const m of [duelQty, duelRes, duelPick]) m.delete(id);
       const foe = last.sides[1];
-      $('msg').textContent = `${foe.city} had bet ${foe.bet}. ` + (last.won ? `Your ${last.sides[0].name} won. You took ${last.prize}.` : `Your ${last.sides[0].name} lost.`);
+      say(`${foe.city} had bet ${foe.bet}. ` + (last.won ? `Your ${last.sides[0].name} won. You took ${last.prize}.` : `Your ${last.sides[0].name} lost.`), true);
       renderBeast();
     }
   }
@@ -2709,10 +2743,13 @@ document.querySelector('.tabs').onclick = e => {
   const button = e.target.closest('[data-tab]');   // the click may land on a badge inside the button
   if (!button) return;
   tab = button.dataset.tab;
-  $('msg').textContent = '';
+  say('');
   if (tab === 'settings' && !settings.visitedSettings) { settings.visitedSettings = true; saveSettings(); }   // ticks off "Make it yours"
+  if (settings.lastTab !== tab) { settings.lastTab = tab; saveSettings(); }
   render();
   if (tab === 'board') loadBoard();
+  const top = $('tab-' + tab).getBoundingClientRect().top, bar = document.querySelector('.tabs').getBoundingClientRect().bottom;
+  if (top < bar) window.scrollTo(0, scrollY + top - bar - 8);
 };
 
 $('collectionFilters').onclick = e => { const b = e.target.closest('[data-collection-filter]'); if(b) { collectionFilter = b.dataset.collectionFilter; renderCollection(); } };
@@ -2739,7 +2776,31 @@ $('resourceToggle').onclick = () => {
   $('resourceToggle').textContent = expanded ? 'Fewer resources' : 'All resources';
 };
 $('inspectorClose').onclick = () => { sel = null; render(); };
-document.addEventListener('keydown', e => { if (gfx() && e.key === 'Escape' && sel) { sel = null; render(); } });
+// Keyboard shortcuts (listed in Settings): number keys change tab; on the City tab the arrow keys move
+// round the map, [ and ] change area, and Escape lets go of the selected tile.
+document.addEventListener('keydown', e => {
+  if (!view || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target instanceof Element && e.target.closest('input, select, textarea, [contenteditable]')) return;   // typing
+  if (['away', 'report', 'present', 'ideologyPick'].some(id => !$(id).hidden)) return;
+  const tabs = [...document.querySelectorAll('.tabs [data-tab]')].filter(b => b.offsetParent !== null);
+  if (/^[0-9]$/.test(e.key)) {
+    const b = tabs[(+e.key + 9) % 10];        // 1 is the first tab, 0 the tenth
+    if (b) { b.click(); e.preventDefault(); }
+    return;
+  }
+  if (tab !== 'city') return;
+  const size = view.state.areas[view.area].size;
+  const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (step) {
+    const at = sel || { x: Math.floor(size / 2), y: Math.floor(size / 2) };
+    sel = { x: Math.min(size - 1, Math.max(0, at.x + (sel ? step[0] : 0))), y: Math.min(size - 1, Math.max(0, at.y + (sel ? step[1] : 0))) };
+    render();
+    e.preventDefault();
+  } else if (e.key === 'Escape' && sel) { sel = null; render(); }
+  else if ((e.key === '[' || e.key === ']') && view.areas.length > 1) {
+    showArea((view.area + (e.key === ']' ? 1 : view.areas.length - 1)) % view.areas.length);
+  }
+});
 $('map').onclick = e => {
   const b = e.target.closest('.tile');
   if (b) { sel = { x: +b.dataset.x, y: +b.dataset.y }; render(); }
@@ -2749,7 +2810,7 @@ $('tile').addEventListener('toggle', e => {   // remember which sections are ope
   if (key) foldState.set(key, e.target.open);
 }, true);
 $('tile').onclick = e => {
-  if (e.target.dataset.build) act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build });
+  if (e.target.dataset.build) { lastBuilt = e.target.dataset.build; act('build', { x: sel.x, y: sel.y, building: e.target.dataset.build }); }
   else if (e.target.dataset.add) act('add', { x: sel.x, y: sel.y, addition: e.target.dataset.add });
   else if ('tame' in e.target.dataset) act('tame', { x: sel.x, y: sel.y });
   else if (e.target.dataset.priority) act('priority', { x: sel.x, y: sel.y, priority: +e.target.dataset.priority });
@@ -2826,10 +2887,16 @@ $('finished').addEventListener('change', e => {
   if (!f) return;
   const now = { give_qty: f.give_qty, want_qty: f.want_qty, [d.side]: Math.floor(+e.target.value) };
   if (now[d.side] >= 1) act('offer_edit', { offer: f.id, ...now });
-  else { $('msg').textContent = 'Amounts must be whole numbers of 1 or more.'; $('finished')._html = null; renderMarket(); }
+  else { say('Amounts must be whole numbers of 1 or more.'); $('finished')._html = null; renderMarket(); }
 });
 $('salesSeen').onclick = () => act('market_seen');
 $('offerForm').addEventListener('input', lotPreview);
+$('giveAll').onclick = () => { $('giveQty').value = Math.max(1, Math.floor(view.state.resources[$('giveRes').value])); lotPreview(); };
+$('swapSides').onclick = () => {
+  [$('giveRes').value, $('wantRes').value] = [$('wantRes').value, $('giveRes').value];
+  [$('giveQty').value, $('wantQty').value] = [$('wantQty').value, $('giveQty').value];
+  lotPreview();
+};
 $('mktFilters').onclick = e => {
   if (e.target.dataset.filter) { mktFilter = e.target.dataset.filter; renderMarket(); }
 };
@@ -2842,8 +2909,8 @@ $('offers').onclick = e => {
   if (e.target.dataset.accept) {
     // Buy the amount typed, rounded down to what the offer's price allows.
     const R = view.defs.resources, typed = lotInput.get(id) || '', b = buyOf(o, +typed);
-    if (typed === '') { $('msg').textContent = `Type how much ${R[o.give]} to buy, or press Max.`; return; }
-    if (!b.lots) { $('msg').textContent = `The least you can buy from that offer is ${lotOf(o).give} ${R[o.give]}.`; return; }
+    if (typed === '') { say(`Type how much ${R[o.give]} to buy, or press Max.`); return; }
+    if (!b.lots) { say(`The least you can buy from that offer is ${lotOf(o).give} ${R[o.give]}.`); return; }
     lotInput.delete(id);
     act('offer_accept', { offer: id, amount: b.get });
   }
