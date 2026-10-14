@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Dolphin City Builder</title>
+<style>
+  body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center; background: #0f1412;
+         color: #cfd8d3; font: 15px/1.5 Consolas, "Cascadia Mono", "Courier New", monospace; }
+  .panel { max-width: 460px; margin: 16px; padding: 20px; border: 1px solid #2c3a33; background: #151c19; }
+  h1 { color: #e6c35c; font-size: 18px; margin: 0 0 10px; }
+  p { color: #8fa39a; margin: 0 0 14px; }
+  button { font: inherit; color: #cfd8d3; background: #1d2622; border: 1px solid #2c3a33; padding: 6px 14px; cursor: pointer; }
+  button:hover { border-color: #e6c35c; color: #e6c35c; }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Can't reach the game</h1>
+    <p>Dolphin City Builder needs an internet connection to reach its server. Check the connection;
+      this page tries again by itself every 15 seconds.</p>
+    <button id="retry">Try again now</button> <span id="count"></span>
+  </div>
+<script>
+  const url = new URLSearchParams(location.search).get('url');
+  const retry = () => { if (url) location.href = url; };
+  document.getElementById('retry').onclick = retry;
+  let left = 15;
+  setInterval(() => { left--; document.getElementById('count').textContent = `(${left}s)`; if (left <= 0) retry(); }, 1000);
+</script>
+</body>
+</html>

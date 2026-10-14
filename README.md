@@ -13,6 +13,7 @@ browser. It is plain Python (standard library only) plus one HTML page.
 | `index.html` | The page players see. |
 | `start.bat` | Double-click on Windows to start the game on your own network. |
 | `desktop/` | The downloadable desktop app (`DolphinCityBuilder.exe`) and how it is built. |
+| `desktop-app/` | The full desktop app: the game in its own Chromium window (Electron), built into an installer. |
 
 Cities are saved in `saves/` and the market in `market.json`. Both are left out
 of git on purpose (see `.gitignore`): they hold each city's password hash, and
@@ -37,6 +38,47 @@ not signed, Windows may say it "protected your PC" the first time; choose
 To rebuild it after changing `desktop/Launcher.cs` (for example if the game
 moves to a new address), double-click `desktop/build.bat`. It uses the C#
 compiler that comes with Windows. `desktop/make_icon.py` redraws the icon.
+
+## The full desktop app (for an installer, or Steam later)
+
+`desktop-app/` is a more complete version of the desktop app. It brings its
+own copy of Chromium (through Electron), so it does not need Edge or Chrome on
+the player's computer, and it can be built for Linux too. Like the small
+launcher it shows the hosted game, so game updates reach players straight
+away and the app itself only needs rebuilding if it changes. It also:
+
+- keeps the player signed in, in storage of its own;
+- shows a "Can't reach the game" page that keeps retrying when there is no
+  connection or the server is down;
+- opens any link away from the game in the player's normal browser;
+- allows only one copy to run; F5 reloads and F11 goes full screen.
+
+To build it you need Node.js (from nodejs.org). In a terminal:
+
+```
+cd desktop-app
+npm install
+npm run dist
+```
+
+That makes, in `desktop-app/dist/`:
+
+| File | What it is |
+|---|---|
+| `Dolphin City Builder Setup 1.0.0.exe` | An installer, with Start menu shortcut and uninstaller. |
+| `DolphinCityBuilder-1.0.0-portable.exe` | The same app as one file that runs without installing. |
+| `win-unpacked/` | The app as a plain folder. This is what Steam would want uploaded. |
+
+They are about 105 MB each, mostly Chromium, so they are not kept in git
+(GitHub refuses files over 100 MB). Share them by attaching them to a GitHub
+release instead. If `npm run start` says Electron is missing, run
+`node node_modules/electron/install.js` once.
+
+`npm run dist:linux` makes a Linux AppImage and folder; it is best run on a
+Linux computer. The game's address is at the top of `desktop-app/main.js`, and
+raising `version` in `desktop-app/package.json` changes the file names of a
+new build. Neither build is code-signed, so Windows shows its "protected your
+PC" warning on first run.
 
 ## Run it on your own computer
 

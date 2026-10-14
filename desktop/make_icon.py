@@ -1,6 +1,6 @@
 """Draws game.ico: a little map, like the area maps on the Explore tab.
 
-Standard library only. Run once before build.bat (game.ico is kept in git too).
+Standard library only. Run once before build.bat, or after changing the design (the icons are kept in git too).
 """
 import struct
 import zlib
@@ -60,5 +60,12 @@ directory = struct.pack("<HHH", 0, 1, len(images))
 for size, data in images:
     directory += struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(data), offset)
     offset += len(data)
-Path(__file__).with_name("game.ico").write_bytes(directory + b"".join(data for _, data in images))
-print("wrote game.ico")
+icon = directory + b"".join(data for _, data in images)
+here = Path(__file__).parent
+(here / "game.ico").write_bytes(icon)
+# The packaged app (desktop-app) uses the same picture: the .ico for Windows, a large .png for Linux.
+packaged = here.parent / "desktop-app" / "build"
+packaged.mkdir(parents=True, exist_ok=True)
+(packaged / "icon.ico").write_bytes(icon)
+(packaged / "icon.png").write_bytes(png_entry(512))
+print("wrote game.ico, desktop-app/build/icon.ico and icon.png")
