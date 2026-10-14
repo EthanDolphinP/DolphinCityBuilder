@@ -1,0 +1,5 @@
+# Scripts that run on the Linux server must keep Unix line endings.
+*.sh text eol=lf
+deploy/dolphincity text eol=lf
+deploy/dolphincity.service text eol=lf
+deploy/Caddyfile text eol=lf

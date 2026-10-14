@@ -12,6 +12,7 @@ browser. It is plain Python (standard library only) plus one HTML page.
 | `wsgi.py` | Lets a web host (PythonAnywhere) run the same game. |
 | `index.html` | The page players see. |
 | `start.bat` | Double-click on Windows to start the game on your own network. |
+| `deploy/` | Scripts for running the game on your own Linux server (see "Your own server"). |
 | `desktop/` | The downloadable desktop app (`DolphinCityBuilder.exe`) and how it is built. |
 | `desktop-app/` | The full desktop app: the game in its own Chromium window (Electron), built into an installer. |
 
@@ -79,6 +80,61 @@ Linux computer. The game's address is at the top of `desktop-app/main.js`, and
 raising `version` in `desktop-app/package.json` changes the file names of a
 new build. Neither build is code-signed, so Windows shows its "protected your
 PC" warning on first run.
+
+## Your own server (for more players, or Steam)
+
+The free PythonAnywhere account is fine for friends, but it is slow under
+load and switches off unless renewed every month. For a bigger audience, run
+the game on a small Linux server (a "VPS") of your own. The game needs very
+little: the cheapest plan of any provider is enough (1 CPU, 1-2 GB of memory),
+for example Hetzner (about 4 euros a month) or DigitalOcean (about 6 dollars).
+
+1. **Get a domain name** (about 10 dollars a year from a registrar such as
+   Cloudflare or Namecheap), so the game has a permanent address like
+   `play.dolphincity.com` and can have HTTPS. Any domain you already own works
+   too: a subdomain of it is enough.
+2. **Rent the server**: choose Ubuntu 24.04, the smallest size, and add your
+   SSH key or a root password when asked. Note its IP address.
+3. **Point the domain at the server**: at your registrar, add an "A" record
+   for the name you chose (for example `play`) with the server's IP address.
+4. **Install the game**: connect with `ssh root@your-server-ip` and run:
+
+   ```
+   curl -fsSL https://raw.githubusercontent.com/EthanDolphinP/DolphinCityBuilder/main/deploy/setup.sh -o setup.sh
+   bash setup.sh play.yourdomain.com
+   ```
+
+   This needs the repository to be public. It installs everything, starts the
+   game as a service that restarts by itself and saves on shutdown, gets an
+   HTTPS certificate, turns on a firewall, and backs the game up every night.
+5. **Bring the cities across** from PythonAnywhere: in a PythonAnywhere Bash
+   console run `cd ~/DolphinCityBuilder && tar -czf cities.tar.gz saves market.json`,
+   download `cities.tar.gz` from the Files tab, copy it to the server
+   (`scp cities.tar.gz root@your-server-ip:`), and there run
+   `dolphincity restore cities.tar.gz`. Do this last thing before telling
+   players about the move, so nothing played on PythonAnywhere afterwards is
+   lost.
+6. **Point the apps at the new address**: change the address at the top of
+   `desktop-app/main.js` (and `desktop/Launcher.cs`), raise the version in
+   `desktop-app/package.json`, and rebuild them. Players of the old app need
+   the new one; you could leave a present or a message on PythonAnywhere
+   telling them where the game has gone.
+
+Looking after it afterwards, over SSH:
+
+| Command | What it does |
+|---|---|
+| `dolphincity update` | Gets the latest code from GitHub and restarts (instead of `git pull` and Reload). |
+| `dolphincity present City "message" wood=100` | Sends a present, as on PythonAnywhere. |
+| `dolphincity reset-password City` | The next person to sign in to City chooses its password. |
+| `dolphincity backup` / `restore file` | A backup now, or put one back. Nightly backups are in `/var/backups/dolphincity` (14 kept). |
+| `dolphincity status` / `logs` / `restart` | How the game service is doing. |
+
+How far this goes: the game keeps every city in memory and handles one request
+at a time, each taking around 20 ms for a large city. With the page checking
+for news every 5 seconds, that is comfortable for a hundred or two players
+online at once. Beyond that the game itself needs changes (a database, more
+than one process), not just a bigger server.
 
 ## Run it on your own computer
 

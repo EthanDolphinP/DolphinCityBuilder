@@ -1,0 +1,25 @@
+# The game as a service: started at boot, restarted if it ever stops, saved on the way down.
+[Unit]
+Description=Dolphin City Builder
+After=network.target
+
+[Service]
+User=dolphin
+Group=dolphin
+Environment=DCB_DATA=/var/lib/dolphincity
+Environment=DCB_HOST=127.0.0.1
+Environment=DCB_PORT=8000
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/dolphincity/server.py
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+# It needs nothing but its own data folder.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dolphincity
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

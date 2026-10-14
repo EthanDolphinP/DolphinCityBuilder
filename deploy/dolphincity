@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Looking after the Dolphin City Builder server. Installed by setup.sh as /usr/local/bin/dolphincity.
+set -euo pipefail
+CODE=/opt/dolphincity
+DATA=/var/lib/dolphincity
+BACKUPS=/var/backups/dolphincity
+KEEP=14                         # nightly backups kept
+game() { sudo -u dolphin env DCB_DATA="$DATA" python3 "$CODE/server.py" "$@"; }
+
+case "${1:-}" in
+  update)          # new code from GitHub, then a restart (which saves everything first)
+    git -C "$CODE" pull --ff-only
+    install -m 755 "$CODE/deploy/dolphincity" /usr/local/bin/dolphincity
+    systemctl restart dolphincity
+    echo "Updated and restarted." ;;
+  restart) systemctl restart dolphincity; echo "Restarted." ;;
+  status)  systemctl status dolphincity --no-pager ;;
+  logs)    journalctl -u dolphincity -n 100 --no-pager ;;
+  present) shift; game --present "$@" ;;          # handed out while the game runs
+  reset-password)                                 # the game must be stopped, or it would save over the change
+    [[ -n "${2:-}" ]] || { echo "Usage: dolphincity reset-password CityName"; exit 1; }
+    systemctl stop dolphincity
+    game --reset-password "$2" || true
+    systemctl start dolphincity ;;
+  backup)
+    stamp=$(date +%Y-%m-%d-%H%M)
+    tar -czf "$BACKUPS/dolphincity-$stamp.tar.gz" -C "$DATA" .
+    ls -1t "$BACKUPS"/dolphincity-*.tar.gz | tail -n +$((KEEP + 1)) | xargs -r rm --
+    echo "Saved $BACKUPS/dolphincity-$stamp.tar.gz" ;;
+  restore)                                        # put a backup (or saves copied from PythonAnywhere) in place
+    [[ -f "${2:-}" ]] || { echo "Usage: dolphincity restore file.tar.gz"; exit 1; }
+    systemctl stop dolphincity
+    tar -xzf "$2" -C "$DATA"
+    chown -R dolphin:dolphin "$DATA"
+    systemctl start dolphincity
+    echo "Restored from $2 and restarted." ;;
+  *)
+    cat <<'USAGE'
+dolphincity update                     get the latest code from GitHub and restart
+dolphincity restart | status | logs    the game service
+dolphincity present City "message" wood=100 egg=rare   (or "all" instead of a city)
+dolphincity reset-password City        the next person to sign in to City picks its password
+dolphincity backup                     save a backup now (one is made every night; 14 are kept)
+dolphincity restore file.tar.gz        replace the game's data with a backup
+USAGE
+    ;;
+esac

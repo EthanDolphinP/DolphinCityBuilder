@@ -1,0 +1,6 @@
+# Caddy serves the game over HTTPS and fetches and renews the certificate itself.
+# setup.sh puts the real domain in place of {$DOMAIN}.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy 127.0.0.1:8000
+}

@@ -27,6 +27,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import socket
 import sys
 import threading
@@ -40,9 +41,12 @@ import game
 import market
 
 ROOT = Path(__file__).parent
-SAVES = ROOT / "saves"
-MARKET_FILE = ROOT / "market.json"
-PRESENTS_FILE = ROOT / "presents.json"   # presents sent from the console, waiting to be handed out
+# Where the live game's data lives. Next to the code by default; a server can keep it elsewhere
+# (DCB_DATA, see deploy/) so that updating or replacing the code never touches it.
+DATA = Path(os.environ.get("DCB_DATA") or ROOT)
+SAVES = DATA / "saves"
+MARKET_FILE = DATA / "market.json"
+PRESENTS_FILE = DATA / "presents.json"   # presents sent from the console, waiting to be handed out
 CITY_NAME = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 BAD_NAME = "City names are 1-24 letters, digits, - or _."
 AUTOSAVE_SECONDS = 60
@@ -483,6 +487,10 @@ def lan_ip():
         s.close()
 
 
+def _stop(*_):
+    raise KeyboardInterrupt
+
+
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--reset-password"]:
         path = SAVES / f"{sys.argv[2]}.json" if len(sys.argv) > 2 and CITY_NAME.match(sys.argv[2]) else None
@@ -495,9 +503,12 @@ if __name__ == "__main__":
         sys.exit(f"{sys.argv[2]} has no password now. Whoever signs in to it next chooses the new one.")
     if sys.argv[1:2] == ["--present"]:
         sys.exit(send_present(sys.argv[2:]))
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("DCB_PORT", 8000))
+    host = os.environ.get("DCB_HOST", "0.0.0.0")      # 127.0.0.1 behind a web server such as Caddy
+    # A service manager stops the game with SIGTERM: treat it like Ctrl+C, so everything is saved first.
+    signal.signal(signal.SIGTERM, _stop)
     startup()
-    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
     print("Text City Builder is running.")
     print(f"  On this computer:      http://localhost:{port}")
     print(f"  On your local network: http://{lan_ip()}:{port}")
