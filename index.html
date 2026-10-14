@@ -30,7 +30,7 @@
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   button:disabled { color: var(--faint); cursor: not-allowed; }
   input[type=number] { width: 90px; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }   /* auto-fit: each row is filled edge to edge */
   .stat { border: 1px solid var(--line); background: var(--inset); padding: 6px 9px; min-width: 0; }
   .stat .k { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
   /* values wrap onto a second line sooner than spill out of the box */
@@ -38,7 +38,9 @@
   .stat .k, .stat .v, .stat .r { overflow-wrap: anywhere; }
   .stat .v { color: var(--bright); font-size: 16px; line-height: 1.25; }
   .stat .r { font-size: 12px; color: var(--dim); }
-  button { max-width: 100%; }
+  button, select, input { max-width: 100%; }     /* a long menu or field shrinks to its box instead of sticking out */
+  input[type=range] { margin-left: 0; margin-right: 0; }
+  .bar > *, .buy > *, .fin > * { min-width: 0; }
   .panel { min-width: 0; overflow-wrap: break-word; }
   .head > * { min-width: 0; }
   .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -81,7 +83,8 @@
   .opt { border-top: 1px solid var(--line); padding: 7px 0; }
   .opt button { float: right; margin-left: 8px; }
   #log { max-height: 180px; overflow-y: auto; white-space: pre-wrap; }
-  #msg { min-height: 1.45em; margin-top: 8px; }
+  #msg { margin-top: 8px; }
+  #msg:empty { display: none; }      /* no empty gap under the figures when there is nothing to say */
   .glyph { display: inline-block; min-width: 2.2em; font-weight: bold; }
   .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   button.on { border-color: var(--accent); color: var(--accent); }
@@ -236,11 +239,11 @@
   .gfx #resources .stat .v { font-size: 22px; font-weight: 650; margin-top: 4px; }
   .gfx #resources .stat .k .ui-icon { width: 22px; height: 22px; color: var(--accent); }
   .gfx #resources .stat.zero { background: transparent; border-style: dashed; }
-  .gfx .owned-badge, .gfx .state-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; font-size: 11px; padding: 3px 6px; font-weight: 600; }
-  .gfx .owned-badge { color: var(--good); background: var(--inset); }
-  .gfx .state-badge.missing { color: var(--dim); border: 1px dashed var(--line); }
-  .gfx .state-badge.locked { color: var(--dim); background: var(--button); }
-  .gfx .state-badge .ui-icon { width: 13px; height: 13px; }
+  .owned-badge, .state-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; font-size: 11px; padding: 3px 6px; font-weight: 600; }
+  .owned-badge { color: var(--good); background: var(--inset); }
+  .state-badge.missing { color: var(--dim); border: 1px dashed var(--line); }
+  .state-badge.locked { color: var(--dim); background: var(--button); }
+  .state-badge .ui-icon { width: 13px; height: 13px; }
   .gfx .requirement-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 8px; margin-top: 12px; }
   .gfx .requirement { background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
   .gfx .requirement .ui-icon { color: var(--accent); width: 22px; height: 22px; }
@@ -259,21 +262,21 @@
   .gfx .cost-pill.short { border-color: var(--bad); color: var(--bad); }
   .gfx .cost-pill.enough { color: var(--good); }
   .gfx .cost-pill small { color: var(--dim); }
-  .gfx .collection-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; margin-top: 12px; }
-  .gfx .building-card { display: flex; flex-direction: column; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; gap: 7px; }
-  .gfx .building-card.owned { border-color: var(--good); }
-  .gfx .building-card.missing { border-style: dashed; }
-  .gfx .building-card.locked { border-style: dashed; }
-  .gfx .building-art { background: var(--button); border-radius: 10px; display: flex; align-items: center; justify-content: center; height: 70px; color: var(--accent); }
-  .gfx .building-art .ui-icon { height: 48px; width: 48px; stroke-width: 1.4; }
-  .gfx .building-card.owned .building-art { color: var(--good); }
-  .gfx .building-card.locked .building-art { color: var(--dim); }
-  .gfx .building-card strong { color: var(--bright); font-size: 14px; }
-  .gfx .building-card .cost-pills { margin: 0; }
-  .gfx .building-card .cost-pill { border: 0; background: none; padding: 0; }
-  .gfx .building-card button { margin-top: auto; font-size: 12px; }
-  .gfx .collection-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .gfx .collection-filters button { font-size: 12px; }
+  .collection-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; margin-top: 12px; }
+  .building-card { display: flex; flex-direction: column; background: var(--inset); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; gap: 7px; }
+  .building-card.owned { border-color: var(--good); }
+  .building-card.missing { border-style: dashed; }
+  .building-card.locked { border-style: dashed; }
+  .building-art { background: var(--button); border-radius: 10px; display: flex; align-items: center; justify-content: center; height: 70px; color: var(--accent); }
+  .building-art .ui-icon { height: 48px; width: 48px; stroke-width: 1.4; }
+  .building-card.owned .building-art { color: var(--good); }
+  .building-card.locked .building-art { color: var(--dim); }
+  .building-card strong { color: var(--bright); font-size: 14px; }
+  .building-card .cost-pills { margin: 0; }
+  .building-card .cost-pill { border: 0; background: none; padding: 0; }
+  .building-card button { margin-top: auto; font-size: 12px; }
+  .collection-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .collection-filters button { font-size: 12px; }
   .gfx .tile { height: var(--tw,44px); }
   .gfx .tile .ui-icon { width: 64%; height: 64%; }
   .gfx .tile.occupied { box-shadow: inset 0 0 0 1px #fff6; }
@@ -294,9 +297,9 @@
   .gfx .tabs .ui-icon { width: 17px; height: 17px; }
   .gfx .tabs .nav-badge { background: var(--accent); color: var(--bg); font-size: 10px; font-weight: bold; border-radius: 5px; padding: 1px 4px; }
   .gfx #tutorial { margin-bottom: 0; }
-  .gfx.mobile .collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-  .gfx.mobile .building-card { padding: 10px; }
-  .gfx.mobile .building-card button { font-size: 12px; }
+  .mobile .collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .mobile .building-card { padding: 10px; }
+  .mobile .building-card button { font-size: 12px; }
   .gfx.mobile .requirement-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
   .gfx.mobile .requirement { padding: 8px; }
   .gfx.mobile .requirement .amount { font-size: 16px; }
@@ -319,8 +322,12 @@
   .gfx #logPanel > h2 { display: none; }
   .gfx #logPanel > #log { margin-top: 12px; }
   /* Parts that only the visual interface has. */
-  html:not(.gfx) .resource-head, html:not(.gfx) #inspectorClose, html:not(.gfx) #collectionPanel,
+  html:not(.gfx) .resource-head, html:not(.gfx) #inspectorClose,
   html:not(.gfx) #logPanel > summary { display: none; }
+  /* The building collection in the text interface: square corners, the building's letter for a picture. */
+  html:not(.gfx) .building-card, html:not(.gfx) .building-art, html:not(.gfx) .owned-badge, html:not(.gfx) .state-badge { border-radius: 0; }
+  html:not(.gfx) .building-art { height: 44px; font-size: 24px; font-weight: bold; }
+  html:not(.gfx) .building-card .cost { font-size: 12px; }
   html:not(.gfx) #inspector > .head { display: block; }
 </style>
 </head>
@@ -636,6 +643,7 @@
           <label><span class="k">Open the game on</span><select data-setting="startTab">
             <option value="city">City</option><option value="people">People</option><option value="beast">Beast</option><option value="market">Market</option><option value="social">Social</option></select></label>
           <label class="check"><input data-setting="tutorial" type="checkbox"> Show the Getting started list on the City tab</label>
+          <label class="check"><input data-setting="collection" type="checkbox"> Show the Building collection on the City tab</label>
           <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
           <label class="check"><input data-setting="reports" type="checkbox"> Show a report when an expedition returns</label>
           <label class="check"><input data-setting="confirmDemolish" type="checkbox"> Ask before demolishing a building</label>
@@ -822,7 +830,7 @@ const FONTS = {
 };
 const DEFAULT_SETTINGS = { visuals: 'text', theme: 'forest', accent: '', font: 'mono', zoom: 100, tile: 'medium', width: 'normal', layout: 'auto',
                            rate: 'hour', clock: 'auto', abbreviate: false, separators: true,
-                           poll: 5, startTab: 'city', tutorial: true, away: true, reports: true, confirmDemolish: false, mapKey: true };
+                           poll: 5, startTab: 'city', tutorial: true, collection: false, away: true, reports: true, confirmDemolish: false, mapKey: true };
 let settings = { ...DEFAULT_SETTINGS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
 function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} }
@@ -1381,7 +1389,8 @@ function render() {
       `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results.`);
   renderFinder();
   renderTile();
-  if (gfx() && tab === 'city') renderCollection();
+  $('collectionPanel').hidden = !settings.collection;
+  if (settings.collection && tab === 'city') renderCollection();
   renderPeople();
   renderBeast();
   renderGuide();
@@ -1470,15 +1479,16 @@ function renderCollection() {
  const missing = entries.filter(([id,b]) => !counts[id] && unlocked(b));
  const locked = entries.filter(([,b]) => !unlocked(b));
  const filters = {all:['This era',entries.filter(([,b]) => b.tech <= state.tech)],owned:['Owned',owned],missing:['Not built',missing],locked:['Locked',locked]};
+ const pic = kind => gfx() ? icon(kind) : '';
  $('collectionSummary').textContent = `${Object.values(counts).reduce((a,b)=>a+b,0)} buildings / ${owned.length} kinds owned`;
- setHTML($('collectionFilters'),Object.entries(filters).map(([k,[label,list]]) => `<button data-collection-filter="${k}" aria-pressed="${collectionFilter === k}" class="${collectionFilter === k ? 'on' : ''}">${icon(k === 'owned' ? 'check' : k === 'locked' ? 'lock' : 'house')}${label} <span class="dim">${list.length}</span></button>`).join(''));
+ setHTML($('collectionFilters'),Object.entries(filters).map(([k,[label,list]]) => `<button data-collection-filter="${k}" aria-pressed="${collectionFilter === k}" class="${collectionFilter === k ? 'on' : ''}">${pic(k === 'owned' ? 'check' : k === 'locked' ? 'lock' : 'house')}${label} <span class="dim">${list.length}</span></button>`).join(''));
  const search = $('collectionSearch').value.toLowerCase().trim();
  const list = filters[collectionFilter][1].filter(([,b]) => (b.name+' '+defs.categories[b.category]).toLowerCase().includes(search));
  setHTML($('collection'),list.map(([id,b]) => {
   const count = counts[id] || 0, ready = unlocked(b), kind = count ? 'owned' : ready ? 'missing' : 'locked';
   const label = count ? `${count} ${visiting ? 'built' : 'owned'}` : ready ? 'Not built yet' : 'Locked';
-  return `<div class="building-card ${kind}"><div class="building-art">${icon(buildingIcon(b))}</div><strong>${esc(b.name)}</strong><span class="${count ? 'owned-badge' : 'state-badge '+kind}">${icon(count ? 'check' : ready ? 'house' : 'lock')}${label}</span>` +
-   (count ? `<button data-locate-building="${esc(id)}">${icon('pin')}Locate</button>` : ready ? goods(b.cost)+`<button data-choose-site="${esc(id)}">${icon('pin')}Find a site</button>` : `<span class="small dim">${esc(b.tech > state.tech ? defs.tech[b.tech].name : (defs.research[b.research]?.name || 'Research required'))}</span>`) + `</div>`;
+  return `<div class="building-card ${kind}"><div class="building-art">${gfx() ? icon(buildingIcon(b)) : esc(b.glyph)}</div><strong>${esc(b.name)}</strong><span class="${count ? 'owned-badge' : 'state-badge '+kind}">${pic(count ? 'check' : ready ? 'house' : 'lock')}${label}</span>` +
+   (count ? `<button data-locate-building="${esc(id)}">${pic('pin')}Locate</button>` : ready ? (gfx() ? goods(b.cost) : `<div class="cost">${goods(b.cost)}</div>`)+`<button data-choose-site="${esc(id)}">${pic('pin')}Find a site</button>` : `<span class="small dim">${esc(b.tech > state.tech ? defs.tech[b.tech].name : (defs.research[b.research]?.name || 'Research required'))}</span>`) + `</div>`;
  }).join('') || '<p class="dim">No buildings match this view.</p>');
 }
 function buildingFacts(rows, key) {
