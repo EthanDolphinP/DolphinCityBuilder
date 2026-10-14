@@ -583,8 +583,14 @@
         <div id="resSummary" class="stats" style="margin-bottom:10px"></div>
         <div class="bar" style="margin-top:0">
           <input id="resSearch" type="search" placeholder="Search research, e.g. farm, power, livestock" style="flex:1 1 240px">
-          <span id="resFilters" class="bar" style="margin:0"></span>
+          <select id="resKind" title="What the research gives">
+            <option value="">Gives anything</option><option value="building">Gives a new building</option>
+            <option value="addition">Gives a new addition</option><option value="boost">Makes buildings faster</option>
+            <option value="other">Something else</option></select>
+          <select id="resSort" title="Order">
+            <option value="level">By tech level</option><option value="cheapest">Cheapest first</option><option value="name">A to Z</option></select>
         </div>
+        <div id="resFilters" class="bar"></div>
         <div id="research"></div>
       </div>
     </div>
@@ -601,10 +607,11 @@
       <div class="panel">
         <h2>Market</h2>
         <div id="mktSummary" class="stats"></div>
+        <div id="mktViews" class="bar"></div>
       </div>
 
-      <details class="panel" open>
-        <summary class="cat">Open offers <span id="offersCount" class="count"></span></summary>
+      <details class="panel" open data-mkt="buy sell">
+        <summary class="cat"><span id="offersTitle">Open offers</span> <span id="offersCount" class="count"></span></summary>
         <div class="bar" style="margin-top:0">
           <input id="mktSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
           <select id="mktGives"></select>
@@ -614,7 +621,7 @@
         <div id="offers" class="scroll" style="margin-top:10px"></div>
       </details>
 
-      <details class="panel" open>
+      <details class="panel" open data-mkt="sell">
         <summary class="cat">Post an offer</summary>
         <form id="offerForm" class="bar" style="margin-top:0">
           <span class="pair">I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select></span>
@@ -630,7 +637,7 @@
           shown before you press Buy; Max buys all you can afford.</p>
       </details>
 
-      <details class="panel" id="finishedPanel" open>
+      <details class="panel" id="finishedPanel" open data-mkt="sell">
         <summary class="cat">Finished orders <span id="finishedCount" class="count"></span></summary>
         <p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Change the
           amounts by typing new ones or with the &times; and &divide; buttons, which change both sides and keep the
@@ -638,7 +645,7 @@
         <div id="finished" class="scroll"></div>
       </details>
 
-      <details class="panel" open>
+      <details class="panel" open data-mkt="bills">
         <summary class="cat">Bills <span id="billsCount" class="count"></span></summary>
         <div id="bills" class="scroll"></div>
         <div class="cat">Propose a bill</div>
@@ -656,7 +663,7 @@
           per-hour figures at the top.</p>
       </details>
 
-      <details class="panel">
+      <details class="panel" data-mkt="history">
         <summary class="cat">Recent trades <span id="tradesCount" class="count"></span></summary>
         <div id="trades" class="small"></div>
       </details>
@@ -1056,8 +1063,9 @@ let visiting = null;   // name of another city being viewed read-only
 let myBanned = [];     // cities this player's city has banned
 let awayShown = null;  // the away report already on screen or dismissed
 let finder = { kind: '', what: '' };   // what the Find box is searching for
-let resFilter = 'all';  // which research the Research tab lists
+let resFilter = settings.resFilter || 'todo';  // which research the Research tab lists (remembered)
 let mktFilter = 'all';  // which offers the Market tab lists
+let mktView = settings.mktView || 'buy';   // which part of the market is showing (remembered)
 const lotInput = new Map();   // how much the player has typed to buy from each offer
 const finInput = new Map();   // amounts being typed into a finished order: "id:give_qty" -> text
 // Replace a list's HTML without losing the box the player is typing in.
@@ -1781,11 +1789,23 @@ function renderResearch() {
     return out.join('<br>');
   };
   const ready = r => !r.done && !r.problem && r.affordable;
-  const filters = { all: ['All', () => true], ready: ['Can research now', ready],
-                    todo: ['Not researched yet', r => !r.done], done: ['Researched', r => r.done] };
+  const filters = { todo: ['Not researched yet', r => !r.done], ready: ['Can research now', ready],
+                    done: ['Researched', r => r.done], all: ['All', () => true] };
+  if (!filters[resFilter]) resFilter = 'todo';
+  // What kind of thing each research gives, for the "Gives" menu.
+  const kinds = id => {
+    const out = new Set();
+    if (Object.values(defs.buildings).some(b => b.research === id)) out.add('building');
+    if (Object.values(defs.additions).some(a => a.research === id)) out.add('addition');
+    if (R[id].boost) out.add('boost');
+    if (!out.size || R[id].effect) out.add('other');
+    return out;
+  };
+  const kind = $('resKind').value, sort = $('resSort').value;
   const words = $('resSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const text = r => (R[r.id].name + ' ' + R[r.id].desc + ' ' + gives(r.id).replace(/<[^>]+>/g, ' ')).toLowerCase();
-  const matches = r => filters[resFilter][1](r) && words.every(w => text(r).includes(w));
+  const narrowed = view.research.filter(r => (!kind || kinds(r.id).has(kind)) && words.every(w => text(r).includes(w)));
+  const matches = r => filters[resFilter][1](r) && narrowed.includes(r);
 
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   const rate = view.status.rates.knowledge;
@@ -1794,33 +1814,42 @@ function renderResearch() {
     stat('Researched', `${view.research.filter(r => r.done).length} / ${view.research.length}`, '') +
     stat('Ready now', view.research.filter(ready).length, 'can be researched'));
   setHTML($('resFilters'), Object.entries(filters).map(([k, [label, test]]) =>
-    `<button data-filter="${k}" class="${k === resFilter ? 'on' : ''}">${label} (${view.research.filter(test).length})</button>`).join(''));
+    `<button data-filter="${k}" class="${k === resFilter ? 'on' : ''}">${label} (${narrowed.filter(test).length})</button>`).join(''));
 
+  // One compact line per research: what it gives, what it costs, and what stops it; the description folds away.
+  const row = r => {
+    const d = R[r.id], level = defs.tech[d.tech], locked = d.tech > state.tech;
+    const right = r.done ? (gfx() ? `<span class="owned-badge">${icon('check')}Researched</span>` : `<span class="good">Researched</span>`)
+      : `<button data-research="${esc(r.id)}" ${r.problem || !r.affordable ? 'disabled' : ''}>Research</button>`;
+    const needs = r.done ? '' : r.problem ? `<span class="bad">${esc(r.problem)}</span>`
+      : `<span class="dim">needs a ${esc(defs.buildings[d.building].name)} (you have one)</span>`;
+    return `<div class="brow ${r.done || ready(r) ? '' : 'cant'}"><div class="head"><span class="hi">${esc(d.name)} ` +
+      `<span class="dim small">${esc(level.name)}</span></span>${right}</div>` +
+      `<div class="sum ${r.done ? 'good' : ''}">${gives(r.id).split('<br>').join(' &middot; ')}</div>` +
+      (r.done ? '' : `<div class="small">${goods(d.cost)} ${needs}</div>`) +
+      `<details class="fold" data-fold="rd:${esc(r.id)}" ${isOpen('rd:' + r.id, false) ? 'open' : ''}><summary>About it</summary>` +
+      `<div class="dim">${esc(d.desc)}${locked ? ` Opens when your city is a ${esc(level.name)}.` : ''}</div></details></div>`;
+  };
   // Within a level: what can be done now first, finished research last.
   const order = r => r.done ? 3 : ready(r) ? 0 : r.problem ? 2 : 1;
-  const searching = words.length || resFilter !== 'all';
-  const html = defs.tech.map((level, i) => {
-    const all = view.research.filter(r => R[r.id].tech === i);
-    const items = all.filter(matches).sort((a, b) => order(a) - order(b));
-    if (!items.length) return '';
-    const title = `${esc(level.name)}: ${all.filter(r => r.done).length} of ${all.length} researched` +
-      (i > state.tech ? ' - level not reached yet' : '') + (searching ? ` (${items.length} shown)` : '');
-    // While searching or filtering every level with a match is open; otherwise the player's own choice.
-    return (searching ? section('resfind:' + i, title, true) : section('res:' + i, title, i === state.tech)) +
-      items.map(r => {
-        const d = R[r.id], locked = i > state.tech;
-        const right = r.done ? (gfx() ? `<span class="owned-badge">${icon('check')}Unlocked</span>` : `<span class="good">Researched</span>`)
-          : `<button data-research="${esc(r.id)}" ${r.problem || !r.affordable ? 'disabled' : ''}>Research</button>`;
-        const rows = [];
-        if (!r.done) rows.push(['Cost', goods(d.cost)]);
-        if (!r.done && gfx()) rows.push(['Required building', `<span class="${buildingCount(d.building) ? 'owned-badge' : 'state-badge missing'}">${icon(buildingCount(d.building) ? 'check' : 'lock')}${esc(defs.buildings[d.building].name)} &middot; ${buildingCount(d.building) ? 'Owned' : 'Not built'}</span>` + (r.problem ? `<div class="bad small">${esc(r.problem)}</div>` : '')]);
-        else if (!r.done) rows.push([r.problem ? 'Blocked' : 'Needs', r.problem ? `<span class="bad">${esc(r.problem)}</span>`
-          : `a ${esc(defs.buildings[d.building].name)} <span class="dim">(you have one)</span>`]);
-        rows.push(['Gives', `<span class="${r.done ? 'good' : ''}">${gives(r.id)}</span>`]);
-        return `<div class="card ${locked ? 'dim' : ''}"><div class="head"><span class="${locked ? '' : 'hi'}">${esc(d.name)}</span>${right}</div>` +
-          (gfx() ? fold('researchDesc:' + r.id, 'Details', [esc(d.desc)]) : `<div class="desc">${esc(d.desc)}</div>`) + kv(rows) + `</div>`;
-      }).join('') + `</details>`;
-  }).join('');
+  const searching = words.length || kind || resFilter !== 'all';
+  let html;
+  if (sort !== 'level') {
+    const cost = r => Object.values(R[r.id].cost).reduce((a, b) => a + b, 0);
+    const list = view.research.filter(matches).sort(sort === 'cheapest' ? (a, b) => cost(a) - cost(b) : (a, b) => R[a.id].name.localeCompare(R[b.id].name));
+    html = list.map(row).join('');
+  } else {
+    html = defs.tech.map((level, i) => {
+      const all = view.research.filter(r => R[r.id].tech === i);
+      const items = all.filter(matches).sort((a, b) => order(a) - order(b));
+      if (!items.length) return '';
+      const title = `${esc(level.name)}: ${all.filter(r => r.done).length} of ${all.length} researched` +
+        (i > state.tech ? ' - level not reached yet' : '') + (searching ? ` (${items.length} shown)` : '');
+      // While searching or filtering every level with a match is open; otherwise the player's own choice.
+      return (searching ? section('resfind:' + i, title, true) : section('res:' + i, title, i === state.tech)) +
+        items.map(row).join('') + `</details>`;
+    }).join('');
+  }
   setHTML($('research'), html || `<p class="dim">Nothing matches.</p>`);
 }
 
@@ -2463,8 +2492,28 @@ function renderMarket() {
       asked ? `<span class="bad">${asked} waiting for your answer</span>` : `${myBills.filter(b => b.status === 'proposed').length} proposed`) +
     stat('Trades made', market.history.length, 'recently, by anyone'));
 
+  // ---- which part of the market shows ----
+  const forMe = myBills.filter(b => b.status === 'proposed' && b.to === state.name).length;
+  const parts = {
+    buy: ['Buy', `${market.offers.filter(o => !mine(o)).length} on sale`],
+    sell: ['Sell', `${market.offers.filter(mine).length} yours, ${(state.finished || []).length} finished`],
+    bills: ['Bills', forMe ? `<span class="bad">${forMe} to answer</span>` : `${myBills.length}`],
+    history: ['History', `${market.history.length}`],
+    all: ['Everything', ''],
+  };
+  setHTML($('mktViews'), Object.entries(parts).map(([k, [label, note]]) =>
+    `<button data-mkt-view="${k}" class="${mktView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
+  for (const panel of document.querySelectorAll('#tab-market [data-mkt]'))
+    panel.hidden = mktView !== 'all' && !panel.dataset.mkt.split(' ').includes(mktView);
+  if (mktView !== 'all') for (const panel of document.querySelectorAll('#tab-market [data-mkt]')) if (!panel.hidden) panel.open = true;
+
   // ---- open offers: search, material menus and filter buttons all apply together ----
-  const filters = { all: ['All', () => true], afford: ['I can accept', canAccept], mine: ['My offers', mine] };
+  // Buying shows other cities' offers; selling shows your own; Everything shows both.
+  const filters = mktView === 'buy' ? { all: ['All', o => !mine(o)], afford: ['I can accept', canAccept] }
+    : mktView === 'sell' ? { mine: ['Yours on sale', mine] }
+    : { all: ['All', () => true], afford: ['I can accept', canAccept], mine: ['My offers', mine] };
+  if (!filters[mktFilter]) mktFilter = Object.keys(filters)[0];
+  $('offersTitle').textContent = mktView === 'sell' ? 'Your offers on sale' : mktView === 'buy' ? 'Offers from other cities' : 'Open offers';
   const words = $('mktSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const gives = $('mktGives').value, wants = $('mktWants').value;
   const narrowed = market.offers.filter(o => (!gives || o.give === gives) && (!wants || o.want === wants) &&
@@ -2970,11 +3019,16 @@ $('swapSides').onclick = () => {
   [$('giveQty').value, $('wantQty').value] = [$('wantQty').value, $('giveQty').value];
   lotPreview();
 };
+$('mktViews').onclick = e => {
+  const b = e.target.closest('[data-mkt-view]');
+  if (b) { mktView = settings.mktView = b.dataset.mktView; saveSettings(); renderMarket(); }
+};
 $('mktFilters').onclick = e => {
   if (e.target.dataset.filter) { mktFilter = e.target.dataset.filter; renderMarket(); }
 };
+for (const id of ['resKind', 'resSort']) $(id).onchange = () => { if (view) renderResearch(); };
 $('resFilters').onclick = e => {
-  if (e.target.dataset.filter) { resFilter = e.target.dataset.filter; renderResearch(); }
+  if (e.target.dataset.filter) { resFilter = settings.resFilter = e.target.dataset.filter; saveSettings(); renderResearch(); }
 };
 $('offers').onclick = e => {
   const id = +(e.target.dataset.accept || e.target.dataset.max), o = view.market.offers.find(x => x.id === id);
