@@ -475,15 +475,16 @@
 
     <!-- Beast -->
     <div id="tab-beast" hidden>
-      <div class="cols">
+      <div class="panel"><h2>Beasts</h2><div id="beastViews" class="bar" style="margin-top:0"></div></div>
+      <div class="cols" data-bst="overview">
         <div class="panel"><h2>Your beast</h2><div id="beastActive"></div></div>
         <div class="panel"><h2>Beast mission</h2><div id="beastMission"></div></div>
       </div>
-      <details class="panel" open>
+      <details class="panel" open data-bst="eggs">
         <summary class="cat">Eggs <span id="eggCount" class="count"></span></summary>
         <div id="beastEggs"></div>
       </details>
-      <details class="panel" open>
+      <details class="panel" open data-bst="beasts">
         <summary class="cat">Your beasts <span id="beastCount" class="count"></span></summary>
         <div class="bar" style="margin-top:0">
           <input id="beastSearch" type="search" placeholder="Search beasts, e.g. drake, rare, expeditions" style="flex:1 1 220px">
@@ -495,11 +496,11 @@
         <p class="dim small" style="margin:6px 0">Click a kind of beast to see every one of them you have.</p>
         <div id="beastList"></div>
       </details>
-      <details class="panel" id="beastTradePanel" open>
+      <details class="panel" id="beastTradePanel" open data-bst="trades">
         <summary class="cat">Beast trades <span id="beastTradeCount" class="count"></span></summary>
         <div id="beastTrades" class="scroll"></div>
       </details>
-      <details class="panel" id="arenaPanel" open>
+      <details class="panel" id="arenaPanel" open data-bst="arena">
         <summary class="cat">Arena <span id="duelCount" class="count"></span></summary>
         <p class="dim small" style="margin-top:0">Challenge another city to a duel. They can see your beast but not your
           bet, and they choose whether to accept. If they do, they pick a beast and a bet of their own, both bets are
@@ -520,7 +521,7 @@
         <div class="cat">Your recent duels</div>
         <div id="duelResults"></div>
       </details>
-      <details class="panel">
+      <details class="panel" data-bst="overview">
         <summary class="cat">How beasts work</summary>
         <p class="dim small" style="margin:0">Every egg has one small mission of its own, shown with the egg. It
           hatches once it has been kept warm long enough and that mission is done. Egg missions never run out,
@@ -1995,7 +1996,30 @@ function fillTrade() {
   for (const box of document.querySelectorAll('#tab-beast input[data-td]'))
     if (box.value !== tradeDraft[box.dataset.td]) box.value = tradeDraft[box.dataset.td];
 }
+let beastView = settings.beastView || 'overview';   // which part of the Beast tab shows (remembered)
+const beastShows = part => beastView === 'all' || beastView === part;
+// The buttons along the top of the Beast tab, each with what is waiting there.
+function renderBeastViews() {
+  const { state } = view, bv = view.beast, own = !visiting;
+  const m = bv.mission, eggs = bv.beasts.filter(b => b.egg), hatched = bv.beasts.length - eggs.length;
+  const eggTodo = eggs.filter(b => b.task && !b.task.complete).length;
+  const forMe = (view.market.duels || []).filter(d => d.to === state.name).length;
+  const mine = (view.market.beast_offers || []).filter(o => o.city === state.name).length;
+  const parts = {
+    overview: ['Your beast', !own || !bv.hatched ? '' : m && !m.complete ? '<span class="good">mission to do</span>' : 'mission done'],
+    eggs: ['Eggs', `${eggs.length}` + (own && eggTodo ? `, <span class="good">${eggTodo} waiting on you</span>` : '')],
+    beasts: ['All beasts', `${hatched}`],
+    ...(own ? { trades: ['Trades', `${(view.market.beast_offers || []).length} on offer` + (mine ? `, ${mine} yours` : '')],
+                arena: ['Arena', forMe ? `<span class="hi">${forMe} ${forMe === 1 ? 'challenge' : 'challenges'} for you</span>` : ''] } : {}),
+    all: ['Everything', ''],
+  };
+  if (!parts[beastView]) beastView = 'overview';
+  setHTML($('beastViews'), Object.entries(parts).map(([k, [label, note]]) =>
+    `<button data-beast-view="${k}" class="${beastView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
+  for (const panel of document.querySelectorAll('#tab-beast [data-bst]')) panel.hidden = !beastShows(panel.dataset.bst);
+}
 function renderBeast() {
+  renderBeastViews();
   const { state } = view, bv = view.beast, R = view.defs.resources, S = bv.stats, own = !visiting;
   const meter = (n, total, cls) => `<div class="meter"><div class="${cls || ''}" style="width:${total ? Math.min(100, n / total * 100) : 0}%"></div></div>`;
   const tick = ok => `<span class="${ok ? 'good' : 'bad'}">[${ok ? 'x' : ' '}]</span>`;
@@ -2130,7 +2154,7 @@ function renderBeast() {
 
   // ---- beasts other cities (and this one) have put up for trade ----
   renderArena();
-  $('beastTradePanel').hidden = !own;
+  $('beastTradePanel').hidden = !own || !beastShows('trades');
   if (!own) return;
   const offers = view.market.beast_offers || [];
   $('beastTradeCount').textContent = `(${offers.length})`;
@@ -2190,7 +2214,7 @@ function fillDuels() {
 }
 function renderArena() {
   const { state } = view, bv = view.beast, R = view.defs.resources, own = !visiting;
-  $('arenaPanel').hidden = !own;
+  $('arenaPanel').hidden = !own || !beastShows('arena');
   if (!own) return;
   const fighters = bv.beasts.filter(b => !b.egg && !b.duel);
   const stats = st => Object.keys(bv.stats).map(k => st[k]).join(' / ');
@@ -2819,6 +2843,10 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!$('report').hidden) $('reportOk').click(); else if (!$('away').hidden) $('awayOk').click();
 });
+$('beastViews').onclick = e => {
+  const b = e.target.closest('[data-beast-view]');
+  if (b) { beastView = settings.beastView = b.dataset.beastView; saveSettings(); renderBeast(); }
+};
 $('tab-beast').onclick = e => {
   if ('deliver' in e.target.dataset) act('mission_deliver');
   else if (e.target.dataset.eggDeliver) act('egg_deliver', { beast: +e.target.dataset.eggDeliver });
