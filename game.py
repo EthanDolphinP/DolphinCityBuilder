@@ -30,6 +30,7 @@ beasts (eggs, missions and the bonuses they give) in beasts.py.
 
 import math
 import random
+from contextlib import contextmanager
 import re
 
 import beasts
@@ -2522,6 +2523,11 @@ def work_plan(state):
 
     Returns (jobs, housing, totals) where jobs is a list of working buildings.
     """
+    with _stats_cached():
+        return _work_plan(state)
+
+
+def _work_plan(state):
     free = state["population"]
     housing, needed, herd_room, jobs = BASE_HOUSING + int(beasts.bonus(state, "housing")), 0, 0, []
     beast_power = 1 + beasts.bonus(state, "power")
@@ -2624,8 +2630,30 @@ def _meal(state, housing, when):
     return arrivals > 0
 
 
+_STAT_CACHE = None     # while view() or work_plan() runs (they change nothing) each city_stat is worked out once, not per tile
+
+
+@contextmanager
+def _stats_cached():
+    """Keep city_stat results for the length of a calculation that changes nothing in the city."""
+    global _STAT_CACHE
+    if _STAT_CACHE is not None:      # already inside one
+        yield
+        return
+    _STAT_CACHE = {}
+    try:
+        yield
+    finally:
+        _STAT_CACHE = None
+
+
 def city_stat(state, field):
     """`field` added up over every building (and its additions) in the city."""
+    if _STAT_CACHE is not None:
+        key = (id(state), field)
+        if key not in _STAT_CACHE:
+            _STAT_CACHE[key] = sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
+        return _STAT_CACHE[key]
     return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
 
 
@@ -3136,8 +3164,41 @@ def apply_action(state, now, action, data):
 # What the browser sees
 # --------------------------------------------------------------------------
 
-def view(state, ai=0):
-    """The saved state plus everything the UI needs computed to show area `ai`."""
+def view(state, ai=0, detail=None):
+    """The saved state plus everything the UI needs computed to show area `ai`.
+
+    What could be built or added on a tile is only worked out for `detail`, the
+    (x, y) of the tile the player has selected: doing it for every tile was most
+    of the work and most of the size of each reply.
+    """
+    with _stats_cached():
+        return _view(state, ai, detail)
+
+
+DEFS = None       # the content tables the page needs, the same for every city; see defs()
+
+
+def defs():
+    global DEFS
+    if DEFS is None:
+        DEFS = {
+            "terrains": TERRAINS,
+            "resources": RESOURCES,
+            "tradeable": [k for k in RESOURCES if k not in UNTRADEABLE],
+            "buildings": BUILDINGS,
+            "categories": CATEGORIES,
+            "tech": TECH_LEVELS,
+            "research": RESEARCH,
+            "additions": ADDITIONS,
+            "max_additions": MAX_ADDITIONS,
+            "slaughter_food": SLAUGHTER_FOOD,
+            "environments": ENVIRONMENTS,
+            "wildlife": WILDLIFE,
+        }
+    return DEFS
+
+
+def _view(state, ai, detail):
     if not 0 <= ai < len(state["areas"]):
         ai = 0
     area = state["areas"][ai]
@@ -3185,6 +3246,10 @@ def view(state, ai=0):
                 cell["tame"] = {"problem": tame_problem, "cost": cost,
                                 "affordable": not _missing(state, cost)}
             if tile["building"]:
+                cell["housing"] = tile_housing(tile)
+            if (x, y) != detail:
+                pass                     # build and addition choices only for the selected tile
+            elif tile["building"]:
                 cell["housing"] = tile_housing(tile)
                 cell["additions"] = []   # additions that could still be attached
                 for aid, a in ADDITIONS.items():
@@ -3257,20 +3322,7 @@ def view(state, ai=0):
             "expedition": trip and {**trip, "where": where(trip["rx"], trip["ry"]),
                                     "env": region_env(state, trip["rx"], trip["ry"])},
         },
-        "defs": {
-            "terrains": TERRAINS,
-            "resources": RESOURCES,
-            "tradeable": [k for k in RESOURCES if k not in UNTRADEABLE],
-            "buildings": BUILDINGS,
-            "categories": CATEGORIES,
-            "tech": TECH_LEVELS,
-            "research": RESEARCH,
-            "additions": ADDITIONS,
-            "max_additions": MAX_ADDITIONS,
-            "slaughter_food": SLAUGHTER_FOOD,
-            "environments": ENVIRONMENTS,
-            "wildlife": WILDLIFE,
-        },
+        "defs": defs(),
     }
 
 

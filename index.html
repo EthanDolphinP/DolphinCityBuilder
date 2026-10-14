@@ -1202,20 +1202,26 @@ function clock(t) {
   return new Date(t * 1000).toLocaleString([], style);
 }
 
+// The selected tile, whose build and addition choices the server works out (it skips the rest).
+const tileParam = () => sel ? `${sel.x},${sel.y}` : '';
+// The content tables never change while the game runs, so after the first reply they are not sent again.
+const defsHave = () => view && view.defs ? view.defs_version || '' : '';
+let detailAsked = '';   // the tile whose details have been asked for, so they are asked for once
 async function api(action, extra) {
   const opts = action
     ? { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Token': token},
-        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), ...extra }) }
+        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), tile: tileParam(), defs: defsHave(), ...extra }) }
     : { headers: {'X-Token': token} };
   const res = await fetch(action ? '/api/action'
-    : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}`
-    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}`, opts);
+    : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}&tile=${tileParam()}&defs=${defsHave()}`
+    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}`, opts);
   return res.json();
 }
 
 function accept(data) {
   // Ignore an answer about a city we have since stopped (or started) looking at.
   if ((data.visiting ? data.state.name : null) !== visiting) return;
+  if (!data.defs && view) data.defs = view.defs;          // the server left out what we already have
   if (!visiting) myBanned = data.state.banned;
   // A different area, or the map grew and coordinates shifted.
   if (view && (view.area !== data.area ||
@@ -1435,16 +1441,18 @@ function render() {
   renderTile();
   $('collectionPanel').hidden = !settings.collection;
   if (settings.collection && tab === 'city') renderCollection();
-  renderPeople();
-  renderBeast();
-  renderGuide();
-  renderSettings();
+  // Only the tab on screen is drawn; the others are drawn when they are opened.
+  if (tab === 'people') renderPeople();
+  if (tab === 'beast') renderBeast();
+  if (tab === 'guide') renderGuide();
+  if (tab === 'settings') renderSettings();
   $('mapKey').hidden = !settings.mapKey;
   fitMap();
-  renderResearch();
-  renderExplore();
-  if (!visiting) renderMarket();
-  if (!visiting) renderSocial();
+  if (tab === 'research') renderResearch();
+  if (tab === 'explore') renderExplore();
+  if (!visiting && tab === 'market') renderMarket();
+  if (!visiting && tab === 'social') renderSocial();
+  setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));   // city names the forms suggest
 
   const text = state.log.slice().reverse().map(e => `[${clock(e.t)}] ${e.text}`).join('\n');
   if ($('log').textContent !== text) $('log').textContent = text;
@@ -1548,6 +1556,8 @@ function renderTile() {
   if (!sel) { setHTML(box, `<div class="inspector-empty">${icon('pin')}<strong>Your city, tile by tile</strong><p>Select a building to manage it.<br>Select empty land to see what fits.</p><div class="owned-badge">${icon('check')} Built</div> <span class="state-badge missing">Empty land</span></div>`); return; }
   const { state, defs } = view;
   const t = state.areas[view.area].tiles[sel.y][sel.x], info = view.tiles[sel.y][sel.x], status = view.status;
+  const waiting = !(t.building ? 'additions' in info : 'build' in info);
+  if (waiting && detailAsked !== `${view.area}:${sel.x},${sel.y}`) { detailAsked = `${view.area}:${sel.x},${sel.y}`; refresh(); }
   const terr = defs.terrains[t.terrain];
   const water = (terr.groups || []).includes('water');
 
@@ -1592,7 +1602,8 @@ function renderTile() {
 
     // ---- additions ----
     const A = defs.additions;
-    if (t.additions.length || info.additions.length) {
+    if (waiting) html += `<p class="dim small">Loading what can be added here...</p>`;
+    else if (t.additions.length || info.additions.length) {
       html += section('additions', `Additions: ${t.additions.length} of ${defs.max_additions} attached`, true);
       for (const a of t.additions) html += `<div class="card"><span class="good">${esc(A[a].name)}</span> ` + (gfx() ? `<span class="owned-badge">${icon('check')}Owned</span>` : `<span class="dim small">attached</span>`) +
         `<div class="desc">${esc(A[a].desc)}</div></div>`;
@@ -1606,6 +1617,7 @@ function renderTile() {
     }
   } else if (!visiting) {
     // ---- what can be built here, by category ----
+    if (waiting) { setHTML(box, html + `<p class="dim">Loading what can be built here...</p>`); return; }
     const can = info.build.filter(o => !o.problem), cannot = info.build.filter(o => o.problem);
     if (!can.length) html += `<div class="cat">Build</div><div class="card dim">Nothing you know how to build fits this tile.</div>`;
     for (const [cat, label] of Object.entries(defs.categories)) {

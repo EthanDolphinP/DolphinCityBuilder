@@ -20,6 +20,7 @@ If someone forgets theirs, stop the server and run
 and whoever signs in to that city next chooses its new password.
 """
 
+import gzip
 import hashlib
 import hmac
 import json
@@ -231,8 +232,26 @@ def send_present(args):
             "It is handed out the next time anyone uses the game.")
 
 
-def city_view(state, now, area=0, find=None):
-    out = game.view(state, area if isinstance(area, int) else 0)
+DEFS_VERSION = None    # a short fingerprint of game.defs(), so a page that already has them isn't sent them again
+
+
+def _tile(value):
+    """ "x,y" (the tile the player has selected) -> (x, y), or None."""
+    try:
+        x, y = (int(v) for v in str(value).split(","))
+        return x, y
+    except (TypeError, ValueError):
+        return None
+
+
+def city_view(state, now, area=0, find=None, tile=None, have_defs=None):
+    global DEFS_VERSION
+    out = game.view(state, area if isinstance(area, int) else 0, _tile(tile))
+    if DEFS_VERSION is None:
+        DEFS_VERSION = hashlib.sha1(json.dumps(game.defs(), sort_keys=True).encode()).hexdigest()[:12]
+    out["defs_version"] = DEFS_VERSION
+    if have_defs == DEFS_VERSION:
+        del out["defs"]           # the page has these already: about 80 KB less on every update
     if isinstance(find, str) and ":" in find:      # the Find box: "kind:what"
         out["found"] = game.find(state, *find.split(":", 1))
     out["state"] = {k: v for k, v in state.items() if k not in PRIVATE}
@@ -264,7 +283,8 @@ def handle_get(path, query, token, now):
         if not signed_in(state, token):
             return 401, SIGN_IN
         ONLINE[name] = now
-        out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0])
+        out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0],
+                        query.get("tile", [""])[0], query.get("defs", [""])[0])
         out["away"] = game.check_in(state, now)
         return 200, out
 
@@ -279,7 +299,8 @@ def handle_get(path, query, token, now):
             return 404, {"error": f"There is no city called {name}."}
         if viewer in state["banned"]:
             return 403, {"error": f"{name} has banned your city from viewing it."}
-        out = city_view(state, now, _area(query.get("area", ["0"])[0]))
+        out = city_view(state, now, _area(query.get("area", ["0"])[0]), None,
+                        query.get("tile", [""])[0], query.get("defs", [""])[0])
         out["visiting"] = True
         out["state"].pop("social", None)    # who a city deals with, and its lists, are its own business
         out["state"].pop("messages", None)
@@ -379,7 +400,8 @@ def handle_post(path, data, token, now):
     else:
         error = game.apply_action(state, now, action, data)
     flush()
-    out = city_view(state, now, 0 if action == "restart" else data.get("area", 0), data.get("find"))
+    out = city_view(state, now, 0 if action == "restart" else data.get("area", 0), data.get("find"),
+                    data.get("tile"), data.get("defs"))
     out["error"] = error
     return 200, out
 
@@ -411,12 +433,23 @@ def respond(method, path, query="", token=None, body=b""):
                 flush()
         else:
             status, reply = 400, {"error": "Bad request."}
-        return status, json.dumps(reply).encode("utf-8"), "application/json"
+        return status, json.dumps(reply, separators=(",", ":")).encode("utf-8"), "application/json"
+
+
+def compress(body, accept_encoding):
+    """Gzip a reply if the browser accepts it: a city's update shrinks to about a tenth.
+    Returns (body, extra headers)."""
+    if len(body) > 1024 and "gzip" in (accept_encoding or ""):
+        return gzip.compress(body, compresslevel=5), [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]
+    return body, []
 
 
 class Handler(BaseHTTPRequestHandler):
     def _reply(self, status, body, content_type):
+        body, extra = compress(body, self.headers.get("Accept-Encoding"))
         self.send_response(status)
+        for name, value in extra:
+            self.send_header(name, value)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")

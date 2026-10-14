@@ -20,7 +20,8 @@ def application(environ, start_response):
     status, payload, content_type = server.respond(
         environ["REQUEST_METHOD"], environ.get("PATH_INFO") or "/",
         environ.get("QUERY_STRING", ""), environ.get("HTTP_X_TOKEN"), body)
-    start_response(f"{status} {HTTPStatus(status).phrase}", [
+    payload, extra = server.compress(payload, environ.get("HTTP_ACCEPT_ENCODING"))
+    start_response(f"{status} {HTTPStatus(status).phrase}", extra + [
         ("Content-Type", content_type),
         ("Content-Length", str(len(payload))),
         ("Cache-Control", "no-store"),
