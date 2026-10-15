@@ -94,6 +94,10 @@
   .opt { border-top: 1px solid var(--line); padding: 7px 0; }
   .opt button { float: right; margin-left: 8px; }
   #log { max-height: 180px; overflow-y: auto; white-space: pre-wrap; }
+  #log.tall { max-height: 60vh; }
+  #advanceMore > summary { margin-top: 6px; }
+  .mobile #toMap { display: inline-block; }
+  #toMap { display: none; }
   #msg { margin-top: 8px; }
   #msg:empty { display: none; }      /* no empty gap under the figures when there is nothing to say */
   .glyph { display: inline-block; min-width: 2.2em; font-weight: bold; }
@@ -421,7 +425,8 @@
           <span id="advanceTitle" class="hi"></span>
           <button id="advance"></button>
         </div>
-        <div id="advanceInfo" class="checks"></div>
+        <details id="advanceMore"><summary id="advanceSummary" class="small"></summary>
+          <div id="advanceInfo" class="checks"></div></details>
       </div>
       <div class="cols">
         <div class="panel">
@@ -447,7 +452,7 @@
           </div>
         </div>
         <div class="panel inspector" id="inspector">
-          <div class="head"><h2 id="tileTitle">Tile</h2><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
+          <div class="head"><h2 id="tileTitle">Tile</h2><button id="toMap" title="Back up to the map">Back to the map</button><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
           <div id="tile" class="dim">
             <div id="tileInfo"></div>
             <div id="buildTools" hidden>
@@ -470,7 +475,13 @@
         <div id="collectionFilters" class="collection-filters"></div>
         <div id="collection" class="collection-grid"></div>
       </div>
-      <details class="panel" id="logPanel" open><summary class="cat" style="margin:0">Recent activity</summary><h2>Chronicle</h2><div id="log" class="dim"></div></details>
+      <details class="panel" id="logPanel" open><summary class="cat" style="margin:0">Recent activity</summary><h2>Chronicle</h2>
+        <div class="bar" style="margin-top:0">
+          <input id="logSearch" type="search" placeholder="Search the Chronicle" style="flex:1 1 160px">
+          <span id="logKinds" class="bar" style="margin:0"></span>
+          <button id="logTall" title="Show more lines at once">Taller</button>
+        </div>
+        <div id="log" class="dim" style="margin-top:6px"></div></details>
     </div>
 
     <!-- Beast -->
@@ -1207,7 +1218,7 @@ function renderTutorial() {
   for (const a of state.areas) for (const row of a.tiles) for (const t of row) if (t.building) { built.add(t.building); count++; }
   const c = { state, beast: view.beast, built: count, has: (...ids) => ids.some(id => built.has(id)) };
   const done = TUTORIAL.map(([, , test]) => !!test(c)), n = done.filter(Boolean).length, next = done.indexOf(false);
-  const show = settings.tutorial && !visiting && next >= 0;
+  const show = settings.tutorial && !visiting && next >= 0 && state.tech < 2;   // past Village a city knows its way round
   $('tutorial').hidden = !show;
   if (!show) return;
   setHTML($('tutorialBody'),
@@ -1512,6 +1523,14 @@ function render() {
   $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
   $('advance').hidden = !adv;
   if (adv) { $('advance').textContent = `Advance to ${adv.name}`; $('advance').disabled = !adv.ready; }
+  $('advanceMore').hidden = !adv;
+  if (adv) {
+    const met = adv.checks.filter(c => c.ok).length;
+    setHTML($('advanceSummary'), adv.ready ? '<span class="good">Everything it needs is ready</span>'
+      : `<span class="dim">What it needs:</span> ${met} of ${adv.checks.length} ready` +
+        ` <span class="dim">(still missing: ${esc(adv.checks.filter(c => !c.ok).map(c => c.text.replace(/^[\d,.]+ of [\d,.]+ /, '')).join(', '))})</span>`);
+    if ($('advanceMore')._set === undefined) { $('advanceMore').open = settings.advanceOpen !== false; $('advanceMore')._set = true; }
+  }
   setHTML($('advanceInfo'), !adv ? '' : gfx() ? `<div class="requirement-grid">${adv.checks.map(requirementCard).join('')}</div>`
     : adv.checks.map(c => `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join(''));
 
@@ -1574,7 +1593,19 @@ function render() {
   if (!visiting && tab === 'social') renderSocial();
   setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));   // city names the forms suggest
 
-  const text = state.log.slice().reverse().map(e => `[${clock(e.t)}] ${e.text}`).join('\n');
+  // The Chronicle, narrowed by the search box and the kind of entry.
+  const LOG_KINDS = { all: ['All', /./], build: ['Building', /built|demolish|added .* to the|addition/i],
+                      people: ['People', /arriv|population|hungry|meal|food has/i],
+                      beast: ['Beasts', /beast|egg|mission|hatch|duel/i],
+                      trade: ['Trade', /offer|bought|sold|bill|trade|market|present/i],
+                      explore: ['Exploring', /expedition|mapped|area|tame|wild/i],
+                      learn: ['Research', /research|tech level|now a |ideology|blessing|breakthrough|charter|pact|discovery|tradition/i] };
+  if (!LOG_KINDS[logKind]) logKind = 'all';
+  setHTML($('logKinds'), Object.entries(LOG_KINDS).map(([k, [label, re]]) =>
+    `<button class="chip ${logKind === k ? 'on' : ''}" data-log-kind="${k}">${label} <span class="dim">${state.log.filter(e => re.test(e.text)).length}</span></button>`).join(''));
+  const lwords = $('logSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const entries = state.log.filter(e => LOG_KINDS[logKind][1].test(e.text) && lwords.every(w => e.text.toLowerCase().includes(w)));
+  const text = entries.slice().reverse().map(e => `[${clock(e.t)}] ${e.text}`).join('\n') || 'Nothing in the Chronicle matches.';
   if ($('log').textContent !== text) $('log').textContent = text;
 
   tick();
@@ -2281,6 +2312,7 @@ function renderArena() {
 }
 
 let socFilter = 'known';    // which cities the Social tab lists
+let logKind = 'all';         // which kind of Chronicle entry shows
 let readSent = '';          // the last conversation this page told the server it has read
 let lastBuilt = null;       // the building last built, offered first on the next empty tile
 const SOC_KINDS = { trade: ['trade', 'trades'], beast: ['beast trade', 'beast trades'], bill: ['bill event', 'bill events'],
@@ -3122,8 +3154,17 @@ $('buildSort').onchange = () => { settings.buildSort = $('buildSort').value; sav
 $('buildSort').value = settings.buildSort || 'newest';
 $('map').onclick = e => {
   const b = e.target.closest('.tile');
-  if (b) { sel = { x: +b.dataset.x, y: +b.dataset.y }; render(); }
+  if (!b) return;
+  sel = { x: +b.dataset.x, y: +b.dataset.y };
+  render();
+  // On a phone the tile's details are far below the map: go to them (the visual style shows them as a sheet instead).
+  if (isMobile && !gfx()) $('inspector').scrollIntoView({ block: 'start' });
 };
+$('toMap').onclick = () => $('map').scrollIntoView({ block: 'center' });
+$('advanceMore').addEventListener('toggle', () => { settings.advanceOpen = $('advanceMore').open; saveSettings(); });
+$('logKinds').onclick = e => { const b = e.target.closest('[data-log-kind]'); if (b) { logKind = b.dataset.logKind; render(); } };
+$('logSearch').oninput = () => { if (view) render(); };
+$('logTall').onclick = () => { const tall = $('log').classList.toggle('tall'); $('logTall').textContent = tall ? 'Shorter' : 'Taller'; };
 $('tile').addEventListener('toggle', e => {   // remember which sections are open
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
