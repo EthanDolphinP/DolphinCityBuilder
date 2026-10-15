@@ -545,18 +545,19 @@
 
     <!-- People -->
     <div id="tab-people" hidden>
-      <div class="panel"><h2>Will the city grow?</h2><div id="pplGrowth"></div></div>
+      <div class="panel"><h2>People</h2><div id="pplViews" class="bar" style="margin-top:0"></div></div>
+      <div class="panel" data-ppl="growth"><h2>Will the city grow?</h2><div id="pplGrowth"></div></div>
       <div class="cols">
-        <div class="panel"><h2>Food</h2><div id="pplFood"></div>
+        <div class="panel" data-ppl="food"><h2>Food</h2><div id="pplFood"></div>
           <form id="slaughterForm" class="bar" hidden>
             <span class="pair">Slaughter <input id="slaughterN" type="number" min="1" step="1" value="1"> livestock</span>
             <button>Slaughter</button>
             <span id="slaughterNote" class="dim small"></span>
           </form>
         </div>
-        <div class="panel"><h2>Housing</h2><div id="pplHousing"></div></div>
+        <div class="panel" data-ppl="housing"><h2>Housing</h2><div id="pplHousing"></div></div>
       </div>
-      <div class="panel"><h2>Work</h2><div id="pplWork"></div></div>
+      <div class="panel" data-ppl="work"><h2>Work</h2><div id="pplWork"></div></div>
     </div>
 
     <!-- Explore -->
@@ -2487,8 +2488,24 @@ function renderSettings() {
     `<div class="opt"><button data-unban="${esc(c)}">Unban</button>${esc(c)}</div>`).join('') : `<span class="dim">You have not banned anyone.</span>`);
 }
 
+let pplView = settings.pplView || 'all';   // which part of the People tab shows (remembered)
 function renderPeople() {
   const { state, status } = view, pop = state.population, food = Math.floor(state.resources.food);
+  // ---- the buttons along the top, each saying in a word or two how that part is doing ----
+  {
+    const growing = status.growth.every(g => g.ok) && !state.hungry, net = status.rates.food;
+    const free = status.housing - pop, gap = Math.max(0, status.jobs - (pop - status.idle));
+    const parts = {
+      all: ['Overview', ''],
+      growth: ['Growth', growing ? `<span class="good">+${status.arrivals_next} next meal</span>` : '<span class="bad">not growing</span>'],
+      food: ['Food', `<span class="${net >= 0 ? 'good' : 'bad'}">${net >= 0 ? '+' : ''}${num(net)} / hour</span>`],
+      housing: ['Housing', free > 0 ? `${free} free` : '<span class="bad">full</span>'],
+      work: ['Work', gap ? `<span class="bad">${gap} jobs empty</span>` : status.idle ? `${status.idle} idle` : '<span class="good">all filled</span>'],
+    };
+    setHTML($('pplViews'), Object.entries(parts).map(([k, [label, note]]) =>
+      `<button data-ppl-view="${k}" class="${pplView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join(''));
+    for (const panel of document.querySelectorAll('#tab-people [data-ppl]')) panel.hidden = pplView !== 'all' && panel.dataset.ppl !== pplView;
+  }
   const meter = (parts, total) => `<div class="meter">` + parts.map(([n, cls]) =>
     `<div class="${cls || ''}" style="width:${total ? Math.min(100, n / total * 100) : 0}%"></div>`).join('') + `</div>`;
   const perHour = 3600 / status.meal_time;
@@ -2530,7 +2547,7 @@ function renderPeople() {
     meter([[Math.min(pop, status.housing), pop >= status.housing ? 'warn' : '']], Math.max(status.housing, pop)) +
     `<p class="${pop >= status.housing ? 'bad' : 'dim'}">` + (pop >= status.housing ? 'Full. Nobody new can move in until you build more.'
       : `${status.housing - pop} free ${status.housing - pop === 1 ? 'place' : 'places'}.`) + `</p>` +
-    status.housing_from.map(([name, n]) => `<div class="opt">${esc(name)} <span style="float:right">${n}</span></div>`).join(''));
+    status.housing_from.slice().sort((a, b) => b[1] - a[1]).map(([name, n]) => `<div class="opt">${esc(name)} <span style="float:right">${n}</span></div>`).join(''));
 
   // Work
   const staffed = pop - status.idle, short = Math.max(0, status.jobs - staffed);
@@ -2541,7 +2558,8 @@ function renderPeople() {
     `<p>` + (short ? `<span class="bad">${short} ${short === 1 ? 'job has' : 'jobs have'} nobody to do ${short === 1 ? 'it' : 'them'}.</span> ` +
         `Grow the population, or select a building and use its Staffing buttons to choose which ones get workers first.`
       : status.idle ? `${status.idle} ${status.idle === 1 ? 'person has' : 'people have'} nothing to do. They still eat, so build something for them to work in.`
-      : 'Everyone has a job and every job is filled.') + `</p>`);
+      : 'Everyone has a job and every job is filled.') + `</p>` +
+    (short || view.areas.some(a => a.problems) ? `<div class="bar"><button data-ppl-problems>Show buildings that need attention on the map</button></div>` : ''));
 }
 
 // The Guide. `opening` is true when the search or menus just changed: sections
@@ -3173,6 +3191,19 @@ $('research').addEventListener('toggle', e => {
   const key = e.target.dataset && e.target.dataset.fold;
   if (key && key.startsWith('res:')) foldState.set(key, e.target.open);
 }, true);
+$('pplViews').onclick = e => {
+  const b = e.target.closest('[data-ppl-view]');
+  if (b) { pplView = settings.pplView = b.dataset.pplView; saveSettings(); renderPeople(); }
+};
+$('pplWork').onclick = e => {
+  if (!e.target.closest('[data-ppl-problems]')) return;
+  // the City tab's Find box, set to buildings that are not working properly
+  finder = { kind: 'problems', what: '' };
+  $('findKind').value = 'problems';
+  findChoices();
+  tab = 'city';
+  refresh();
+};
 $('slaughterForm').onsubmit = e => {
   e.preventDefault();
   act('slaughter', { count: Number($('slaughterN').value) });
