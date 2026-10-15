@@ -17,7 +17,9 @@ market.py, which use take() and give() here to move a beast.
 
 More eggs come from expeditions (rarer species are likelier far from home,
 and a species is likelier in the kinds of land it lives in, its "home"), from
-rare weather (now and then an egg turns up where it is passing),
+rare weather (now and then an egg turns up where it is passing), from
+breeding (a male and a female of one species lay an egg every BREED_TIME, its
+stats a mix of theirs: see "Breeding" below),
 from taming wild animals (a small chance of a nest), from reaching a new tech
 level, from a beast reaching level 5 and level 10, and from a Nesting Ground
 building, which lays one every few days. Presents and trades can bring them too.
@@ -57,6 +59,9 @@ TAME_EGG_CHANCE = 0.06      # chance that taming a wild animal turns up an egg
 TECH_EGGS = ["common", "uncommon", "rare", "epic", "legendary"]   # the egg for reaching Village, Town, ...
 EGG_LEVELS = {5: 0, 10: 1, 15: 1, 20: 2}   # a beast reaching this level brings home an egg this many rarities above its own
 NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often (there is no limit on eggs)
+SEXES = ("male", "female")  # every beast is one, chosen when its egg is found
+BREED_TIME = 12 * HOUR      # a breeding pair lays an egg this often
+BREED_MUTATION = 0.05       # a bred stat lands between its parents', then moves up to 5% either way
 NEST_WEIGHTS = {"common": 70, "uncommon": 25, "rare": 5}
 HOME_WEIGHT = 4             # a species is this many times likelier on an expedition into land it calls home
 WEATHER_EGG_CHANCE = 0.004  # chance, at each meal, that rare weather in an area turns up an egg there
@@ -593,7 +598,8 @@ def _pick_kind(state, rng, level, avoid=None):
 def new_egg(state, now, species):
     state["beast_count"] = state.get("beast_count", 0) + 1
     beast = {"id": state["beast_count"], "species": species, "stage": "egg", "level": 0, "xp": 0,
-             "obtained": now, "missions": 0, "tasks_needed": rarity_of(species)["egg_tasks"]}
+             "obtained": now, "missions": 0, "tasks_needed": rarity_of(species)["egg_tasks"],
+             "sex": random.choice(SEXES)}
     beast["task"] = _egg_task(state, species, random.Random())
     beast["stats"] = roll_stats(species, random.Random())
     state["beasts"].append(beast)
@@ -623,6 +629,8 @@ def take(state, beast_id):
         return None, "Your active beast can't be traded. Make another beast active first."
     if beast.get("duel"):
         return None, "That beast is waiting for a duel. Withdraw the duel first."
+    if beast["id"] in _pair(state):
+        return None, "That beast is in your breeding pair. Stop breeding first."
     state["beasts"].remove(beast)
     return beast, None
 
@@ -644,7 +652,7 @@ def public(beast):
         return {"egg": True, "name": f"{rarity['name']} egg", "rarity": rarity["name"], "color": rarity["color"]}
     return {"egg": False, "name": species["name"], "species": beast["species"], "rarity": rarity["name"],
             "color": rarity["color"], "level": beast["level"], "stats": beast["stats"], "nature": species["nature"],
-            "likes": LIKES[beast["species"]]}
+            "likes": LIKES[beast["species"]], "sex": beast.get("sex")}
 
 
 def _egg_task(state, species, rng, avoid=None):
@@ -692,6 +700,9 @@ def migrate(state, now):
     for beast in state["beasts"]:
         if "stats" not in beast:    # a beast from before stats
             beast["stats"] = roll_stats(beast["species"], random.Random())
+        if "sex" not in beast:      # a beast from before breeding
+            beast["sex"] = random.choice(SEXES)
+    state.setdefault("breeding", None)
     # Eggs from before rarity mattered: as many missions as their rarity asks, and a fresh one that fits.
     for beast in state["beasts"]:
         if beast["stage"] == "egg" and "tasks_needed" not in beast:
@@ -920,6 +931,7 @@ def tick(state, now):
             game.log(state, now, f"*** The egg has hatched: a {species['name']} "
                                  f"({RARITIES[species['rarity']]['name'].lower()}), {species['nature'].lower()}. ***")
     _nest(state, now)
+    _breed(state, now)
     _pick_active(state)
     _check_possible(state, now)
     beast = active(state)
@@ -972,6 +984,95 @@ def _nest(state, now):
     game.log(state, now, f"A {view_name(egg)} has been laid at the Nesting Ground. See the Beast tab.")
 
 
+# --------------------------------------------------------------- breeding --
+# The player picks a male and a female hatched beast of one species. Every
+# BREED_TIME the pair lays an egg of that species, which waits in the breeding
+# pen until the player collects it. Each of its stats lands somewhere between
+# its parents' and then moves a little either way (BREED_MUTATION), never past
+# what the species can have, so careful breeding can work up to an S.
+# state["breeding"] = {"male": id, "female": id, "next": time, "eggs": [{"stats", "parents"}]}
+# (the pair may be gone while laid eggs still wait).
+
+def _pair(state):
+    b = state.get("breeding") or {}
+    return [b[k] for k in ("male", "female") if b.get(k)]
+
+
+def bred_stats(species, one, two, rng):
+    """A child's stats: each between its parents', give or take BREED_MUTATION, within what the species can have."""
+    out = {}
+    for key, (low, high) in stat_range(species).items():
+        a, b = sorted((one[key], two[key]))
+        value = rng.uniform(a, b) * rng.uniform(1 - BREED_MUTATION, 1 + BREED_MUTATION)
+        out[key] = max(low, min(high, round(value)))
+    return out
+
+
+def breed_set(state, now, male_id, female_id):
+    male, female = get(state, male_id), get(state, female_id)
+    if not male or not female:
+        return "Pick a male and a female from your beasts."
+    if male["stage"] == "egg" or female["stage"] == "egg":
+        return "Only hatched beasts can breed."
+    if male["species"] != female["species"]:
+        return "Both parents must be the same kind of beast."
+    if male.get("sex") != "male" or female.get("sex") != "female":
+        return "Pick one male and one female."
+    old = state.get("breeding") or {}
+    if (old.get("male"), old.get("female")) == (male_id, female_id):
+        return "Those two are already your breeding pair."
+    state["breeding"] = {"male": male_id, "female": female_id, "next": now + BREED_TIME, "eggs": old.get("eggs", [])}
+    game.log(state, now, f"{title(male)} and {title(female)} are now your breeding pair. "
+                         f"Their first egg will be ready in {BREED_TIME // HOUR} hours.")
+    return None
+
+
+def breed_stop(state, now):
+    b = state.get("breeding")
+    if not b or not _pair(state):
+        return "You have no breeding pair."
+    state["breeding"] = {"eggs": b.get("eggs", [])} if b.get("eggs") else None
+    game.log(state, now, "The breeding pair has been split up.")
+    return None
+
+
+def breed_collect(state, now):
+    b = state.get("breeding")
+    if not b or not b.get("eggs"):
+        return "There are no eggs in the breeding pen yet."
+    for laid in b["eggs"]:
+        egg = new_egg(state, now, laid["species"])
+        egg.update(stats=laid["stats"], bred=laid["parents"])
+        game.tally(state, "bred")
+    game.log(state, now, f"Collected {len(b['eggs'])} {'egg' if len(b['eggs']) == 1 else 'eggs'} from the breeding pen. See the Eggs.")
+    b["eggs"] = []
+    if not _pair(state):
+        state["breeding"] = None
+    return None
+
+
+def _breed(state, now):
+    """Lay the eggs that are due, and split the pair up if either parent has gone (traded, say)."""
+    b = state.get("breeding")
+    if not b or not _pair(state):
+        return
+    male, female = get(state, b["male"]), get(state, b["female"])
+    if not male or not female or male["stage"] == "egg" or female["stage"] == "egg":
+        state["breeding"] = {"eggs": b["eggs"]} if b.get("eggs") else None
+        game.log(state, now, "The breeding pair has been split up: one of them is no longer here.")
+        return
+    rng = random.Random()
+    laid = 0
+    while now >= b["next"]:
+        b["eggs"].append({"species": male["species"], "stats": bred_stats(male["species"], male["stats"], female["stats"], rng),
+                          "parents": [f"{title(male)} (level {male['level']})", f"{title(female)} (level {female['level']})"]})
+        b["next"] += BREED_TIME
+        laid += 1
+    if laid:
+        game.log(state, b["next"] - BREED_TIME, f"Your breeding pair has laid {'an egg' if laid == 1 else f'{laid} eggs'}. "
+                                                f"Collect it from the Breeding part of the Beast tab.")
+
+
 # ------------------------------------------------------------ expeditions --
 
 def expedition_egg(state, now, distance, rng, env=None):
@@ -1021,6 +1122,22 @@ def _describe(per, level, power):
     return out
 
 
+def _breeding_view(state):
+    b = state.get("breeding") or {}
+    pair = _pair(state)
+    out = {"eggs": [{"species": e["species"], "name": SPECIES[e["species"]]["name"], "stats": e["stats"], "parents": e["parents"]}
+                    for e in b.get("eggs", [])]}
+    if pair:
+        male, female = get(state, b["male"]), get(state, b["female"])
+        species = male["species"]
+        # what the next egg's stats can be: from below the lower parent to above the higher one
+        ranges = {k: [max(lo, round(min(male["stats"][k], female["stats"][k]) * (1 - BREED_MUTATION))),
+                      min(hi, round(max(male["stats"][k], female["stats"][k]) * (1 + BREED_MUTATION)))]
+                  for k, (lo, hi) in stat_range(species).items()}
+        out.update(male=b["male"], female=b["female"], next=b["next"], species=species, ranges=ranges)
+    return out
+
+
 def view(state, now):
     power = _power(state)
     beasts = []
@@ -1029,6 +1146,9 @@ def view(state, now):
         rarity = RARITIES[species["rarity"]]
         entry = {"id": b["id"], "egg": egg, "active": b["id"] == state.get("beast_active"),
                  "rarity": rarity["name"], "color": rarity["color"], "level": b["level"]}
+        entry["sex"] = b.get("sex")
+        if egg and b.get("bred"):     # a bred egg: its parents, and so what is inside, are known
+            entry.update(bred={"parents": b["bred"], "species": b["species"], "name": species["name"], "stats": b["stats"]})
         if egg:     # what is inside stays a surprise
             entry.update(name=f"{rarity['name']} egg", warm=now - b["obtained"], warm_needed=hatch_time(state, b),
                          missions=b["missions"], tasks_needed=tasks_needed(b), task=b.get("task"))
@@ -1057,6 +1177,7 @@ def view(state, now):
         "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"], "range": stat_range(k)} for k, s in SPECIES.items()},
         "duel": DUEL, "duel_xp": DUEL_XP,
         "nest_at": state.get("nest_at"), "nest_time": NEST_TIME,
+        "breeding": _breeding_view(state), "breed_time": BREED_TIME, "breed_mutation": BREED_MUTATION,
         "tame_egg": round((TAME_EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
         "species_count": len(SPECIES),
         "duels": state.get("duels", []),

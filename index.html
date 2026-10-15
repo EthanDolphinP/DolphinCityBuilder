@@ -204,6 +204,7 @@
   .grade { font-weight: bold; font-size: 12px; padding: 0 3px; border-radius: 3px; border: 1px solid currentColor; }
   .gS { color: #e6c35c; } .gA { color: #7fd17f; } .gB { color: #a6d96a; } .gC { color: #d9d36a; }
   .gD { color: #e0a85a; } .gE { color: #e08a5a; } .gF { color: #e06a6a; }
+  .sex.m { color: #6fb3e8; } .sex.f { color: #e88fc0; }
   .pin { background: none; border: none; padding: 0 4px; color: var(--dim); cursor: pointer; font: inherit; }
   .pin.on { color: var(--hi); }
   .statTable th[data-stat-sort] { cursor: pointer; }
@@ -525,6 +526,10 @@
         <p class="dim small" style="margin:6px 0">Click a kind of beast to see every one of them you have.</p>
         <div id="beastList"></div>
       </details>
+      <details class="panel" id="breedPanel" open data-bst="breeding">
+        <summary class="cat">Breeding <span id="breedCount" class="count"></span></summary>
+        <div id="beastBreeding"></div>
+      </details>
       <details class="panel" id="beastTradePanel" open data-bst="trades">
         <summary class="cat">Beast trades <span id="beastTradeCount" class="count"></span></summary>
         <div id="beastTrades" class="scroll"></div>
@@ -570,7 +575,8 @@
           Every beast also has Health, Attack, Defense and Speed. They differ a little from one beast to the
           next of the same kind, and they do not change anything in the city. Each is graded against the lowest
           and highest its kind can have: F is the lowest, then E, D, C, B and A, and S is the best possible;
-          the overall grade averages all four. Any beast or egg except your
+          the overall grade averages all four. Every beast is male or female: on the Breeding part of this tab, a
+          male and a female of the same kind lay an egg every 12 hours, its stats a mix of their own. Any beast or egg except your
           active beast can be offered to other cities with its Trade button, for a material or for a beast
           of a kind and level you name.</p>
       </details>
@@ -1232,7 +1238,7 @@ const HOWTO = [
   ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
-  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
+  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
@@ -1535,6 +1541,7 @@ function render() {
   // Countdown timers, advanced locally between server updates by tick().
   timers = { meal: { cycle: status.meal_time, progress: state.meal, speed: 1, waiting: [] } };
   const bv = view.beast;
+  if (bv.breeding.male) timers.breed = { cycle: bv.breed_time, progress: bv.breed_time - (bv.breeding.next - view.now), speed: 1, waiting: [] };
   if (bv.nest_at) timers.nest = { cycle: bv.nest_time, progress: bv.nest_time - (bv.nest_at - view.now), speed: 1, waiting: [] };
   timers.mission = { cycle: bv.mission_period, progress: bv.mission_period - (bv.mission_at - view.now), speed: 1, waiting: [] };
   for (const b of bv.beasts) {
@@ -2245,6 +2252,8 @@ function renderBeastViews() {
     overview: ['Your beast', !own || !bv.hatched ? '' : m && !m.complete ? '<span class="good">mission to do</span>' : 'mission done'],
     eggs: ['Eggs', `${eggs.length}` + (own && eggTodo ? `, <span class="good">${eggTodo} waiting on you</span>` : '')],
     beasts: ['All beasts', `${hatched}`],
+    ...(own ? { breeding: ['Breeding', bv.breeding.eggs.length ? `<span class="good">${bv.breeding.eggs.length} ${bv.breeding.eggs.length === 1 ? 'egg' : 'eggs'} to collect</span>`
+                                     : bv.breeding.male ? 'pair breeding' : ''] } : {}),
     ...(own ? { trades: ['Trades', `${(view.market.beast_offers || []).length} on offer` + (mine ? `, ${mine} yours` : '')],
                 arena: ['Arena', forMe ? `<span class="hi">${forMe} ${forMe === 1 ? 'challenge' : 'challenges'} for you</span>` : ''] } : {}),
     all: ['Everything', ''],
@@ -2255,6 +2264,8 @@ function renderBeastViews() {
   for (const panel of document.querySelectorAll('#tab-beast [data-bst]')) panel.hidden = !beastShows(panel.dataset.bst);
 }
 // ---- stat grades: how good a stat is for its species. F to A from the lowest it can roll up, S the best ----
+const statLine = (st, sp) => Object.entries(view.beast.stats).map(([k, name]) => `<span class="dim">${esc(name)}</span> <span class="hi">${st[k]}</span>${gradeTag(sp, k, st[k])}`).join(' &nbsp; ') +
+  (sp ? ` &nbsp; <span class="dim">Overall</span> ${gradeTag(sp, null, st)}` : '');
 const GRADES = ['F', 'E', 'D', 'C', 'B', 'A'];
 function statPlace(species, k, v) {     // 0 = the lowest this species can roll, 1 = the highest
   const r = view.beast.species[species] && view.beast.species[species].range[k];
@@ -2279,8 +2290,6 @@ function renderBeast() {
   const { state } = view, bv = view.beast, R = view.defs.resources, S = bv.stats, own = !visiting;
   const meter = (n, total, cls) => `<div class="meter"><div class="${cls || ''}" style="width:${total ? Math.min(100, n / total * 100) : 0}%"></div></div>`;
   const tick = ok => `<span class="${ok ? 'good' : 'bad'}">[${ok ? 'x' : ' '}]</span>`;
-  const statLine = (st, sp) => Object.entries(S).map(([k, name]) => `<span class="dim">${esc(name)}</span> <span class="hi">${st[k]}</span>${gradeTag(sp, k, st[k])}`).join(' &nbsp; ') +
-    (sp ? ` &nbsp; <span class="dim">Overall</span> ${gradeTag(sp, null, st)}` : '');
   const options = (list, cur) => list.map(([v, n]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
   if (!tradeDraft.species) tradeDraft.species = Object.keys(bv.species)[0];
   if (tradeFor !== null && !bv.beasts.some(b => b.id === tradeFor)) tradeFor = null;
@@ -2303,7 +2312,11 @@ function renderBeast() {
     const warm = b.warm >= b.warm_needed, t = b.task;
     let html = `<div class="head"><span class="big" style="color:${esc(b.color)}">${esc(b.name)}</span></div>` +
       `<pre class="beastArt" style="color:${esc(b.color)}">${EGG_ART}</pre>` +
-      `<div class="dim small">Nobody knows what is inside until it hatches. ${b.tasks_needed > 1 ? 'Rarer eggs ask for more.' : ''} It needs two things:</div>` +
+      (b.bred ? `<div class="small">Bred from ${esc(b.bred.parents.join(' and '))}: a <span class="hi">${esc(b.bred.name)}</span> ${sexMark(b.sex)}</div>` +
+        `<div class="small">${Object.entries(bv.stats).map(([k, name]) => `<span class="dim">${esc(name)}</span> ${b.bred.stats[k]}${gradeTag(b.bred.species, k, b.bred.stats[k])}`).join(' &nbsp; ')}` +
+        ` &nbsp; <span class="dim">Overall</span> ${gradeTag(b.bred.species, null, b.bred.stats)}</div>`
+        : `<div class="dim small">Nobody knows what is inside until it hatches.</div>`) +
+      `<div class="dim small">${b.tasks_needed > 1 ? 'Rarer eggs ask for more. ' : ''}It needs two things:</div>` +
       `<div class="opt">${tick(warm)} Kept warm for ${duration(b.warm_needed)}` +
       (warm ? '' : ` - <span class="hi" data-timer="hatch${b.id}"></span> to go`) + `</div>` +
       `<div class="opt">${tick(b.missions >= b.tasks_needed)} ${b.tasks_needed > 1 ? `Its own missions, one after another (${Math.min(b.missions, b.tasks_needed)} of ${b.tasks_needed} done)` : 'Its own mission'}` +
@@ -2326,7 +2339,7 @@ function renderBeast() {
   setHTML($('beastActive'), mine
     ? `<div class="head"><span class="big" style="color:${esc(mine.color)}">${esc(mine.name)}</span><span class="dim small">${esc(mine.rarity)}</span></div>` +
       `<pre class="beastArt" style="color:${esc(mine.color)}">${esc(mine.art)}</pre><div class="desc">${esc(mine.desc)}</div>` +
-      kv([['Nature', esc(mine.nature)], ['Level', `<span class="hi">${mine.level}</span> of ${mine.cap} <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts grow to ${mine.cap})</span>`]]) +
+      kv([['Nature', esc(mine.nature)], ['Sex', sexMark(mine.sex, true)], ['Level', `<span class="hi">${mine.level}</span> of ${mine.cap} <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts grow to ${mine.cap})</span>`]]) +
       (mine.max_level ? `<div class="good small">Fully grown.</div>`
         : `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
       `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats, mine.species)}</div>` +
@@ -2383,6 +2396,7 @@ function renderBeast() {
       `<div>Reaching a new tech level: one egg each time, rarer at the higher levels.</div>` +
       `<div>A beast reaching level 5 brings home an egg as rare as it is; at levels 10 and 15, one rarer; at level 20, two rarities higher.</div>` +
       `<div>A Nesting Ground (Village, needs Incubation) is left an egg every ${duration(bv.nest_time)}.</div>` +
+      `<div>Breeding: a male and a female of one kind lay an egg every ${duration(bv.breed_time)}, its stats a mix of theirs.</div>` +
       `<div>Trading with other cities, below, and presents.</div>` +
       `<div class="dim">There are ${bv.species_count} kinds of beast to find.</div></div></details>`, fillTrade);
 
@@ -2412,7 +2426,7 @@ function renderBeast() {
         ...(g.list[0].home && g.list[0].home.length ? [['Home', esc(g.list[0].home.join(', ')) + ' <span class="dim small">(its eggs are likelier there)</span>']] : []),
         ['You have', g.list.length]])}</div></div>` +
       `<div class="scroll"><table><tr>${th('level', 'Level')}<th>Experience</th>${Object.entries(S).map(([k, name]) => th(k, esc(name))).join('')}${th('grade', 'Grade')}<th>Gives the city</th><th></th></tr>` +
-      g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed} <span class="small">(max ${b.cap})</span></td>` +
+      g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level} ${sexMark(b.sex)}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed} <span class="small">(max ${b.cap})</span></td>` +
         Object.keys(S).map(k => `<td>${b.stats[k]}${gradeTag(b.species, k, b.stats[k])}</td>`).join('') + `<td>${gradeTag(b.species, null, b.stats)}</td>` + `<td class="dim small" style="white-space:normal;min-width:160px">${esc(b.bonus.join('; '))}</td><td>` +
         (b.active ? `<span class="good">active</span>` : !own ? ''
           : `<button data-beast-active="${b.id}">Make active</button> ` +
@@ -2423,6 +2437,7 @@ function renderBeast() {
 
   // ---- beasts other cities (and this one) have put up for trade ----
   renderArena();
+  renderBreeding();
   $('beastTradePanel').hidden = !own || !beastShows('trades');
   if (!own) return;
   const offers = view.market.beast_offers || [];
@@ -2480,6 +2495,65 @@ function fillDuels() {
     out.textContent = bet < 1 ? 'Bet at least 1.' : bet > have ? `You have only ${have} ${R[res.value]}.`
       : `Your ${me.name} would fight at ${boostText(duelBoost(me.likes, res.value, bet))}` + (me.likes === res.value ? ' (it likes this).' : ` (it likes ${R[me.likes]}).`);
   }
+}
+const sexMark = (sex, words) => !sex ? '' : `<span class="sex${sex === 'male' ? ' m' : ' f'}" title="${sex}">${sex === 'male' ? '&#9794;' : '&#9792;'}${words ? ' ' + sex : ''}</span>`;
+const breedDraft = { species: '', male: '', female: '' };
+function renderBreeding() {
+  const bv = view.beast, own = !visiting, br = bv.breeding, S = bv.stats;
+  $('breedPanel').hidden = !own || !beastShows('breeding');
+  if (!own) return;
+  const hatched = bv.beasts.filter(b => !b.egg), byId = id => hatched.find(b => b.id === id);
+  $('breedCount').textContent = br.eggs.length ? `(${br.eggs.length} to collect)` : br.male ? '(breeding)' : '';
+  const statText = b => Object.keys(S).map(k => `${b.stats[k]}${grade(statPlace(b.species, k, b.stats[k]))}`).join(' / ') + ` [${grade(gradeScore(b.species, b.stats))}]`;
+  let html = `<p class="dim small" style="margin-top:0">Pick a male and a female of the same kind. Every ${duration(bv.breed_time)} they lay an egg of their kind, ` +
+    `which waits here until you collect it. Each of its stats lands between its parents' and can move up to ${Math.round(bv.breed_mutation * 100)}% either way, ` +
+    `never past the best its kind can have, so breeding your best beasts together can work up to S grades.</p>`;
+
+  // eggs waiting
+  if (br.eggs.length) html += `<div class="cat">In the breeding pen</div>` + br.eggs.map(e =>
+    `<div class="opt">${esc(e.name)} egg <span class="dim small">from ${esc(e.parents.join(' and '))}</span> - ` +
+    Object.entries(S).map(([k, name]) => `<span class="dim">${esc(name)}</span> ${e.stats[k]}${gradeTag(e.species, k, e.stats[k])}`).join(' &nbsp; ') +
+    ` &nbsp; <span class="dim">Overall</span> ${gradeTag(e.species, null, e.stats)}</div>`).join('') +
+    `<div class="bar"><button data-breed-collect>Collect ${br.eggs.length === 1 ? 'the egg' : 'all ' + br.eggs.length + ' eggs'}</button></div>`;
+
+  // the pair now
+  if (br.male) {
+    const m = byId(br.male), f = byId(br.female);
+    html += `<div class="cat">Your breeding pair</div>` +
+      [m, f].map(b => b ? `<div class="opt">${sexMark(b.sex)} <span style="color:${esc(b.color)}">${esc(b.name)}</span> level ${b.level} - ${statLine(b.stats, b.species)}</div>` : '').join('') +
+      `<div class="opt">Next egg in <span class="hi" data-timer="breed"></span></div>` +
+      `<div class="opt small"><span class="dim">Its stats can be:</span> ` + Object.entries(S).map(([k, name]) => {
+        const [lo, hi] = br.ranges[k];
+        return `<span class="dim">${esc(name)}</span> ${lo}${lo === hi ? '' : '-' + hi} <span class="dim">(${grade(statPlace(br.species, k, lo))}${lo === hi ? '' : ' to ' + grade(statPlace(br.species, k, hi))})</span>`;
+      }).join(' &nbsp; ') + `</div>` +
+      `<div class="bar"><button data-breed-stop>Stop breeding</button></div>`;
+  }
+
+  // choosing a pair: only kinds with at least one male and one female
+  const kinds = {};
+  for (const b of hatched) (kinds[b.species] = kinds[b.species] || { name: b.name, male: [], female: [] })[b.sex === 'male' ? 'male' : 'female'].push(b);
+  const ready = Object.entries(kinds).filter(([, k]) => k.male.length && k.female.length).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  html += `<div class="cat">${br.male ? 'Choose a different pair' : 'Choose a pair'}</div>`;
+  if (!ready.length) {
+    const lonely = Object.values(kinds).map(k => `${k.name} (${k.male.length ? k.male.length + ' male' : ''}${k.male.length && k.female.length ? ', ' : ''}${k.female.length ? k.female.length + ' female' : ''})`);
+    html += `<p class="dim">You don't have a male and a female of any one kind yet.` +
+      (lonely.length ? ` You have: ${esc(lonely.join(', '))}.` : '') +
+      ` More eggs come from expeditions, taming, a Nesting Ground, rare weather and new tech levels, or trade for a mate in Beast trades.</p>`;
+  } else {
+    if (!kinds[breedDraft.species] || !ready.some(([id]) => id === breedDraft.species)) breedDraft.species = ready[0][0];
+    const k = kinds[breedDraft.species];
+    if (!k.male.some(b => String(b.id) === breedDraft.male)) breedDraft.male = String([...k.male].sort((a, b) => gradeScore(b.species, b.stats) - gradeScore(a.species, a.stats))[0].id);
+    if (!k.female.some(b => String(b.id) === breedDraft.female)) breedDraft.female = String([...k.female].sort((a, b) => gradeScore(b.species, b.stats) - gradeScore(a.species, a.stats))[0].id);
+    const opt = (list, cur) => list.map(b => `<option value="${b.id}" ${String(b.id) === cur ? 'selected' : ''}>Level ${b.level}: ${esc(statText(b))}</option>`).join('');
+    html += `<div class="bar"><label class="dim">Kind <select data-bd="species">` +
+      ready.map(([id, x]) => `<option value="${esc(id)}" ${id === breedDraft.species ? 'selected' : ''}>${esc(x.name)} (${x.male.length} male, ${x.female.length} female)</option>`).join('') + `</select></label></div>` +
+      `<div class="bar"><label>${sexMark('male')} <select data-bd="male">${opt(k.male, breedDraft.male)}</select></label>` +
+      `<label>${sexMark('female')} <select data-bd="female">${opt(k.female, breedDraft.female)}</select></label>` +
+      `<button data-breed-start>${br.male ? 'Breed these two instead' : 'Start breeding'}</button></div>` +
+      `<p class="dim small">Stats are shown as health / attack / defense / speed with their grades; the best of each sex is picked for you.` +
+      (br.male ? ' Changing the pair starts the 12 hours again; eggs already laid stay in the pen.' : '') + `</p>`;
+  }
+  setHTMLKeep($('beastBreeding'), html);
 }
 function renderArena() {
   const { state } = view, bv = view.beast, R = view.defs.resources, own = !visiting;
@@ -3297,6 +3371,9 @@ $('tab-beast').onclick = e => {
   if ('deliver' in e.target.dataset) act('mission_deliver');
   else if (e.target.dataset.eggDeliver) act('egg_deliver', { beast: +e.target.dataset.eggDeliver });
   else if (e.target.dataset.beastActive) act('beast_active', { beast: +e.target.dataset.beastActive });
+  else if ('breedStart' in e.target.dataset) act('breed_set', { male: +breedDraft.male, female: +breedDraft.female });
+  else if ('breedStop' in e.target.dataset) act('breed_stop');
+  else if ('breedCollect' in e.target.dataset) act('breed_collect');
   else if (e.target.dataset.trade) { tradeFor = +e.target.dataset.trade; renderBeast(); }
   else if ('tradeClose' in e.target.dataset) { tradeFor = null; renderBeast(); }
   else if (e.target.dataset.tradePost) {
@@ -3315,6 +3392,7 @@ $('tab-beast').onclick = e => {
 $('tab-beast').addEventListener('input', e => {
   const d = e.target.dataset;
   if (d.td) { tradeDraft[d.td] = e.target.value; if (e.target.tagName === 'SELECT') renderBeast(); }
+  else if (d.bd) { breedDraft[d.bd] = e.target.value; renderBreeding(); }
   else if (d.btPay) payPick.set(+d.btPay, +e.target.value);
 });
 $('tab-beast').addEventListener('toggle', e => {   // remember which kinds of beast are open

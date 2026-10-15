@@ -3672,6 +3672,12 @@ def apply_action(state, now, action, data):
         return ideology.take(state, now, data.get("perk"))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
+    if action == "breed_set":
+        return beasts.breed_set(state, now, data.get("male"), data.get("female"))
+    if action == "breed_stop":
+        return beasts.breed_stop(state, now)
+    if action == "breed_collect":
+        return beasts.breed_collect(state, now)
     if action == "mission_deliver":
         return beasts.deliver(state, now)
     if action == "egg_deliver":
@@ -4027,7 +4033,7 @@ TALLIES = [
     ("additions", "Additions attached"), ("researched", "Research done"), ("tech_ups", "Tech levels gained"),
     ("expeditions", "Expeditions completed"), ("tamed", "Wild animals tamed"), ("tamed_livestock", "Livestock from taming"),
     ("slaughtered", "Livestock slaughtered by hand"), ("rare_weather", "Spells of rare weather seen (area x meal)"),
-    ("eggs", "Eggs found"), ("hatched", "Eggs hatched"), ("egg_missions", "Egg missions done"),
+    ("eggs", "Eggs found"), ("bred", "Eggs bred"), ("hatched", "Eggs hatched"), ("egg_missions", "Egg missions done"),
     ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
