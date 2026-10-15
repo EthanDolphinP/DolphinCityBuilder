@@ -649,6 +649,7 @@
           <select id="mktGives"></select>
           <select id="mktWants"></select>
         </div>
+        <div id="mktSelling" class="bar areaChips"></div>
         <div id="mktFilters" class="bar"></div>
         <div id="offers" class="scroll" style="margin-top:10px"></div>
       </details>
@@ -663,6 +664,7 @@
           <button>Post offer</button>
         </form>
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
+        <p id="priceHint" class="small dim" style="margin:4px 0 0"></p>
         <p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
           until it is sold or you cancel. The two amounts set the price, and other cities can buy any part
           of the offer at that price. To buy from an offer, type how much of it you want and the cost is
@@ -697,6 +699,7 @@
 
       <details class="panel" data-mkt="history">
         <summary class="cat">Recent trades <span id="tradesCount" class="count"></span></summary>
+        <div class="bar" style="margin-top:0"><label class="check"><input id="tradesMine" type="checkbox"> Only trades my city took part in</label></div>
         <div id="trades" class="small"></div>
       </details>
     </div>
@@ -1155,11 +1158,24 @@ const lotOf = o => {
   const fullGive = o.full_give || o.give_qty, fullWant = o.full_want || o.want_qty, n = gcd(fullGive, fullWant) || 1;
   return { give: fullGive / n, want: fullWant / n, lots: Math.floor(o.give_qty / (fullGive / n)) };
 };
+// What other cities ask for the same trade, so a new offer can be priced to sell.
+function priceHint() {
+  const R = view.defs.resources, g = $('giveRes').value, w = $('wantRes').value;
+  const same = view.market.offers.filter(o => o.city !== view.state.name && o.give === g && o.want === w);
+  const each = o => o.want_qty / o.give_qty;     // what one of the thing on sale costs
+  if (!same.length) { $('priceHint').textContent = `Nobody else is selling ${R[g]} for ${R[w]} right now, so you set the price.`; return; }
+  const best = same.reduce((a, b) => each(a) <= each(b) ? a : b);
+  const mine = Math.floor(+$('wantQty').value) / Math.floor(+$('giveQty').value);
+  $('priceHint').textContent = `${same.length} other ${same.length === 1 ? 'offer sells' : 'offers sell'} ${R[g]} for ${R[w]}; ` +
+    `the cheapest asks ${+each(best).toFixed(3)} ${R[w]} for each ${R[g]} (${best.city}).` +
+    (mine > 0 ? ` Yours asks ${+mine.toFixed(3)}, ${mine <= each(best) ? 'the best price on the market' : 'more than theirs, so theirs will likely sell first'}.` : '');
+}
 function lotPreview() {
   if (!view) return;
   const R = view.defs.resources, give = Math.floor(+$('giveQty').value), want = Math.floor(+$('wantQty').value);
   if (!(give >= 1 && want >= 1)) { $('lotPreview').textContent = ''; return; }
   const l = lotOf({ give_qty: give, want_qty: want });
+  priceHint();
   $('lotPreview').textContent = l.lots > 1
     ? `Price: ${l.give} ${R[$('giveRes').value]} for ${l.want} ${R[$('wantRes').value]}. Buyers can take any amount${l.give > 1 ? ' in steps of ' + l.give : ''}, up to all ${give}.`
     : `These amounts share no common factor, so this can only be bought all at once. Round numbers can be bought a part at a time.`;
@@ -2757,6 +2773,13 @@ function renderMarket() {
     panel.hidden = mktView !== 'all' && !panel.dataset.mkt.split(' ').includes(mktView);
   if (mktView !== 'all') for (const panel of document.querySelectorAll('#tab-market [data-mkt]')) if (!panel.hidden) panel.open = true;
 
+  // ---- what other cities have on sale, one button per material: a click shows only those offers ----
+  const onSale = {};
+  for (const o of market.offers) if (!mine(o)) onSale[o.give] = (onSale[o.give] || 0) + 1;
+  setHTML($('mktSelling'), mktView === 'sell' || !Object.keys(onSale).length ? '' : `<span class="dim small">On sale</span>` +
+    Object.entries(onSale).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+      `<button class="chip ${$('mktGives').value === k ? 'on' : ''}" data-mkt-sells="${esc(k)}">${esc(R[k])} <span class="dim">${n}</span></button>`).join(''));
+
   // ---- open offers: search, material menus and filter buttons all apply together ----
   // Buying shows other cities' offers; selling shows your own; Everything shows both.
   const filters = mktView === 'buy' ? { all: ['All', o => !mine(o)], afford: ['I can accept', canAccept] }
@@ -2851,11 +2874,13 @@ function renderMarket() {
     }).join('') + `</table>` : `<span class="dim">You have no bills.</span>`);
 
   $('tradesCount').textContent = `(${market.history.length})`;
-  setHTML($('trades'), market.history.length ? market.history.slice().reverse().map(t => {
+  const history = market.history.filter(t => !$('tradesMine').checked || t.seller === state.name || t.buyer === state.name);
+  setHTML($('trades'), history.length ? history.slice().reverse().map(t => {
     const involved = t.seller === state.name || t.buyer === state.name;
     return `<div class="opt ${involved ? 'hi' : 'dim'}"><span class="dim">[${clock(t.t)}]</span> ${esc(t.seller)} gave ` +
       `${t.give_qty} ${esc(R[t.give])} to ${esc(t.buyer)} for ${t.want_qty} ${esc(R[t.want])}</div>`;
-  }).join('') + `<p class="dim">Trades your city took part in are shown in white.</p>` : `<span class="dim">No trades yet.</span>`);
+  }).join('') + `<p class="dim">Trades your city took part in are shown in white.</p>`
+    : `<span class="dim">${market.history.length ? 'Your city has not traded recently.' : 'No trades yet.'}</span>`);
 }
 
 async function loadBoard() {
@@ -3335,6 +3360,13 @@ $('swapSides').onclick = () => {
   [$('giveQty').value, $('wantQty').value] = [$('wantQty').value, $('giveQty').value];
   lotPreview();
 };
+$('mktSelling').onclick = e => {
+  const b = e.target.closest('[data-mkt-sells]');
+  if (!b) return;
+  $('mktGives').value = $('mktGives').value === b.dataset.mktSells ? '' : b.dataset.mktSells;   // a second click shows everything again
+  renderMarket();
+};
+$('tradesMine').onchange = () => renderMarket();
 $('mktViews').onclick = e => {
   const b = e.target.closest('[data-mkt-view]');
   if (b) { mktView = settings.mktView = b.dataset.mktView; saveSettings(); renderMarket(); }
