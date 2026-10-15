@@ -1173,7 +1173,7 @@ function setHTMLKeep(el, html, fill) {
   const a = document.activeElement, key = a && el.contains(a) && a.dataset.k;
   const changed = el._html !== html;
   setHTML(el, html);
-  fill();
+  if (fill) fill();     // put back what the player had typed, where a panel has boxes
   if (changed && key) { const again = el.querySelector(`[data-k="${key}"]`); if (again) again.focus(); }
 }
 // What typing `typed` into an offer's box would buy: whole lots only, never more than is left.
