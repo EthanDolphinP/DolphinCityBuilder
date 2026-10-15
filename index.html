@@ -692,9 +692,16 @@
     <!-- Settings -->
     <div id="tab-settings" hidden>
       <div class="panel">
+        <h2>Settings</h2>
         <p class="dim small" style="margin-top:0">Everything here changes only how the game looks and behaves for you, in this
           browser; nothing in your city changes. Try a setting and change it back whenever you like, or use
-          "Put every setting back to normal" at the bottom of Behaviour.</p>
+          "Put every setting back to normal" under Behaviour.</p>
+        <div class="bar" style="margin-top:0">
+          <input id="setSearch" type="search" placeholder="Find a setting, e.g. font, numbers, password" style="flex:1 1 220px">
+        </div>
+        <div id="setViews" class="bar"></div>
+      </div>
+      <div class="panel" data-set="display">
         <h2>Display</h2>
         <div class="setGrid">
           <label><span class="k">Theme</span><select data-setting="theme"></select></label>
@@ -712,7 +719,7 @@
             <option value="narrow">Narrow</option><option value="normal">Normal</option><option value="wide">Wide</option><option value="full">Full window</option></select></label>
         </div>
       </div>
-      <div class="panel">
+      <div class="panel" data-set="numbers">
         <h2>Numbers and time</h2>
         <div class="setGrid">
           <label><span class="k">Show income</span><select data-setting="rate">
@@ -724,7 +731,7 @@
         </div>
         <p id="numberSample" class="dim small" style="margin-bottom:0"></p>
       </div>
-      <div class="panel">
+      <div class="panel" data-set="behaviour">
         <h2>Behaviour</h2>
         <div class="setGrid">
           <label><span class="k">Check the server for changes</span><select data-setting="poll">
@@ -744,7 +751,7 @@
           device can have their own.</p>
         <div class="bar"><button id="resetSettings">Put every setting back to normal</button></div>
       </div>
-      <div class="panel own">
+      <div class="panel own" data-set="account">
         <h2>Account</h2>
         <div class="bar" style="margin-top:0">
           <button id="switch">Sign out</button>
@@ -756,7 +763,7 @@
           <span class="dim small">Other browsers signed in to this city will have to sign in again.</span>
         </form>
       </div>
-      <div class="panel own">
+      <div class="panel own" data-set="account">
         <h2>Privacy</h2>
         <p class="dim small" style="margin-top:0">A banned city cannot view yours or propose bills to you.</p>
         <div id="banList"></div>
@@ -765,7 +772,7 @@
           <button>Ban this city</button>
         </form>
       </div>
-      <div class="panel own" style="border-color:var(--bad)">
+      <div class="panel own" style="border-color:var(--bad)" data-set="account">
         <h2>Start again</h2>
         <p class="dim small" style="margin-top:0">Wipes this city and gives it a new map. Its market offers and bills
           are removed. The password stays the same. This cannot be undone.</p>
@@ -2432,7 +2439,35 @@ function renderIdeology() {
         }).join('') + `</div>`;
     }).join('') + `</div>`);
 }
+let setView = settings.setView || 'display';   // which part of the Settings tab shows (remembered)
+// The parts of the Settings tab, and a search that shows only the settings whose words match.
+function renderSetViews() {
+  const parts = { display: 'Display', numbers: 'Numbers and time', behaviour: 'Behaviour', account: 'Account and privacy', all: 'Everything' };
+  const words = $('setSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const panels = [...document.querySelectorAll('#tab-settings [data-set]')];
+  const counts = {};
+  for (const panel of panels) {
+    // every setting (a label, or a block of buttons) matches on its own words, or on its panel's heading
+    const heading = panel.querySelector('h2').textContent.toLowerCase();
+    const items = [...panel.querySelectorAll('.setGrid > label, .setGrid > p, :scope > div.bar, :scope > form:not(#passForm), :scope > #banList, :scope > button')];
+    let n = 0;
+    for (const item of items) {
+      const hit = !words.length || words.every(w => (heading + ' ' + item.textContent).toLowerCase().includes(w));
+      item.hidden = !hit;
+      if (hit) n++;
+    }
+    counts[panel.dataset.set] = (counts[panel.dataset.set] || 0) + n;
+    panel.dataset.hits = n;
+  }
+  // While searching, every part with a match shows; otherwise only the chosen part.
+  for (const panel of panels) panel.hidden = words.length ? panel.dataset.hits === '0' : setView !== 'all' && panel.dataset.set !== setView;
+  setHTML($('setViews'), Object.entries(parts).map(([k, label]) =>
+    `<button data-set-view="${k}" class="${!words.length && setView === k ? 'on' : ''}">${label}` +
+    (words.length && k !== 'all' ? ` <span class="dim small">${counts[k] || 0}</span>` : '') + `</button>`).join('') +
+    (words.length && !Object.values(counts).some(Boolean) ? `<span class="dim small">No setting matches.</span>` : ''));
+}
 function renderSettings() {
+  renderSetViews();
   // Fill the menus once, then show the current choices.
   const fill = (key, options) => {
     const el = document.querySelector(`[data-setting=${key}]`);
@@ -3278,6 +3313,15 @@ $('tab-settings').addEventListener('input', e => {
   applySettings();
   if (view) render();
 });
+$('setViews').onclick = e => {
+  const b = e.target.closest('[data-set-view]');
+  if (!b) return;
+  setView = settings.setView = b.dataset.setView;
+  saveSettings();
+  $('setSearch').value = '';
+  renderSetViews();
+};
+$('setSearch').oninput = () => renderSetViews();
 $('resetSettings').onclick = () => { settings = { ...DEFAULT_SETTINGS, visitedSettings: true }; saveSettings(); applySettings(); if (view) render(); };
 $('banList').onclick = e => { if (e.target.dataset.unban) act('unban', { target: e.target.dataset.unban }); };
 $('banForm').onsubmit = e => {
