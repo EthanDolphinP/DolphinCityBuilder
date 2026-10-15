@@ -782,9 +782,10 @@
           <select id="guideTech"></select>
           <select id="guideCat"></select>
         </div>
+        <div id="guideViews" class="bar"></div>
         <p id="guideNote" class="dim small" style="margin-bottom:0"></p>
       </div>
-      <details class="panel" open>
+      <details class="panel" open id="gSecMap">
         <summary class="cat">Reading the map</summary>
         <p class="dim" style="margin:0">Each tile shows its terrain symbol. If something is on it, the second character
           is the building (white when working, red when something is wrong, grey when switched off) or the
@@ -2510,6 +2511,7 @@ function renderPeople() {
 
 // The Guide. `opening` is true when the search or menus just changed: sections
 // with something to show are then opened, otherwise they are left as the player has them.
+let guideView = settings.guideView || 'howto';   // which part of the Guide shows (remembered)
 function renderGuide(opening) {
   const { state, defs } = view, T = defs.terrains, B = defs.buildings;
   for (const [id, first, options] of [
@@ -2539,7 +2541,9 @@ function renderGuide(opening) {
 
   const terrains = Object.values(T).filter(t => !buildingOnly && has(`${t.name} ${t.desc || ''} ${(t.groups || []).join(' ')}`));
   const topics = HOWTO.filter(([title, body]) => !buildingOnly && has(title + ' ' + body));
-  setHTML($('guideHowto'), topics.map(([title, body]) => `<div class="opt"><span class="hi">${esc(title)}</span><div class="dim" style="margin-top:2px">${esc(body)}</div></div>`).join(''));
+  setHTML($('guideHowto'), topics.map(([title, body]) =>
+    `<details class="fold" data-fold="howto:${esc(title)}" ${words.length || isOpen('howto:' + title, false) ? 'open' : ''}>` +
+    `<summary><span class="hi">${esc(title)}</span></summary><div class="dim" style="margin-top:2px;font-size:14px">${esc(body)}</div></details>`).join(''));
   $('gCountHowto').textContent = topics.length === HOWTO.length ? `(${HOWTO.length})` : `(${topics.length} of ${HOWTO.length})`;
   $('gSecHowto').hidden = !topics.length;
   let shown = topics.length + fill('Terrain', Object.keys(T).length, ['Tile', 'Height', 'Fertility', 'Fish', 'Notes'], terrains.map(t =>
@@ -2570,9 +2574,24 @@ function renderGuide(opening) {
     `<tr><td><span class="glyph animal">${esc(w.glyph)}</span> ${esc(w.name)}</td>` +
     `<td>${esc(land(w.terrain))}</td><td>${w.livestock}</td></tr>`));
 
-  $('guideNote').textContent = shown ? (words.length || buildingOnly ? `${shown} entries match. ` : '') +
-      'Click a heading to open or close it. The two menus narrow the Buildings list.'
-    : 'Nothing in the guide matches.';
+  // ---- one section at a time (or all), each button saying how many entries match ----
+  const counts = { howto: topics.length, Terrain: terrains.length, Buildings: buildings.length,
+                   Additions: additions.length, Wildlife: animals.length };
+  const names = { howto: 'How to play', Terrain: 'Terrain', Buildings: 'Buildings', Additions: 'Additions', Wildlife: 'Wildlife' };
+  if (buildingOnly && guideView !== 'all') guideView = 'Buildings';     // the two menus are about buildings
+  setHTML($('guideViews'), Object.entries(names).map(([k, label]) =>
+    `<button data-guide-view="${k}" class="${guideView === k ? 'on' : ''}" ${counts[k] ? '' : 'disabled'}>${label} <span class="dim small">${counts[k]}</span></button>`).join('') +
+    `<button data-guide-view="all" class="${guideView === 'all' ? 'on' : ''}">Everything</button>`);
+  for (const k of Object.keys(names)) {
+    const sec = k === 'howto' ? $('gSecHowto') : $('gSec' + k);
+    sec.hidden = !counts[k] || (guideView !== 'all' && guideView !== k);
+    if (!sec.hidden && guideView !== 'all') sec.open = true;
+  }
+  $('gSecMap').hidden = guideView !== 'all' && guideView !== 'howto';
+  const elsewhere = Object.keys(names).filter(k => k !== guideView && counts[k] && guideView !== 'all');
+  $('guideNote').textContent = !shown ? 'Nothing in the guide matches.'
+    : guideView !== 'all' && !counts[guideView] ? `Nothing here matches; try ${elsewhere.map(k => `${names[k]} (${counts[k]})`).join(', ')}.`
+    : (words.length || buildingOnly ? `${shown} entries match. ` : '') + 'The buttons above show one part of the guide; the two menus narrow the Buildings list.';
 }
 
 function renderMarket() {
@@ -3230,6 +3249,14 @@ $('boardViews').onclick = e => {
 };
 $('boardWho').onclick = e => { const b = e.target.closest('[data-board-who]'); if (b) { boardWho = b.dataset.boardWho; renderBoard(); } };
 for (const id of ['guideSearch', 'guideTech', 'guideCat']) $(id).oninput = () => { if (view) renderGuide(true); };
+$('guideViews').onclick = e => {
+  const b = e.target.closest('[data-guide-view]');
+  if (b) { guideView = settings.guideView = b.dataset.guideView; saveSettings(); renderGuide(true); }
+};
+$('tab-guide').addEventListener('toggle', e => {   // remember which topics are open
+  const key = e.target.dataset && e.target.dataset.fold;
+  if (key) foldState.set(key, e.target.open);
+}, true);
 
 setInterval(tick, 1000);
 // Pick up trades and changes made by other players.
