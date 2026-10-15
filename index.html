@@ -1200,7 +1200,7 @@ const HOWTO = [
   ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
-  ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
+  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
@@ -2154,10 +2154,11 @@ function renderBeast() {
     const warm = b.warm >= b.warm_needed, t = b.task;
     let html = `<div class="head"><span class="big" style="color:${esc(b.color)}">${esc(b.name)}</span></div>` +
       `<pre class="beastArt" style="color:${esc(b.color)}">${EGG_ART}</pre>` +
-      `<div class="dim small">Nobody knows what is inside until it hatches. It needs two things:</div>` +
+      `<div class="dim small">Nobody knows what is inside until it hatches. ${b.tasks_needed > 1 ? 'Rarer eggs ask for more.' : ''} It needs two things:</div>` +
       `<div class="opt">${tick(warm)} Kept warm for ${duration(b.warm_needed)}` +
       (warm ? '' : ` - <span class="hi" data-timer="hatch${b.id}"></span> to go`) + `</div>` +
-      `<div class="opt">${tick(b.missions >= 1)} Its own mission` + (t ? `: <span class="${b.missions >= 1 ? 'good' : 'hi'}">${esc(t.text)}</span>` : ' done') + `</div>`;
+      `<div class="opt">${tick(b.missions >= b.tasks_needed)} ${b.tasks_needed > 1 ? `Its own missions, one after another (${Math.min(b.missions, b.tasks_needed)} of ${b.tasks_needed} done)` : 'Its own mission'}` +
+      (t ? `: <span class="${b.missions >= b.tasks_needed ? 'good' : 'hi'}">${esc(t.text)}</span>` : ' done') + `</div>`;
     if (t && !t.complete && t.pay) {
       const have = Math.floor(state.resources[t.pay]), ok = have >= t.need;
       html += `<div class="small">You have ${have} of ${t.need} ${esc(R[t.pay])}</div>` + meter(Math.min(have, t.need), t.need, ok ? '' : 'alt') +
@@ -2165,7 +2166,7 @@ function renderBeast() {
     } else if (t && !t.complete) {
       html += `<div class="small">${t.done} of ${t.need} done <span class="dim">- this counts up by itself as you do it</span></div>` + meter(t.done, t.need, 'alt');
     }
-    if (warm && b.missions >= 1) html += `<div class="good small">Hatching...</div>`;
+    if (warm && b.missions >= b.tasks_needed) html += `<div class="good small">Hatching...</div>`;
     if (own) html += tradeFor === b.id ? tradeForm(b) : `<div class="bar"><button data-trade="${b.id}">Trade</button></div>`;
     return html;
   };
@@ -2176,9 +2177,9 @@ function renderBeast() {
   setHTML($('beastActive'), mine
     ? `<div class="head"><span class="big" style="color:${esc(mine.color)}">${esc(mine.name)}</span><span class="dim small">${esc(mine.rarity)}</span></div>` +
       `<pre class="beastArt" style="color:${esc(mine.color)}">${esc(mine.art)}</pre><div class="desc">${esc(mine.desc)}</div>` +
-      kv([['Nature', esc(mine.nature)], ['Level', `<span class="hi">${mine.level}</span> of ${bv.max_level}`]]) +
+      kv([['Nature', esc(mine.nature)], ['Level', `<span class="hi">${mine.level}</span> of ${mine.cap} <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts grow to ${mine.cap})</span>`]]) +
       (mine.max_level ? `<div class="good small">Fully grown.</div>`
-        : `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${bv.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
+        : `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
       `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats)}</div>` +
       `<div class="opt dim small">Likes ${esc(R[mine.likes])}: bet it on this beast in the Arena below to make it fight harder.</div>` +
       (mine.home && mine.home.length ? `<div class="opt dim small">Its eggs are found most often in: ${esc(mine.home.join(', '))}.</div>` : '') +
@@ -2219,11 +2220,18 @@ function renderBeast() {
       : `<p class="dim" style="margin:0">No eggs waiting to hatch.</p>`) +
     (bv.nest_at ? `<div class="opt">Nesting Ground: next egg in <span class="hi" data-timer="nest"></span>` +
       (eggs.length >= bv.nest_full ? ` <span class="bad small">- none will be laid while you have ${bv.nest_full} or more eggs waiting</span>` : '') + `</div>` : '') +
+    `<details class="fold" data-fold="egg:rarity" ${isOpen('egg:rarity', false) ? 'open' : ''}><summary>What each rarity takes</summary><div class="scroll">` +
+      `<table><tr><th>Rarity</th><th>Kept warm</th><th class="n">Egg missions</th><th class="n">Grows to level</th><th>Missions ask for</th><th class="n">Experience per mission, before bonuses</th></tr>` +
+      Object.values(bv.rarities).map(r => `<tr><td style="color:${esc(r.color)}">${esc(r.name)}</td><td>${duration(r.hatch * 3600 / (1 + bv.hatch_speed))}</td>` +
+        `<td class="n">${r.egg_tasks}</td><td class="n">${r.max_level}</td><td>${r.pay === 1 ? 'the usual amount' : 'x' + r.pay + ' goods, x' + r.events + ' tasks'}</td>` +
+        `<td class="n">${Math.round(10 * r.xp)}</td></tr>`).join('') + `</table>` +
+      `<p class="dim small">Missions also grow with the beast's level and your tech level, and only ever ask for things your city can do. ` +
+      `Levels past 10 add half as much to a beast's bonus as the first ten.</p></div></details>` +
     `<details class="fold" data-fold="egg:ways" ${isOpen('egg:ways', !eggs.length) ? 'open' : ''}><summary>Ways to get eggs</summary><div>` +
       `<div>Expeditions: about a ${bv.egg_chance}% chance one area from home, more further out, where rarer eggs are likelier too.</div>` +
       `<div>Taming a wild animal: a ${bv.tame_egg}% chance of an egg in its nest.</div>` +
       `<div>Reaching a new tech level: one egg each time, rarer at the higher levels.</div>` +
-      `<div>A beast reaching level 5 brings home an egg as rare as it is; at level 10, one rarer still.</div>` +
+      `<div>A beast reaching level 5 brings home an egg as rare as it is; at levels 10 and 15, one rarer; at level 20, two rarities higher.</div>` +
       `<div>A Nesting Ground (Village, needs Incubation) is left an egg every ${duration(bv.nest_time)}.</div>` +
       `<div>Trading with other cities, below, and presents.</div>` +
       `<div class="dim">There are ${bv.species_count} kinds of beast to find.</div></div></details>`, fillTrade);
@@ -2254,7 +2262,7 @@ function renderBeast() {
         ...(g.list[0].home && g.list[0].home.length ? [['Home', esc(g.list[0].home.join(', ')) + ' <span class="dim small">(its eggs are likelier there)</span>']] : []),
         ['You have', g.list.length]])}</div></div>` +
       `<div class="scroll"><table><tr>${th('level', 'Level')}<th>Experience</th>${Object.entries(S).map(([k, name]) => th(k, esc(name))).join('')}<th>Gives the city</th><th></th></tr>` +
-      g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed}</td>` +
+      g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed} <span class="small">(max ${b.cap})</span></td>` +
         Object.keys(S).map(k => `<td>${b.stats[k]}</td>`).join('') + `<td class="dim small" style="white-space:normal;min-width:160px">${esc(b.bonus.join('; '))}</td><td>` +
         (b.active ? `<span class="good">active</span>` : !own ? ''
           : `<button data-beast-active="${b.id}">Make active</button> ` +

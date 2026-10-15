@@ -3143,6 +3143,8 @@ def _meal(state, housing, when):
         log(state, when, "Everyone is fed again.")
     arrivals = _arrivals(pop, res["food"], housing, 1 + city_attracts(state, when))
     state["population"] += arrivals
+    if arrivals:
+        beasts.note(state, when, "arrival", arrivals)
     return arrivals > 0
 
 
@@ -3338,6 +3340,7 @@ def add_addition(state, now, area, x, y, aid):
         return f"Not enough resources for {a['name']} (need {fmt_goods(missing)})."
     _pay(state, a["cost"])
     tile["additions"].append(aid)
+    beasts.note(state, now, "addition")
     log(state, now, f"Added {a['name']} to the {BUILDINGS[tile['building']]['name']} at ({x},{y}).")
     return None
 
