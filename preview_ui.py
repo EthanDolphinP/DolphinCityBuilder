@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import game
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -52,7 +53,15 @@ class PreviewHandler(BaseHTTPRequestHandler):
         request = Request(UPSTREAM + self.path, data=body, headers=headers, method=self.command)
         try:
             with urlopen(request, timeout=25) as response:
-                self.reply(response.status, response.read(), response.headers.get("Content-Type", "application/json"))
+                payload = response.read()
+                # Derive new display metrics locally from the returned snapshot only.
+                # The hosted city and its saved state are never changed here.
+                if path in {"/api/state", "/api/action", "/api/visit", "/api/login"}:
+                    data = json.loads(payload)
+                    if "state" in data and "status" in data and "food_potential" not in data["status"]:
+                        data["status"]["food_potential"] = game.view(data["state"], data.get("area", 0))["status"]["food_potential"]
+                        payload = json.dumps(data).encode()
+                self.reply(response.status, payload, response.headers.get("Content-Type", "application/json"))
         except HTTPError as error:
             if error.code >= 500:
                 self.reply(error.code, json.dumps({"error": f"Live server returned HTTP {error.code}. Try again shortly."}).encode())

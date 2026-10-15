@@ -45,6 +45,25 @@
   .head > * { min-width: 0; }
   .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .small { font-size: 13px; }
+  .expedition-card { display: flex; align-items: center; flex-wrap: wrap; gap: 18px;
+    margin-top: 12px; padding: 22px; border: 1px solid var(--accent); border-left-width: 5px;
+    background: linear-gradient(110deg, var(--hl), var(--panel)); border-radius: 12px; }
+  .expedition-icon { display: grid; place-items: center; width: 64px; height: 64px;
+    border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); background: var(--inset); }
+  .expedition-icon .ui-icon { width: 34px; height: 34px; }
+  .expedition-info { flex: 1 1 180px; min-width: 0; }
+  .expedition-label { color: var(--accent); font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; }
+  .expedition-destination { color: var(--bright); font-size: 24px; font-weight: bold; margin: 4px 0; overflow-wrap: anywhere; }
+  .expedition-arrival { padding: 12px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--inset); }
+  .expedition-arrival strong { display: block; color: var(--accent); font-size: 30px; font-variant-numeric: tabular-nums; }
+  .expedition-route { flex-basis: 100%; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--dim); }
+  .expedition-route span { flex: 1; border-top: 2px dashed var(--accent); opacity: .65; }
+  .expedition-route .ui-icon { width: 18px; height: 18px; flex-shrink: 0; }
+  @media (max-width: 520px) {
+    .expedition-card { padding: 16px; gap: 12px; }
+    .expedition-icon { width: 48px; height: 48px; }
+    .expedition-arrival { flex-basis: 100%; }
+  }
   .kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 6px 0 2px; }
   .kv > :nth-child(odd) { color: var(--dim); }
   .cat { margin: 16px 0 0; padding-bottom: 3px; border-bottom: 1px solid var(--line); color: var(--accent);
@@ -266,6 +285,33 @@
   .ideoCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .ideoCard { border: 1px solid var(--line); background: var(--inset); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
   .ideoCard.on { border-color: var(--accent); }
+  #ideologyBody > .panel { border-radius: 16px; }
+  #ideologyBody button, #ideologyPick button { border-radius: 9px; }
+  .ideoCards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; }
+  .ideoCard { padding: 20px; border-radius: 14px; gap: 12px; position: relative; }
+  .ideoCard .name { font-size: 19px; font-weight: 650; }
+  .ideoCard.on, .perk.taken { border-color: var(--ideo); background: linear-gradient(135deg, color-mix(in srgb, var(--ideo) 10%, var(--panel)), var(--inset)); }
+  .ideoCard.locked { border-style: dashed; }
+  .ideology-emblem { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 16px;
+    color: var(--ideo); border: 1px solid color-mix(in srgb, var(--ideo) 40%, var(--line)); background: color-mix(in srgb, var(--ideo) 12%, var(--inset)); }
+  .ideology-emblem .ui-icon { width: 30px; height: 30px; }
+  .perk .ideology-emblem { width: 42px; height: 42px; border-radius: 12px; }
+  .perk .ideology-emblem .ui-icon { width: 23px; height: 23px; }
+  .ideology-hero { padding: 26px; border-top: 3px solid var(--ideo); background: linear-gradient(115deg, color-mix(in srgb, var(--ideo) 10%, var(--panel)), var(--panel)); }
+  .ideology-identity { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .ideology-intro { flex: 1 1 240px; }
+  .ideology-intro h2 { margin-bottom: 6px; }
+  .ideology-title { font-size: 30px; font-weight: 700; color: var(--bright); }
+  .ideology-description { color: var(--dim); max-width: 680px; margin-top: 6px; }
+  .ideology-points { padding: 14px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--inset); }
+  .ideology-points strong { display: block; color: var(--ideo); font-size: 30px; line-height: 1.2; }
+  .ideology-points span { font-size: 12px; color: var(--dim); }
+  .ideology-hero > .bar { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .ideology-bonus { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin: 8px 0; background: var(--inset); border: 1px solid var(--line); border-radius: 10px; }
+  .ideology-bonus .ui-icon { width: 18px; height: 18px; flex-shrink: 0; }
+  .perk-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+  .perk-state .ui-icon { width: 14px; height: 14px; }
+  @media (max-width: 520px) { .ideology-hero { padding: 18px; } .ideology-title { font-size: 26px; } .ideology-points { width: 100%; } }
   .ideoCard .name { color: var(--bright); font-size: 16px; }
   .ideoCard button { margin-top: auto; align-self: flex-start; }
   .perk.taken { border-color: var(--ideo, var(--good)); }
@@ -642,6 +688,7 @@
         <h2>Explore</h2>
         <div id="expViews" class="bar" style="margin-top:0"></div>
       </div>
+      <div id="trip"></div>
       <div class="panel" data-exp="areas">
         <h2>Your areas <span id="areasCount" class="count"></span></h2>
         <div class="bar" style="margin-top:0">
@@ -660,7 +707,6 @@
         <p class="dim">An expedition team maps one new area next to land you already know. The supplies it
           needs depend on the kind of land it is heading into and how far that is from home.
           People, materials and research are shared by all your areas.</p>
-        <div id="trip"></div>
         <div class="bar">
           <select id="destKind" title="Kind of land"></select>
           <select id="destSort" title="Order">
@@ -2134,8 +2180,12 @@ function renderExplore() {
   }
 
   // ---- where an expedition can go ----
-  setHTML($('trip'), trip ? `<p class="hi">An expedition is on its way to the ${esc(E[trip.env].name.toLowerCase())} ` +
-    `${esc(trip.where)} of home. It arrives in <span data-timer="trip"></span>.</p>` : '');
+  setHTML($('trip'), trip ? `<section class="expedition-card" aria-label="Active expedition">` +
+    `<div class="expedition-icon">${icon('pin')}</div>` +
+    `<div class="expedition-info"><div class="expedition-label">Expedition underway</div>` +
+    `<div class="expedition-destination">${esc(E[trip.env].name)}</div><div>${esc(trip.where)} of home</div></div>` +
+    `<div class="expedition-arrival"><span class="small dim">Arrives in</span><strong data-timer="trip"></strong></div>` +
+    `<div class="expedition-route">Home<span aria-hidden="true"></span>Mapping new land ${icon('pin')}</div></section>` : '');
   fillKinds($('destKind'), explore.destinations.map(d => d.env), 'Any land');
   const dkind = $('destKind').value;
   const dests = explore.destinations.filter(d => !dkind || d.env === dkind);
@@ -2682,10 +2732,14 @@ function renderSocial() {
 
 // ---- Ideology: chosen once at Village; every tech level after gives a point to spend on its perks.
 const ideologyLater = () => settings.ideologyLater === new Date().toDateString();   // "Decide later" pressed today: the choice window waits until tomorrow
+const ideologyIcons = { faith: 'shaman', progress: 'knowledge', commerce: 'trade', wild: 'tree', wayfarers: 'pin', community: 'people' };
+function ideologyArt(id, art, perk = false, taken = false) {
+  return `<div class="ideology-emblem">${icon(perk ? (taken ? 'check' : 'knowledge') : ideologyIcons[id] || 'shaman')}</div>`;
+}
 function ideologyCards(chooseable) {
   const I = view.defs.ideologies;
   return `<div class="ideoCards">` + Object.entries(I).map(([id, i]) =>
-    `<div class="ideoCard" style="--ideo:${esc(i.color)}"><pre class="ideoArt">${esc(i.art)}</pre>` +
+    `<div class="ideoCard ${view.ideology.id === id ? 'on' : ''}" style="--ideo:${esc(i.color)}">${ideologyArt(id, i.art)}` +
     `<span class="name" style="color:${esc(i.color)}">${esc(i.name)}</span><span class="dim small">${esc(i.desc)}</span>` +
     `<div class="small good">${i.text.map(esc).join('<br>')}</div>` +
     perkPreview(id, i) +
@@ -2733,18 +2787,17 @@ function renderIdeology() {
   if (!parts[ideoView]) ideoView = 'mine';
   const show = part => ideoView === 'all' || ideoView === part;
 
-  const header = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Ideology</h2><pre class="ideoArt">${esc(i.art)}</pre>` +
-    `<div class="head"><span class="big" style="color:${esc(i.color)}">${esc(i.name)}</span>` +
-    (own ? `<span class="${iv.points ? 'good' : 'dim'}">${iv.points} ${iv.points === 1 ? 'point' : 'points'} to spend</span>` : '') + `</div>` +
-    `<div class="dim small">${esc(i.desc)}</div>` +
+  const header = `<div class="panel ideology-hero" style="--ideo:${esc(i.color)}">` + `<div class="ideology-identity">${ideologyArt(iv.id, i.art)}<div class="ideology-intro"><h2>Your city's ideology</h2>` +
+      `<div class="ideology-title">${esc(i.name)}</div><div class="ideology-description">${esc(i.desc)}</div></div>` +
+      (own ? `<div class="ideology-points"><strong>${iv.points}</strong><span>${iv.points === 1 ? 'point' : 'points'} to spend</span></div>` : '') + `</div>` +
     `<div class="bar">` + Object.entries(parts).map(([k, [label, note]]) =>
       `<button data-ideo-view="${k}" class="${ideoView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join('') + `</div></div>`;
 
   const mine = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Everything it gives the city now</h2>` +
-    iv.total.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
+    iv.total.map(t => `<div class="ideology-bonus good">${icon('check')}${esc(t)}</div>`).join('') +
     `<div class="cat">Your ${esc(i.perk_plural.toLowerCase())} (${iv.perks.length})</div>` +
     (iv.perks.length ? `<div class="ideoCards" style="margin-top:8px">` + iv.perks.map(id => i.perks[id]).filter(Boolean).map(p =>
-      `<div class="ideoCard perk taken"><pre class="perkArt lit">${esc(p.art)}</pre><span class="name" style="color:${esc(i.color)}">${esc(p.name)}</span>` +
+      `<div class="ideoCard perk taken">${ideologyArt(iv.id, p.art, true, true)}<span class="name" style="color:${esc(i.color)}">${esc(p.name)}</span>` +
       `<div class="small good">${p.text.map(esc).join('<br>')}</div></div>`).join('') + `</div>`
       : `<p class="dim">None yet.${own && iv.points ? ' Open Perks to spend your points.' : ''}</p>`) +
     `<p class="dim small" style="margin-bottom:0">Every tech level from Village up earns one point (five in all, by Megacity). ` +
@@ -2760,7 +2813,8 @@ function renderIdeology() {
       return `<div class="cat">${esc(defs.tech[tier].name)} ${open ? '' : `<span class="dim">- opens when your city is a ${esc(defs.tech[tier].name)}</span>`}</div>` +
         `<div class="ideoCards" style="margin-top:8px">` + shown.filter(([, p]) => p.tier === tier).map(([id, p]) => {
           const taken = iv.perks.includes(id);
-          return `<div class="ideoCard perk ${taken ? 'taken' : open ? '' : 'locked'}"><pre class="perkArt ${taken ? 'lit' : ''}">${esc(p.art)}</pre>` +
+          return `<div class="ideoCard perk ${taken ? 'taken' : open ? '' : 'locked'}">${ideologyArt(iv.id, p.art, true, taken)}` +
+            (`<span class="perk-state">${icon(taken ? 'check' : open ? 'knowledge' : 'lock')}${taken ? 'Unlocked' : open ? 'Available at this tier' : `Requires ${esc(defs.tech[p.tier].name)}`}</span>`) +
             `<span class="name" ${taken ? `style="color:${esc(i.color)}"` : ''}>${esc(p.name)}</span>` +
             `<span class="dim small">${esc(i.perk_word)}. ${esc(p.desc)}</span><div class="small good">${p.text.map(esc).join('<br>')}</div>` +
             (taken ? `<span class="good small">Yours</span>`
@@ -2859,13 +2913,21 @@ function renderPeople() {
     (state.hungry ? `<div class="opt bad">The food has run out. Nobody leaves or dies, but every building that does not make food works at half speed until a meal can be served in full.</div>` : ''));
 
   // Food
-  const top = Math.max(status.food_made, status.food_eaten, 1);
+  const fullHousingFood = status.housing * perHour;
+  const potentialFood = status.food_potential;
+  const top = Math.max(status.food_made, potentialFood || 0, status.food_eaten, fullHousingFood, 1);
   const net = status.rates.food, meals = pop ? Math.floor(food / pop) : 0;
   setHTML($('pplFood'),
-    `Made per hour: <span class="good">${num(status.food_made)}</span>` + meter([[status.food_made]], top) +
+    `Made per hour: <span class="good">${num(status.food_made)}</span>` +
+    (potentialFood == null ? '' : ` / <span class="hi">${num(potentialFood)}</span> <span class="dim">with all food buildings running</span>`) +
+    meter([[status.food_made]], top) +
+    (potentialFood == null ? '' : `<div class="dim small">Total assumes full staffing, power and supplies, with current weather and livestock.</div>`) +
     `Eaten per hour: <span class="${status.food_eaten > status.food_made ? 'bad' : ''}">${num(status.food_eaten)}</span> ` +
     `<span class="dim">(${pop} people x 1 food x ${perHour} meals)</span>` +
     meter([[status.food_eaten, status.food_eaten > status.food_made ? 'warn' : 'alt']], top) +
+    `Eaten per hour at full housing: <span class="${fullHousingFood > status.food_made ? 'bad' : 'hi'}">${num(fullHousingFood)}</span> ` +
+    `<span class="dim">(${status.housing} people x 1 food x ${perHour} meals)</span>` +
+    meter([[fullHousingFood, fullHousingFood > status.food_made ? 'warn' : 'alt']], top) +
     `<p>Each hour your store ${net >= 0 ? 'grows' : 'shrinks'} by <span class="${net >= 0 ? 'good' : 'bad'}">${num(Math.abs(net))}</span> food.</p>` +
     `<p>In store: <span class="hi">${food}</span> food = <span class="hi">${meals}</span> ${meals === 1 ? 'meal' : 'meals'}` +
     (net < 0 ? `. At this rate it runs out in about <span class="bad">${duration(food / -net * 3600)}</span>.` : '.') + `</p>`);
@@ -3146,10 +3208,6 @@ function renderBoard() {
   const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : val(c, k);
   const sortLabel = all.find(([k]) => k === boardSort)[1];
 
-  if (!$('boardRank').options.length) $('boardRank').innerHTML =
-    all.map(([k, label]) => `<option value="${esc(k)}">Rank by ${esc(label)}</option>`).join('');
-  $('boardRank').value = boardSort;
-
   // Ranks come from the whole list, so searching doesn't renumber anyone.
   const ranked = board.slice().sort((a, b) =>
     val(b, boardSort) - val(a, boardSort) || b.tech - a.tech || b.population - a.population || a.name.localeCompare(b.name));
@@ -3181,6 +3239,12 @@ function renderBoard() {
   // The column being ranked by is always shown, even if it is not part of the chosen view.
   let cols = views[boardView][1];
   if (!cols.some(([k]) => k === boardSort)) cols = [all.find(([k]) => k === boardSort), ...cols];
+  const extraRanks = all.filter(([k]) => !cols.some(([shown]) => shown === k));
+  setHTML($('boardRank'), `<option value="" disabled selected>More ranking options</option>` +
+    extraRanks.map(([k, label]) => `<option value="${esc(k)}">Rank by ${esc(label)}</option>`).join(''));
+  $('boardRank').value = '';
+  $('boardRank').hidden = !extraRanks.length;
+  $('boardRank').setAttribute('aria-label', 'Rank by a column not currently shown');
   const tag = c => lists[c.name] === 'ally' ? ' <span class="good small">ally</span>' : lists[c.name] === 'enemy' ? ' <span class="bad small">enemy</span>' : '';
   const withIdeology = boardView !== 'materials';
   setHTML($('board'), rows.length ? `<table><tr><th class="n">#</th><th>City</th>` +
