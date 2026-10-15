@@ -864,9 +864,11 @@
           <select id="boardRank"></select>
         </div>
         <div id="boardViews" class="bar"></div>
+        <div id="boardWho" class="bar"></div>
         <div id="board" class="scroll" style="margin-top:10px"><span class="dim">Loading...</span></div>
         <p class="dim small">Click a column heading, or use the menu, to rank by it. View opens another city
-          read-only. Ban stops a city from viewing yours and from proposing bills to you.</p>
+          read-only, and Message writes to it. Ban stops a city from viewing yours, writing to you and proposing
+          bills to you. Allies and enemies come from your lists on the Social tab.</p>
       </div>
     </div>
   </div>
@@ -1247,11 +1249,11 @@ function renderPresent() {
     (list.length > 1 ? `<p class="dim small">${list.length - 1} more waiting after this one.</p>` : ''));
   setHTML($('presentBar'), p.opened ? `<button data-present-close="${p.id}">Thanks!</button>` : `<button data-present-open="${p.id}">Open</button>`);
 }
-let boardView = 'overview', boardBanned = false;   // which columns and cities the Leaderboard shows
+let boardView = settings.boardView || 'overview', boardWho = 'all', boardAll = false;   // columns, which cities, and whether past the top 25
 let jump = null;       // a tile to select once its area has loaded
 const findParam = () => finder.kind && !visiting ? `${finder.kind}:${finder.what}` : '';
 let fetchedAt = 0, lastFetch = 0, timers = {};
-let board = null, boardSort = 'tech';
+let board = null, boardSort = settings.boardSort || 'tech';
 
 let token = null;      // proof to the server that this browser signed in to `city`
 function stored() { try { return { city: localStorage.getItem('city'), token: localStorage.getItem('token') }; } catch { return {}; } }
@@ -2739,7 +2741,15 @@ function renderBoard() {
   const rank = new Map(ranked.map((c, i) => [c.name, i + 1]));
   const banned = c => myBanned.includes(c.name);
   const words = $('boardSearch').value.trim().toLowerCase();
-  const rows = ranked.filter(c => c.name.toLowerCase().includes(words) && (!boardBanned || banned(c)));
+  // Which cities: everyone, or only those on your Social lists, online now, or banned.
+  const lists = ((view.state.social || {}).lists) || {}, online = new Set(view.online || []);
+  const who = { all: ['Everyone', () => true], ally: ['Allies', c => lists[c.name] === 'ally'], enemy: ['Enemies', c => lists[c.name] === 'enemy'],
+                online: ['Online now', c => online.has(c.name) && c.name !== city], banned: ['Banned by you', banned] };
+  if (!who[boardWho]) boardWho = 'all';
+  const matching = ranked.filter(c => c.name.toLowerCase().includes(words) && who[boardWho][1](c));
+  // A long list shows the top 25 (and your own city) until "Show all" is pressed.
+  const TOP = 25, cut = !boardAll && !words && boardWho === 'all' && matching.length > TOP + 5;
+  const rows = cut ? matching.filter((c, i) => i < TOP || c.name === city) : matching;
 
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   const leader = ranked[0], me = ranked.find(c => c.name === city);
@@ -2748,22 +2758,31 @@ function renderBoard() {
     (me ? stat('Your rank', `#${rank.get(city)} of ${board.length}`, `by ${esc(sortLabel.toLowerCase())}`) : '') +
     (leader ? stat('In the lead', esc(leader.name), `${show(leader, boardSort)} ${boardSort === 'tech' ? '' : esc(sortLabel.toLowerCase())}`) : '') +
     stat('Banned by you', myBanned.length, myBanned.length ? esc(myBanned.join(', ')) : 'nobody'));
-  setHTML($('boardViews'), `<span class="dim">Show</span>` + Object.entries(views).map(([k, [label]]) =>
-    `<button data-board-view="${k}" class="${k === boardView ? 'on' : ''}">${label}</button>`).join('') +
-    `<button data-board-banned class="${boardBanned ? 'on' : ''}">Banned only (${board.filter(banned).length})</button>`);
+  setHTML($('boardViews'), `<span class="dim">Columns</span>` + Object.entries(views).map(([k, [label]]) =>
+    `<button data-board-view="${k}" class="${k === boardView ? 'on' : ''}">${label}</button>`).join(''));
+  setHTML($('boardWho'), `<span class="dim">Cities</span>` + Object.entries(who).map(([k, [label, test]]) =>
+    `<button data-board-who="${k}" class="${k === boardWho ? 'on' : ''}">${label} (${ranked.filter(test).length})</button>`).join(''));
 
   // The column being ranked by is always shown, even if it is not part of the chosen view.
   let cols = views[boardView][1];
   if (!cols.some(([k]) => k === boardSort)) cols = [all.find(([k]) => k === boardSort), ...cols];
+  const tag = c => lists[c.name] === 'ally' ? ' <span class="good small">ally</span>' : lists[c.name] === 'enemy' ? ' <span class="bad small">enemy</span>' : '';
+  const withIdeology = boardView !== 'materials';
   setHTML($('board'), rows.length ? `<table><tr><th class="n">#</th><th>City</th>` +
-    cols.map(([k, label]) => `<th class="n sortable${k === boardSort ? ' sorted' : ''}" data-sort="${esc(k)}">${esc(label)}${k === boardSort ? ' v' : ''}</th>`).join('') + `<th></th></tr>` +
+    cols.map(([k, label]) => `<th class="n sortable${k === boardSort ? ' sorted' : ''}" data-sort="${esc(k)}">${esc(label)}${k === boardSort ? ' v' : ''}</th>`).join('') +
+    (withIdeology ? `<th>Ideology</th>` : '') + `<th></th></tr>` +
     rows.map(c => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${rank.get(c.name)}</td>` +
-      `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${banned(c) ? ' <span class="bad">banned</span>' : ''}</td>` +
+      `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${online.has(c.name) && c.name !== city ? ' <span class="good small">online</span>' : ''}` +
+      `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}</td>` +
       cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
+      (withIdeology ? `<td class="dim">${c.ideology ? esc(c.ideology) : '-'}</td>` : '') +
       `<td>` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
-        (visiting ? '' : banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
-                                   : `<button data-ban="${esc(c.name)}">Ban</button>`)) +
-      `</td></tr>`).join('') + `</table>` : `<span class="dim">No city matches.</span>`);
+        (visiting ? '' : `<button data-board-msg="${esc(c.name)}">Message</button> ` + (banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
+                                   : `<button data-ban="${esc(c.name)}">Ban</button>`))) +
+      `</td></tr>`).join('') + `</table>` +
+      (cut ? `<div class="bar"><span class="dim small">Showing the top ${TOP} of ${matching.length}${rank.get(city) > TOP ? ', and your city' : ''}.</span>` +
+        `<button data-board-all>Show all ${matching.length}</button></div>` : '')
+    : `<span class="dim">No city matches.</span>`);
 }
 
 // ------------------------------------------------------------------ time --
@@ -3196,16 +3215,20 @@ $('board').addEventListener('click', e => {
   else if (d.unban) act('unban', { target: d.unban });
 });
 $('board').onclick = e => {
-  if (e.target.dataset.sort) { boardSort = e.target.dataset.sort; renderBoard(); }
+  const d = e.target.dataset;
+  if (d.sort) { boardSort = settings.boardSort = d.sort; saveSettings(); renderBoard(); }
+  else if ('boardAll' in d) { boardAll = true; renderBoard(); }
+  else if (d.boardMsg) { tab = 'social'; render(); openTalk(d.boardMsg); }
 };
 $('boardSearch').oninput = () => renderBoard();
-$('boardRank').onchange = () => { boardSort = $('boardRank').value; renderBoard(); };
+$('boardRank').onchange = () => { boardSort = settings.boardSort = $('boardRank').value; saveSettings(); renderBoard(); };
 $('boardViews').onclick = e => {
-  if (e.target.dataset.boardView) boardView = e.target.dataset.boardView;
-  else if ('boardBanned' in e.target.dataset) boardBanned = !boardBanned;
-  else return;
+  if (!e.target.dataset.boardView) return;
+  boardView = settings.boardView = e.target.dataset.boardView;
+  saveSettings();
   renderBoard();
 };
+$('boardWho').onclick = e => { const b = e.target.closest('[data-board-who]'); if (b) { boardWho = b.dataset.boardWho; renderBoard(); } };
 for (const id of ['guideSearch', 'guideTech', 'guideCat']) $(id).oninput = () => { if (view) renderGuide(true); };
 
 setInterval(tick, 1000);
