@@ -821,8 +821,9 @@
         <p class="dim small" style="margin-bottom:0">Every dealing you have with another city is noted here: trades, beast
           trades, bills and duels. You can also write to other cities, and see who has the game open right now. Mark a city as an ally or an enemy to keep it at the top of the list. The lists are
           only for you: they change nothing in the game and no other city can see them.</p>
+        <div id="socViews" class="bar"></div>
       </div>
-      <details class="panel" open>
+      <details class="panel" open data-soc="cities">
         <summary class="cat">Cities <span id="socCityCount" class="count"></span></summary>
         <div class="bar" style="margin-top:0">
           <input id="socSearch" type="search" placeholder="Search cities by name" style="flex:1 1 200px">
@@ -830,7 +831,7 @@
         </div>
         <div id="socCities" class="scroll" style="margin-top:10px"></div>
       </details>
-      <details class="panel" open id="socMsgPanel">
+      <details class="panel" open id="socMsgPanel" data-soc="messages">
         <summary class="cat">Messages <span id="socMsgCount" class="count"></span></summary>
         <div id="socTalks" class="bar areaChips" style="margin-top:0"></div>
         <form id="msgForm" class="bar">
@@ -840,7 +841,7 @@
         </form>
         <div id="socThread" style="max-height:320px;overflow-y:auto;margin-top:8px"></div>
       </details>
-      <details class="panel" open id="socHistPanel">
+      <details class="panel" open id="socHistPanel" data-soc="history">
         <summary class="cat">History <span id="socHistCount" class="count"></span></summary>
         <div class="bar" style="margin-top:0">
           <select id="socCity"></select>
@@ -2273,8 +2274,23 @@ let readSent = '';          // the last conversation this page told the server i
 let lastBuilt = null;       // the building last built, offered first on the next empty tile
 const SOC_KINDS = { trade: ['trade', 'trades'], beast: ['beast trade', 'beast trades'], bill: ['bill event', 'bill events'],
                     duel: ['duel event', 'duel events'], ban: ['ban', 'bans'] };
+let socView = settings.socView || 'cities';   // which part of the Social tab shows (remembered)
+function showSocial(part) {          // used by the buttons on a city's row, which lead to its messages or history
+  if (socView !== 'all') socView = part;
+  renderSocial();
+}
 function renderSocial() {
   const { state } = view, book = state.social || {}, lists = book.lists || {}, history = book.history || [];
+  // ---- the buttons along the top, each with what is waiting there ----
+  const newMail = (state.messages || []).filter(m => !m.read).length, onlineNow = (view.online || []).filter(c => c !== state.name).length;
+  const listed = Object.keys(lists).length;
+  const parts = { cities: ['Cities', `${listed} on your lists` + (onlineNow ? `, <span class="good">${onlineNow} online</span>` : '')],
+                  messages: ['Messages', newMail ? `<span class="good">${newMail} new</span>` : ''],
+                  history: ['History', `${history.length}`], all: ['Everything', ''] };
+  if (!parts[socView]) socView = 'cities';
+  setHTML($('socViews'), Object.entries(parts).map(([k, [label, note]]) =>
+    `<button data-soc-view="${k}" class="${socView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
+  for (const panel of document.querySelectorAll('#tab-social [data-soc]')) panel.hidden = socView !== 'all' && panel.dataset.soc !== socView;
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   // Everything known about each other city: its list, how many dealings of each kind, and the latest one.
   const online = new Set((view.online || []).filter(c => c !== state.name));
@@ -2877,11 +2893,15 @@ $('tab-beast').addEventListener('toggle', e => {   // remember which kinds of be
 }, true);
 function openTalk(name) {
   $('msgTo').value = name;
-  renderSocial();
+  showSocial('messages');
   $('socMsgPanel').open = true;
   $('socMsgPanel').scrollIntoView({ block: 'start' });
   $('msgText').focus();
 }
+$('socViews').onclick = e => {
+  const b = e.target.closest('[data-soc-view]');
+  if (b) { socView = settings.socView = b.dataset.socView; saveSettings(); renderSocial(); }
+};
 $('socTalks').onclick = e => { const b = e.target.closest('[data-talk]'); if (b) { $('msgTo').value = b.dataset.talk; renderSocial(); $('msgText').focus(); } };
 $('msgTo').oninput = () => { if (view && !visiting) renderSocial(); };
 $('msgForm').onsubmit = async e => {
@@ -2902,7 +2922,7 @@ $('socCities').onclick = e => {
   }
   else if (d.socVisit) visit(d.socVisit);
   else if (d.socMsg) openTalk(d.socMsg);
-  else if (d.socHist) { $('socCity').value = d.socHist; renderSocial(); $('socHistPanel').open = true; $('socHistPanel').scrollIntoView({ block: 'start' }); }
+  else if (d.socHist) { $('socCity').value = d.socHist; showSocial('history'); $('socHistPanel').open = true; $('socHistPanel').scrollIntoView({ block: 'start' }); }
 };
 $('beastSearch').oninput = () => { if (view) renderBeast(); };
 $('duelForm').addEventListener('input', () => { if (view) fillDuels(); });
