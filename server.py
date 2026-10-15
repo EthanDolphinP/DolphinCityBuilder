@@ -249,7 +249,7 @@ def _tile(value):
         return None
 
 
-def city_view(state, now, area=0, find=None, tile=None, have_defs=None):
+def city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=False):
     global DEFS_VERSION
     out = game.view(state, area if isinstance(area, int) else 0, _tile(tile))
     if DEFS_VERSION is None:
@@ -268,7 +268,49 @@ def city_view(state, now, area=0, find=None, tile=None, have_defs=None):
     rates = out["status"]["rates"]
     for k, v in market.bill_rates(MARKET, state["name"]).items():
         rates[k] = round(rates[k] + v, 1)
+    if stats:       # only while the Stats tab is open: it is the most work of any reply
+        out["stats"] = game.city_stats(state, now, rates)
+        out["stats"].insert(-1, market_stats(state, now))
     return out
+
+
+def market_stats(state, now):
+    """The Stats tab's section on trading and other cities (it needs the market, which game.py doesn't see)."""
+    name = state["name"]
+    trades = [h for h in MARKET["history"] if name in (h["seller"], h["buyer"])]
+    bills = [b for b in MARKET["bills"] if name in (b["from"], b["to"])]
+    duels = market.duels_view(MARKET, name)
+    book = state.get("social", {"lists": {}, "history": []})
+    mail = state.get("messages", [])
+    names = all_city_names()
+    board = [game.summary(c) for c in (get_city(n, now) for n in names) if c]
+    rank = lambda key: 1 + sum(1 for c in board if key(c) > key(game.summary(state)))
+    return {"id": "market", "title": "Market and other cities", "blocks": [{"rows": [
+        ["Your open offers", sum(1 for o in MARKET["offers"] if o["city"] == name), f"of {len(MARKET['offers'])} on the market"],
+        ["Finished offers kept", len(state.get("finished", [])), ""],
+        ["Recent market trades you took part in", len(trades), f"of the last {len(MARKET['history'])} on the market"],
+        ["  as the seller", sum(1 for h in trades if h["seller"] == name), ""],
+        ["  as the buyer", sum(1 for h in trades if h["buyer"] == name), ""],
+        ["Bills running", sum(1 for b in bills if b["status"] == "active"), ""],
+        ["Bills waiting for an answer", sum(1 for b in bills if b["status"] != "active"), ""],
+        ["Your beast offers", sum(1 for o in MARKET["beast_offers"] if o["city"] == name), f"of {len(MARKET['beast_offers'])} on the market"],
+        ["Duel challenges for you", sum(1 for d in duels if d.get("to") == name), ""],
+        ["Duel challenges you sent", sum(1 for d in duels if d["city"] == name), ""],
+        ["Duels kept on record", len(state.get("duels", [])), f"{sum(1 for d in state.get('duels', []) if d['won'])} won"],
+        ["Allies", sum(1 for v in book["lists"].values() if v == "ally"), ""],
+        ["Enemies", sum(1 for v in book["lists"].values() if v == "enemy"), ""],
+        ["Cities you have dealt with", len({h["city"] for h in book["history"] if h.get("city")}), "recently"],
+        ["Banned from viewing your city", len(state.get("banned", [])), ""],
+        ["Messages kept", len(mail), f"{sum(1 for m in mail if not m['read'])} unread"],
+        ["Presents waiting to be opened", sum(1 for p in state.get("presents", []) if not p["opened"]), ""],
+        ["Cities in the game", len(names), ""],
+        ["Cities online now", sum(1 for seen in ONLINE.values() if now - seen <= ONLINE_SECONDS), ""],
+        ["Rank by population", rank(lambda c: c["population"]), f"of {len(board)}"],
+        ["Rank by tech level", rank(lambda c: c["tech"]), f"of {len(board)} (cities level with you share a rank)"],
+        ["Rank by research", rank(lambda c: c["research"]), f"of {len(board)}"],
+        ["Rank by buildings", rank(lambda c: c["buildings"]), f"of {len(board)}"],
+        ["Rank by areas", rank(lambda c: c["areas"]), f"of {len(board)}"],
+    ]}]}
 
 
 def _area(value):
@@ -292,7 +334,7 @@ def handle_get(path, query, token, now):
         if re.fullmatch(r"-?\d{1,3}", tz):
             weather.set_timezone(state, int(tz))     # day and night follow the player's own clock
         out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0],
-                        query.get("tile", [""])[0], query.get("defs", [""])[0])
+                        query.get("tile", [""])[0], query.get("defs", [""])[0], query.get("stats", [""])[0] == "1")
         out["away"] = game.check_in(state, now)
         return 200, out
 
@@ -410,7 +452,7 @@ def handle_post(path, data, token, now):
         error = game.apply_action(state, now, action, data)
     flush()
     out = city_view(state, now, 0 if action == "restart" else data.get("area", 0), data.get("find"),
-                    data.get("tile"), data.get("defs"))
+                    data.get("tile"), data.get("defs"), data.get("stats") is True)
     out["error"] = error
     return 200, out
 

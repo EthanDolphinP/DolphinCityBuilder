@@ -196,7 +196,11 @@
   .spcHead { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: flex-start; margin: 8px 0 4px; }
   .tradeForm { border: 1px solid var(--accent); background: var(--inset); padding: 8px 10px; margin: 6px 0; white-space: normal; }
   .tradeForm .bar { margin: 6px 0; align-items: center; }
-  .visiting [data-deliver], .visiting [data-egg-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market], .visiting [data-tab=social] { display: none; }
+  .visiting [data-deliver], .visiting [data-egg-deliver], .visiting [data-beast-active], .visiting #slaughterForm, .visiting #restart, .visiting #changePass, .visiting #passForm, .visiting [data-tab=market], .visiting [data-tab=social], .visiting [data-tab=stats] { display: none; }
+  .statTable td:first-child { white-space: normal; }
+  .statKv { display: grid; grid-template-columns: minmax(140px, max-content) minmax(0, 1fr); gap: 2px 16px; }
+  .statKv > div:nth-child(odd) { color: var(--dim); }
+  .statKv .note { color: var(--dim); font-size: 13px; }
   #away, #report, #present, #ideologyPick { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
@@ -416,6 +420,7 @@
       <button data-tab="market">Market</button>
       <button data-tab="social">Social</button>
       <button data-tab="board">Leaderboard</button>
+      <button data-tab="stats">Stats</button>
       <button data-tab="guide">Guide</button>
       <button data-tab="settings">Settings</button>
     </div>
@@ -800,6 +805,18 @@
     </div>
 
     <!-- Guide -->
+    <div id="tab-stats" hidden>
+      <div class="panel"><h2>Stats</h2>
+        <p class="dim small" style="margin-top:0">Everything about your city in numbers. "All time" counts from when stats began.</p>
+        <div class="bar" style="margin-top:0">
+          <input id="statsSearch" type="search" placeholder="Search the stats" style="flex:1 1 180px">
+          <button id="statsRefresh" title="Work the stats out again now">Refresh</button>
+          <span id="statsAge" class="dim small"></span>
+        </div>
+        <div id="statsViews" class="bar"></div>
+      </div>
+      <div id="statsBody"></div>
+    </div>
     <div id="tab-guide" hidden>
       <div class="panel">
         <h2>Guide</h2>
@@ -1204,6 +1221,7 @@ const HOWTO = [
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
+  ['Stats', 'The Stats tab has everything about your city in numbers: people, every resource and what makes it, buildings, power, land, research, bonuses, time and weather, beasts, the market and your rank among other cities, and all-time counts of what the city has made, built and done since stats began. Pick a section along the top or search for any stat.'],
   ['Shortcuts', 'The number keys 1 to 0 open the tabs in order. On the City tab the arrow keys move round the map, [ and ] go to the previous or next area, and Escape lets go of the tile. When you pick an empty tile, the build list can be searched by name or by what a building makes, narrowed to one kind of building, and sorted; the kinds you built last are at the top, one click each. In Settings you can have the game open on whichever tab you left it on.'],
   ['Making it yours', 'The Settings tab changes the theme, font, size and layout (including a phone layout), how numbers and rates are shown, and which pop-up windows appear. The Find box on the City tab searches your areas for buildings and, with Surveying, for kinds of land.'],
 ];
@@ -1306,6 +1324,7 @@ function remember(name) {
   } catch {}
 }
 function signOut(message) {
+  stats = null; statsAt = 0;     // another city's stats must not show
   remember(null);
   token = city = view = visiting = null;
   $('game').hidden = true; $('away').hidden = true; $('passForm').hidden = true;
@@ -1358,18 +1377,27 @@ const tileParam = () => sel ? `${sel.x},${sel.y}` : '';
 const defsHave = () => view && view.defs ? view.defs_version || '' : '';
 let detailAsked = '';   // the tile whose details have been asked for, so they are asked for once
 const tzMinutes = () => -new Date().getTimezoneOffset();    // minutes ahead of UTC on this device
+// The stats are the most work of any reply, so they are asked for only while the Stats tab is open:
+// when it opens, on Refresh, and then once a minute.
+let stats = null, statsAt = 0, statsAsk = false;
+const wantStats = () => !visiting && tab === 'stats' && (statsAsk || !stats || performance.now() - statsAt > 60000);
 async function api(action, extra) {
   const opts = action
     ? { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Token': token},
-        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), tile: tileParam(), defs: defsHave(), tz: tzMinutes(), ...extra }) }
+        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), tile: tileParam(), defs: defsHave(), tz: tzMinutes(),
+                               stats: wantStats(), ...extra }) }
     : { headers: {'X-Token': token} };
   const res = await fetch(action ? '/api/action'
     : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}&tile=${tileParam()}&defs=${defsHave()}`
-    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}&tz=${tzMinutes()}`, opts);
+    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}&tz=${tzMinutes()}${wantStats() ? '&stats=1' : ''}`, opts);
   return res.json();
 }
 
+function acceptStats(data) {
+  if (data.stats) { stats = data.stats; statsAt = performance.now(); statsAsk = false; }
+}
 function accept(data) {
+  acceptStats(data);
   // Ignore an answer about a city we have since stopped (or started) looking at.
   if ((data.visiting ? data.state.name : null) !== visiting) return;
   if (!data.defs && view) data.defs = view.defs;          // the server left out what we already have
@@ -1567,7 +1595,7 @@ function render() {
   const waitingCount = visiting ? 0 : (state.messages || []).filter(m => !m.read).length + (state.sales || []).length +
     (view.market.duels || []).filter(d => d.to === state.name).length + (ready ? 1 : 0) + (ideoTodo ? 1 : 0) + (todo ? 1 : 0);
   document.title = (waitingCount ? `(${waitingCount}) ` : '') + (visiting ? `${state.name} (visiting)` : state.name) + ' - Dolphin City Builder';
-  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'market', 'social', 'board', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
+  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
   $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
@@ -1636,6 +1664,7 @@ function render() {
   if (tab === 'people') renderPeople();
   if (tab === 'beast') renderBeast();
   if (tab === 'guide') renderGuide();
+  if (tab === 'stats' && !visiting) renderStats();
   if (tab === 'settings') renderSettings();
   $('mapKey').hidden = !settings.mapKey;
   fitMap();
@@ -2058,6 +2087,40 @@ function landHint(env) {
   const loot = (env.loot || []).map(([k]) => R[k]);
   return (main.length || loot.length) ? `<br><span class="dim small">${main.length ? 'Mostly ' + esc(main.join(', ')) : ''}` +
     `${main.length && loot.length ? '; ' : ''}${loot.length ? 'may bring back extra ' + esc(loot.join(', ')) : ''}</span>` : '';
+}
+let statsView = settings.statsView || 'all';   // which section of the Stats tab shows (remembered)
+function statValue(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'number') return num(v);
+  if (typeof v !== 'object') return esc(String(v));
+  if (v.time) return esc(clock(v.time));
+  if ('dur' in v) return esc(duration(v.dur));
+  if ('pct' in v) return `${Math.round(v.pct * 1000) / 10}%`;
+  return esc(String(v));
+}
+function renderStats() {
+  if (!stats) { setHTML($('statsBody'), `<div class="panel"><p class="dim">Working out the stats...</p></div>`); return; }
+  $('statsAge').textContent = `Worked out ${duration((performance.now() - statsAt) / 1000)} ago`;
+  if (!stats.some(s => s.id === statsView)) statsView = 'all';
+  setHTML($('statsViews'), [['all', 'Everything'], ...stats.map(s => [s.id, s.title])].map(([k, label]) =>
+    `<button data-stats-view="${k}" class="${statsView === k ? 'on' : ''}">${esc(label)}</button>`).join(''));
+  const words = $('statsSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = text => words.every(w => text.toLowerCase().includes(w));
+  const plain = v => v && typeof v === 'object' ? statValue(v) : String(v ?? '');
+  const html = stats.filter(s => statsView === 'all' || words.length || s.id === statsView).map(s => {
+    const blocks = s.blocks.map(b => {
+      // with a search, a block keeps only the rows that match (all of them if its title matches)
+      const rows = words.length && !hit(s.title + ' ' + (b.title || '')) ? b.rows.filter(r => hit(r.map(plain).join(' '))) : b.rows;
+      if (!rows.length) return '';
+      const title = b.title ? `<div class="cat">${esc(b.title)}</div>` : '';
+      if (b.head) return title + `<div class="scroll"><table class="statTable"><tr>${b.head.map((h, i) => `<th class="${i ? 'n' : ''}">${esc(h)}</th>`).join('')}</tr>` +
+        rows.map(r => `<tr>${r.map((v, i) => `<td class="${i ? 'n' : ''}">${statValue(v)}</td>`).join('')}</tr>`).join('') + `</table></div>`;
+      return title + `<div class="statKv">` + rows.map(([label, v, note]) =>
+        `<div>${esc(label)}</div><div><span class="hi">${statValue(v)}</span>${note ? ` <span class="note">${statValue(note)}</span>` : ''}</div>`).join('') + `</div>`;
+    }).join('');
+    return blocks ? `<div class="panel"><h2>${esc(s.title)}</h2>${blocks}</div>` : '';
+  }).join('');
+  setHTML($('statsBody'), html || `<div class="panel"><p class="dim">No stats match.</p></div>`);
 }
 function renderFinder() {
   const found = view.found, out = $('findOut');
@@ -3103,6 +3166,12 @@ $('tab-ideology').addEventListener('toggle', e => {   // remember which perk lis
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
 }, true);
+$('statsViews').onclick = e => {
+  const b = e.target.closest('[data-stats-view]');
+  if (b) { statsView = settings.statsView = b.dataset.statsView; saveSettings(); renderStats(); }
+};
+$('statsSearch').oninput = () => { if (view) renderStats(); };
+$('statsRefresh').onclick = () => { statsAsk = true; refresh(); };
 $('presentBar').onclick = e => {
   if (e.target.dataset.presentOpen) act('present_open', { present: +e.target.dataset.presentOpen });
   else if (e.target.dataset.presentClose) act('present_close', { present: +e.target.dataset.presentClose });
@@ -3228,6 +3297,7 @@ document.querySelector('.tabs').onclick = e => {
   if (settings.lastTab !== tab) { settings.lastTab = tab; saveSettings(); }
   render();
   if (tab === 'board') loadBoard();
+  if (tab === 'stats' && !stats) refresh();
   const top = $('tab-' + tab).getBoundingClientRect().top, bar = document.querySelector('.tabs').getBoundingClientRect().bottom;
   if (top < bar) window.scrollTo(0, scrollY + top - bar - 8);
 };

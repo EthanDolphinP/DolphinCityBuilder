@@ -241,6 +241,9 @@ def accept(market, buyer, now, offer_id, get_city, lots=None, amount=None):
         del seller["sales"][:-SALES_KEPT]
 
     _record(market, now, offer["city"], buyer["name"], offer["give"], give_qty, offer["want"], want_qty)
+    game.tally(buyer, "bought")
+    if seller:
+        game.tally(seller, "sold")
     social(buyer, now, offer["city"], "trade", f"You bought {got} from their offer for {paid}.")
     social(seller, now, buyer["name"], "trade", f"They bought {got} from your offer for {paid}.")
     return None
@@ -477,6 +480,9 @@ def accept_beast(market, buyer, now, offer_id, get_city, pay_beast=None):
     beasts.give(buyer, now, offer["beast"])
     game.log(buyer, now, f"Traded with {offer['city']}: gave {paid}, received {name}. See the Beast tab.")
     game.log(seller, now, f"{buyer['name']} took your beast offer: gave {name}, received {paid}.")
+    game.tally(buyer, "beast_trades")
+    if seller:
+        game.tally(seller, "beast_trades")
     social(buyer, now, offer["city"], "beast", f"You took their beast offer: gave {paid}, received {name}.")
     social(seller, now, buyer["name"], "beast", f"They took your beast offer: you gave {name}, received {paid}.")
     return None
@@ -630,6 +636,7 @@ def accept_duel(market, state, now, duel_id, get_city, beast_id, bet, rng=None):
             "sides": [sides[i], sides[1 - i]], "rounds": [dict(r, by=int(r["by"] != i)) for r in rounds]})
         del city["duels"][:-beasts.DUEL_RESULTS_KEPT]
         foe = sides[1 - i]
+        game.tally(city, "duels_won" if winner == i else "duels_lost")
         game.log(city, now, f"Duel: your {sides[i]['name']} (bet {sides[i]['bet']}) "
                             f"{'beat' if winner == i else 'lost to'} {foe['city']}'s {foe['name']} (bet {foe['bet']}). "
                             + (f"You won {prize}." if winner == i else "You lost your bet."))
@@ -682,6 +689,8 @@ def send_message(state, now, to, text, get_city):
     target["message_count"] = target.get("message_count", 0) + 1
     _mailbox(target).append({"id": target["message_count"], "t": now, "city": state["name"], "mine": False,
                              "text": text, "read": False})
+    game.tally(state, "messages_sent")
+    game.tally(target, "messages_received")
     for box in (_mailbox(state), _mailbox(target)):
         del box[:-MESSAGES_KEPT]
     if not waiting:     # one line in the log per conversation waiting, not one per message

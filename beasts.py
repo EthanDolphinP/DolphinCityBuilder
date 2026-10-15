@@ -598,6 +598,7 @@ def new_egg(state, now, species):
     beast["task"] = _egg_task(state, species, random.Random())
     beast["stats"] = roll_stats(species, random.Random())
     state["beasts"].append(beast)
+    game.tally(state, "eggs")
     return beast
 
 
@@ -789,6 +790,7 @@ def give_xp(state, now, beast, amount):
     while beast["level"] < max_level(beast) and beast["xp"] >= xp_needed(beast["level"]):
         beast["xp"] -= xp_needed(beast["level"])
         beast["level"] += 1
+        game.tally(state, "beast_levels")
         game.log(state, now, f"*** {title(beast)} has grown to level {beast['level']}. ***")
         if beast["level"] in EGG_LEVELS:
             names = list(RARITIES)
@@ -842,6 +844,7 @@ def _complete(state, now):
     if not beast:
         return
     game.log(state, now, f"Mission complete: {mission['text']}.")
+    game.tally(state, "missions")
     if beast["stage"] != "egg":
         give_xp(state, now, beast, mission_xp(state, beast))
     tick(state, now)
@@ -850,6 +853,7 @@ def _complete(state, now):
 def _complete_egg(state, now, beast):
     beast["task"]["complete"] = True
     beast["missions"] += 1
+    game.tally(state, "egg_missions")
     game.log(state, now, f"Egg mission complete: {beast['task']['text']}.")
     if beast["missions"] < tasks_needed(beast):      # rarer eggs need more than one, one after another
         beast["task"] = _egg_task(state, beast["species"], random.Random(), beast["task"]["kind"])
@@ -904,6 +908,7 @@ def tick(state, now):
         if (beast["stage"] == "egg" and beast["missions"] >= tasks_needed(beast)
                 and now - beast["obtained"] >= hatch_time(state, beast)):
             beast.update(stage="hatched", level=1, xp=0, hatched=now)
+            game.tally(state, "hatched")
             beast.pop("task", None)
             species = SPECIES[beast["species"]]
             game.log(state, now, f"*** The egg has hatched: a {species['name']} "

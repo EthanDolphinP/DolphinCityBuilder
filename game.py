@@ -2769,6 +2769,8 @@ def migrate(state, now):
                            "climate": state.pop("climate"), "tiles": state.pop("tiles")}]
     # Things added since the save was made.
     state.setdefault("seed", random.randrange(1 << 30))
+    state.setdefault("totals", {})
+    state.setdefault("totals_since", state.get("updated", now))    # counted from here, catching up included
     state.setdefault("research", [])
     state.setdefault("wild", 0)
     state.setdefault("expedition", None)
@@ -2898,6 +2900,12 @@ def rename_area(state, now, area, name):
 # --------------------------------------------------------------------------
 # Rules
 # --------------------------------------------------------------------------
+
+def tally(state, key, n=1):
+    """Add to one of the city's lifetime counters (see TALLIES), shown on the Stats tab."""
+    totals = state.setdefault("totals", {})
+    totals[key] = totals.get(key, 0) + n
+
 
 def log(state, now, text):
     state["log"].append({"t": now, "text": text})
@@ -3131,19 +3139,24 @@ def _speed(state, job, power=1.0, env=1.0):
 def _meal(state, housing, when):
     """Everyone eats. Returns True if the population changed."""
     res, pop = state["resources"], state["population"]
+    tally(state, "meals")
     if res["food"] < pop:
+        tally(state, "hungry_meals")
+        tally(state, "eaten", int(res["food"]))
         res["food"] = 0
         if not state["hungry"]:
             state["hungry"] = True
             log(state, when, "The food has run out. Hungry workers are working at half speed.")
         return False
     res["food"] -= pop
+    tally(state, "eaten", pop)
     if state["hungry"]:
         state["hungry"] = False
         log(state, when, "Everyone is fed again.")
     arrivals = _arrivals(pop, res["food"], housing, 1 + city_attracts(state, when))
     state["population"] += arrivals
     if arrivals:
+        tally(state, "arrivals", arrivals)
         beasts.note(state, when, "arrival", arrivals)
     return arrivals > 0
 
@@ -3220,6 +3233,7 @@ def advance_time(state, now):
 
 def _advance(state, now, remaining):
     res = state["resources"]
+    totals = state.setdefault("totals", {})
     jobs, housing, _ = work_plan(state)
     wildlife_speed = city_stat(state, "wildlife_speed") + beasts.bonus(state, "wildlife_speed")
     rng = random.Random()
@@ -3240,8 +3254,11 @@ def _advance(state, now, remaining):
                     tile["progress"] = job["cycle"]   # finished, waiting for inputs
                     break
                 _pay(state, b.get("consumes", {}))
+                for k, v in b.get("consumes", {}).items():
+                    totals["used:" + k] = totals.get("used:" + k, 0) + v
                 for k, v in job_output(state, job).items():
                     res[k] += v
+                    totals["made:" + k] = totals.get("made:" + k, 0) + v
                 tile["progress"] -= job["cycle"]
         state["meal"] += dt
         while state["meal"] >= MEAL_TIME:
@@ -3252,6 +3269,7 @@ def _advance(state, now, remaining):
             # a new spell of weather starts in every area: rare weather is worth watching
             rare = [i for i in range(len(state["areas"])) if weather.WEATHER[weather.weather_at(state, i, when + 1)].get("rare")]
             if rare:
+                tally(state, "rare_weather", len(rare))
                 beasts.note(state, when, "weather")
                 beasts.weather_egg(state, when, rare, rng)
         state["wild"] += dt * (1 + wildlife_speed)
@@ -3278,6 +3296,7 @@ def build(state, now, area, x, y, bid):
     _pay(state, b["cost"])
     scared = tile["animal"]
     tile.update(building=bid, progress=0, additions=[], animal=None, priority=0)
+    tally(state, "built")
     beasts.note(state, now, "build")
     log(state, now, f"Built {b['name']} at ({x},{y}) in {area_name(area)}."
         + (f" The {WILDLIFE[scared]['name'].lower()} fled." if scared else ""))
@@ -3293,6 +3312,7 @@ def demolish(state, now, area, x, y):
         for k, v in part["cost"].items():
             state["resources"][k] += int(v * DEMOLISH_REFUND)
     tile.update(building=None, progress=0, additions=[], priority=0)
+    tally(state, "demolished")
     log(state, now, f"Demolished {b['name']} at ({x},{y}) in {area_name(area)}.")
     return None
 
@@ -3340,6 +3360,7 @@ def add_addition(state, now, area, x, y, aid):
         return f"Not enough resources for {a['name']} (need {fmt_goods(missing)})."
     _pay(state, a["cost"])
     tile["additions"].append(aid)
+    tally(state, "additions")
     beasts.note(state, now, "addition")
     log(state, now, f"Added {a['name']} to the {BUILDINGS[tile['building']]['name']} at ({x},{y}).")
     return None
@@ -3369,6 +3390,7 @@ def research(state, now, rid):
         return f"Not enough to research {r['name']} (need {fmt_goods(missing)})."
     _pay(state, r["cost"])
     state["research"].append(rid)
+    tally(state, "researched")
     beasts.note(state, now, "research")
     log(state, now, f"Researched {r['name']}.")
     return None
@@ -3397,6 +3419,7 @@ def advance(state, now):
         return f"Not ready to become a {nxt['name']} yet: {', '.join(unmet)}."
     _pay(state, nxt["cost"])
     state["tech"] += 1
+    tally(state, "tech_ups")
     _expand_area(state["areas"][0])
     log(state, now, f"*** {state['name']} is now a {nxt['name']}! The home area has grown. ***")
     beasts.tech_egg(state, now, state["tech"])
@@ -3429,6 +3452,7 @@ def open_present(state, now, present_id):
     if present["opened"]:
         return None
     present["opened"] = True
+    tally(state, "presents")
     for k, v in present["gifts"].items():
         state["resources"][k] += v
     got = [fmt_goods(present["gifts"])] if present["gifts"] else []
@@ -3512,6 +3536,8 @@ def tame(state, now, area, x, y):
         return f"Not enough bait to tame the {w['name'].lower()} (need {fmt_goods(missing)})."
     _pay(state, tame_cost(tile["animal"]))
     state["resources"]["livestock"] += w["livestock"]
+    tally(state, "tamed")
+    tally(state, "tamed_livestock", w["livestock"])
     beasts.note(state, now, "tame")
     beasts.tame_egg(state, now, random.Random())
     tile["animal"] = None
@@ -3527,6 +3553,7 @@ def slaughter(state, now, count):
         return f"You only have {int(state['resources']['livestock'])} livestock."
     state["resources"]["livestock"] -= count
     state["resources"]["food"] += count * SLAUGHTER_FOOD
+    tally(state, "slaughtered", count)
     log(state, now, f"Slaughtered {count} livestock for {count * SLAUGHTER_FOOD} Food.")
     return None
 
@@ -3592,6 +3619,8 @@ def send_expedition(state, now, rx, ry):
     if missing:
         return f"Not enough supplies for the expedition (need {fmt_goods(missing)})."
     _pay(state, cost)
+    for k, v in cost.items():
+        tally(state, "supplies:" + k, v)
     state["expedition"] = {"rx": rx, "ry": ry, "left": now, "arrive": now + expedition_time(state, rx, ry)}
     log(state, now, f"An expedition set out {where(rx, ry)} of home with {fmt_goods(cost)}.")
     return None
@@ -3607,6 +3636,7 @@ def _arrive(state, trip):
     state["areas"].append(area)
     state["expedition"] = None
     log(state, when, f"*** The expedition has mapped a new area: {area_name(area)}. ***")
+    tally(state, "expeditions")
 
     distance = abs(trip["rx"]) + abs(trip["ry"])
     loot = {}
@@ -3987,6 +4017,281 @@ def growth_checks(state, housing):
          "text": f"A free place to live: {pop} people, housing for {housing}",
          "fix": "Build more housing (huts, then houses and apartments) or add rooms to the homes you have."},
     ]
+
+
+# The city's lifetime counters (state["totals"]), counted from when the city first had them.
+# "made:<resource>" / "used:<resource>" / "supplies:<resource>" are kept per resource.
+TALLIES = [
+    ("meals", "Meals eaten"), ("hungry_meals", "Meals with too little food"), ("eaten", "Food eaten"),
+    ("arrivals", "People who have arrived"), ("built", "Buildings built"), ("demolished", "Buildings demolished"),
+    ("additions", "Additions attached"), ("researched", "Research done"), ("tech_ups", "Tech levels gained"),
+    ("expeditions", "Expeditions completed"), ("tamed", "Wild animals tamed"), ("tamed_livestock", "Livestock from taming"),
+    ("slaughtered", "Livestock slaughtered by hand"), ("rare_weather", "Spells of rare weather seen (area x meal)"),
+    ("eggs", "Eggs found"), ("hatched", "Eggs hatched"), ("egg_missions", "Egg missions done"),
+    ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
+    ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
+    ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
+    ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+]
+
+
+def city_stats(state, now, rates):
+    """Everything there is to know about the city, in sections for the Stats tab.
+
+    Each section is {"id", "title", "blocks": [{"title"?, "head"?, "rows"}]}: rows are
+    [label, value, note] (a block with "head" is a table, each row one cell per heading).
+    A value is a number, text, {"time": t}, {"dur": seconds} or {"pct": share}.
+    `rates` is the change per hour of every resource (from view(), with bills).
+    """
+    with _stats_cached():
+        return _city_stats(state, now, rates)
+
+
+def _city_stats(state, now, rates):
+    jobs, housing, totals = work_plan(state)
+    env = weather.job_factors(state, jobs, state["updated"])
+    supply, demand, power = power_status(state, jobs, env)
+    tiles = [(ai, t) for ai, area in enumerate(state["areas"]) for row in area["tiles"] for t in row]
+    built = [t for _, t in tiles if t["building"]]
+    pct = lambda x: {"pct": x}
+    sections = []
+
+    def section(sid, title, *blocks):
+        sections.append({"id": sid, "title": title, "blocks": [b for b in blocks if b and b["rows"]]})
+
+    # ---- overview
+    tech = TECH_LEVELS[state["tech"]]
+    ideo = ideology.chosen(state)
+    checks = advance_checks(state)
+    section("overview", "Overview", {"rows": [
+        ["City", state["name"], ""],
+        ["Tech level", f"{tech['name']} ({state['tech'] + 1} of {len(TECH_LEVELS)})", ""],
+        ["Next tech level", TECH_LEVELS[state["tech"] + 1]["name"] if checks else "none: the highest reached",
+         f"{sum(c['ok'] for c in checks)} of {len(checks)} requirements met" if checks else ""],
+        ["Founded", {"time": state["founded"]}, ""],
+        ["Age", {"dur": now - state["founded"]}, ""],
+        ["Ideology", ideo["name"] if ideo else "not chosen yet", f"{len(state.get('perks', []))} perks taken, {ideology.points(state)} points to spend" if ideo else ""],
+        ["Population", state["population"], ""],
+        ["Buildings", len(built), ""],
+        ["Areas", len(state["areas"]), ""],
+        ["Research done", len(state["research"]), f"of {len(RESEARCH)}"],
+        ["Beasts", sum(1 for b in state["beasts"] if b["stage"] != "egg"), f"{sum(1 for b in state['beasts'] if b['stage'] == 'egg')} eggs"],
+    ]})
+
+    # ---- people
+    workers = state["population"] - totals["idle"]
+    section("people", "People", {"rows": [
+        ["Population", state["population"], ""],
+        ["Housing", housing, f"{max(0, housing - state['population'])} beds free"],
+        ["Jobs", totals["jobs"], f"{max(0, totals['jobs'] - workers)} unfilled"],
+        ["Working", workers, pct(workers / state["population"]) if state["population"] else ""],
+        ["Idle", totals["idle"], ""],
+        ["Hungry", "yes: buildings that don't make food work at half speed" if state["hungry"] else "no", ""],
+        ["Food eaten per meal", state["population"], f"every {MEAL_TIME // 60} minutes"],
+        ["Food eaten per hour", round(state["population"] * 3600 / MEAL_TIME), ""],
+        ["Food in store lasts", {"dur": state["resources"]["food"] / state["population"] * MEAL_TIME} if state["population"] else "", "with nothing more made"],
+        ["Next meal in", {"dur": MEAL_TIME - state["meal"]}, ""],
+        ["Most arrivals per meal", 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]), ""],
+        ["Arrivals at the next meal", next_arrivals(state, housing), ""],
+        ["Extra arrivals from buildings", city_stat(state, "attracts"), ""],
+        ["Extra arrivals at night", weather.night_attracts(state, state["updated"] + 12 * 3600) if not weather.is_night(state, state["updated"])
+         else weather.night_attracts(state, state["updated"]), "from taverns, bath houses and resorts"],
+        ["Housing from buildings", sum(tile_housing(t) for t in built), ""],
+        ["Housing from the starting camp", BASE_HOUSING, ""],
+    ]}, {"title": "Housing by building", "head": ["Building", "Built", "Houses"],
+         "rows": sorted(([BUILDINGS[bid]["name"], n, h] for bid, (n, h) in _group(built, tile_housing).items() if h),
+                        key=lambda r: -r[2])})
+
+    # ---- resources
+    made, used = {k: 0.0 for k in RESOURCES}, {k: 0.0 for k in RESOURCES}
+    by_building = {}
+    for i, job in enumerate(jobs):
+        speed = _speed(state, job, power, env[i][0])
+        if not speed or not job["cycle"] or _missing(state, job["b"].get("consumes", {})):
+            continue
+        per_hour = 3600 / job["cycle"] * speed
+        for k, v in job_output(state, job).items():
+            made[k] += v * per_hour
+            key = (k, job["tile"]["building"])
+            by_building[key] = by_building.get(key, 0) + v * per_hour
+        for k, v in job["b"].get("consumes", {}).items():
+            used[k] += v * per_hour
+    used["food"] += state["population"] * 3600 / MEAL_TIME
+    section("resources", "Resources", {"head": ["Resource", "In store", "Made per hour", "Used per hour", "Change per hour", "Runs out in"],
+        "rows": [[RESOURCES[k], int(state["resources"][k]), round(made[k], 1), round(used[k], 1), rates.get(k, 0),
+                  {"dur": state["resources"][k] / -rates[k] * 3600} if rates.get(k, 0) < 0 and state["resources"][k] > 0 else ""]
+                 for k in RESOURCES]},
+        *[{"title": f"{RESOURCES[k]}: what makes it", "head": ["Building", "Per hour", "Share"],
+           "rows": [[BUILDINGS[bid]["name"], round(v, 1), pct(v / made[k])]
+                    for (res, bid), v in sorted(by_building.items(), key=lambda kv: -kv[1]) if res == k][:12]}
+          for k in RESOURCES if made[k]])
+
+    # ---- buildings
+    working = sum(1 for j in jobs if job_status(state, j, power) == "working")
+    off = sum(1 for t in built if t.get("priority", 0) < 0)
+    first = sum(1 for t in built if t.get("priority", 0) > 0)
+    slots = len(built) * MAX_ADDITIONS
+    attached = sum(len(t["additions"]) for t in built)
+    kinds = {t["building"] for t in built}
+    available = [bid for bid, b in BUILDINGS.items() if b["tech"] <= state["tech"]]
+    section("buildings", "Buildings", {"rows": [
+        ["Buildings", len(built), ""],
+        ["Kinds built", len(kinds), f"of {len(available)} open to your tech level, {len(BUILDINGS)} in the game"],
+        ["Working buildings", len(jobs), "that need workers or make something"],
+        ["Working properly", working, pct(working / len(jobs)) if jobs else ""],
+        ["Not working properly", len(jobs) - working, ""],
+        ["Switched off", off, ""],
+        ["Staffed first", first, ""],
+        ["Additions attached", attached, f"of {slots} slots ({MAX_ADDITIONS} per building)"],
+        ["Kinds of addition used", len({a for t in built for a in t["additions"]}), f"of {len(ADDITIONS)} in the game"],
+        ["One-of-a-kind buildings", sum(1 for k in kinds if BUILDINGS[k].get("unique")), ""],
+        ["Sheltered from day, night and weather", sum(1 for _, t in tiles if t["building"] and (BUILDINGS[t["building"]].get("sheltered") or TERRAINS[t["terrain"]].get("sheltered"))), ""],
+    ]}, {"title": "By kind", "head": ["Kind", "Built"],
+         "rows": [[name, sum(1 for t in built if BUILDINGS[t["building"]].get("category") == cat)] for cat, name in CATEGORIES.items()]},
+        {"title": "By tech level", "head": ["Tech level", "Built", "Kinds built"],
+         "rows": [[lvl["name"], sum(1 for t in built if BUILDINGS[t["building"]]["tech"] == i),
+                   f"{sum(1 for k in kinds if BUILDINGS[k]['tech'] == i)} of {sum(1 for b in BUILDINGS.values() if b['tech'] == i)}"]
+                  for i, lvl in enumerate(TECH_LEVELS)]},
+        {"title": "Every building", "head": ["Building", "Built", "Additions"],
+         "rows": sorted(([BUILDINGS[bid]["name"], n, a] for bid, (n, a) in _group(built, lambda t: len(t["additions"])).items()),
+                        key=lambda r: (-r[1], r[0]))})
+
+    # ---- power
+    gens = [j for j in jobs if j["power_out"]]
+    section("power", "Power", {"rows": [
+        ["Supplied", round(supply, 1), ""],
+        ["Needed", demand, ""],
+        ["Share of the need met", pct(power), "powered buildings slow down in proportion when it is short"],
+        ["Spare", round(supply - demand, 1), ""],
+        ["Generators", len(gens), ""],
+        ["Buildings that need power", sum(1 for j in jobs if j["power_in"]), ""],
+        ["Generator bonus", pct(1 + beasts.bonus(state, "power") + ideology.value(state, "power")), "from your beast and ideology"],
+    ]}, {"title": "Where the power comes from", "head": ["Generator", "Built", "Power now"],
+         "rows": sorted(([BUILDINGS[bid]["name"], n, round(p, 1)] for bid, (n, p) in _group(
+             [j for j in gens], lambda j: j["power_out"] * j["ratio"] * env[jobs.index(j)][1], key=lambda j: j["tile"]["building"]).items()),
+             key=lambda r: -r[2])})
+
+    # ---- land
+    n_tiles = len(tiles)
+    land = [t for _, t in tiles if not terrain_is(t["terrain"], "water")]
+    hi = max(tiles, key=lambda p: p[1]["height"])
+    hot = max(tiles, key=lambda p: p[1]["temp"])
+    cold = min(tiles, key=lambda p: p[1]["temp"])
+    far = max(state["areas"], key=lambda a: abs(a["rx"]) + abs(a["ry"]))
+    section("land", "Land", {"rows": [
+        ["Areas", len(state["areas"]), ""],
+        ["Tiles", n_tiles, ""],
+        ["Tiles built on", len(built), pct(len(built) / n_tiles)],
+        ["Free tiles", n_tiles - len(built), ""],
+        ["Land tiles", len(land), ""],
+        ["Water tiles", n_tiles - len(land), ""],
+        ["Home area size", f"{state['areas'][0]['size']} x {state['areas'][0]['size']}", ""],
+        ["Farthest area", area_name(far), f"{abs(far['rx']) + abs(far['ry'])} steps from home"],
+        ["Average fertility of land", round(sum(t["fertility"] for t in land) / max(1, len(land))), "%"],
+        ["Average temperature", round(sum(t["temp"] for _, t in tiles) / n_tiles, 1), "C"],
+        ["Highest tile", hi[1]["height"], area_name(state["areas"][hi[0]])],
+        ["Hottest tile", hot[1]["temp"], f"C, {area_name(state['areas'][hot[0]])}"],
+        ["Coldest tile", cold[1]["temp"], f"C, {area_name(state['areas'][cold[0]])}"],
+        ["Kinds of terrain owned", len({t["terrain"] for _, t in tiles}), f"of {len(TERRAINS)} in the game"],
+        ["Kinds of land owned", len({a["env"] for a in state["areas"]}), f"of {len(ENVIRONMENTS)} in the game"],
+        ["Wild animals on your land", sum(1 for _, t in tiles if t["animal"]), ""],
+    ]}, {"title": "Terrain", "head": ["Terrain", "Tiles", "Built on"],
+         "rows": sorted(([TERRAINS[k]["name"], n, b] for k, (n, b) in _group([t for _, t in tiles], lambda t: 1 if t["building"] else 0,
+                                                                              key=lambda t: t["terrain"]).items()), key=lambda r: -r[1])},
+        {"title": "Kinds of land", "head": ["Land", "Areas"],
+         "rows": sorted(([ENVIRONMENTS[k]["name"], n] for k, (n, _) in _group(state["areas"], lambda a: 0, key=lambda a: a["env"]).items()),
+                        key=lambda r: -r[1])},
+        {"title": "Wild animals here now", "head": ["Animal", "Here", "Worth"],
+         "rows": sorted(([WILDLIFE[k]["name"], n, f"{WILDLIFE[k]['livestock']} livestock each"] for k, (n, _) in _group(
+             [t for _, t in tiles if t["animal"]], lambda t: 0, key=lambda t: t["animal"]).items()), key=lambda r: -r[1])})
+
+    # ---- research
+    open_now = [rid for rid in RESEARCH if not research_problem(state, rid)]
+    section("research", "Research", {"rows": [
+        ["Done", len(state["research"]), f"of {len(RESEARCH)} in the game"],
+        ["Can be researched now", len(open_now), f"{sum(1 for rid in open_now if not _missing(state, RESEARCH[rid]['cost']))} affordable"],
+        ["Knowledge in store", int(state["resources"]["knowledge"]), ""],
+        ["Knowledge per hour", rates.get("knowledge", 0), ""],
+        ["Knowledge spent on research", sum(RESEARCH[r]["cost"].get("knowledge", 0) for r in state["research"]), ""],
+        ["Cheapest left", min((RESEARCH[r]["cost"].get("knowledge", 0) for r in open_now), default=""), "knowledge"],
+    ]}, {"title": "By tech level", "head": ["Tech level", "Done", "In the game"],
+         "rows": [[lvl["name"], sum(1 for r in state["research"] if RESEARCH[r]["tech"] == i),
+                   sum(1 for r in RESEARCH.values() if r["tech"] == i)] for i, lvl in enumerate(TECH_LEVELS)]})
+
+    # ---- bonuses
+    def factor(cat):
+        out = 1.0
+        for bonus in (beasts.speed_bonus(state, cat), ideology.speed_bonus(state, cat)):
+            if bonus:
+                out *= bonus[0]
+        return out
+    night, weather_cover = weather.shelter(state)
+    section("bonuses", "Bonuses", {"rows": [
+        ["Expedition speed", pct(1 + min(MAX_EXPLORE_SPEED, city_stat(state, "explore_speed")) + beasts.bonus(state, "explore_speed")), "of normal"],
+        ["Expedition supplies", pct(min(_researched(state, "explore_discount"), default=1) * (1 - min(0.6, ideology.value(state, "explore_cost")))), "of the full cost"],
+        ["Expedition range", (lambda r: "any distance" if r >= 99 else f"{r} areas" if r else "none yet")(max(_researched(state, "explore_range"), default=0)), ""],
+        ["Wildlife appears", pct(1 + city_stat(state, "wildlife_speed") + beasts.bonus(state, "wildlife_speed")), "of normal"],
+        ["Generators give", pct(1 + beasts.bonus(state, "power") + ideology.value(state, "power")), "of normal"],
+        ["Night's slowdowns spared", pct(night), ""],
+        ["Bad weather's slowdowns spared", pct(weather_cover), ""],
+        ["Beast mission experience", pct(1 + city_stat(state, "beast_xp")), "of normal"],
+        ["Beast bonus strength", pct(1 + city_stat(state, "beast_power")), "of normal"],
+        ["Egg hatching speed", pct(1 + city_stat(state, "hatch_speed")), "of normal"],
+        ["Beast missions come", pct(1 + city_stat(state, "mission_speed")), "as often as normal"],
+        ["Extra chance of an egg on an expedition", pct(city_stat(state, "egg_chance")), ""],
+        ["Weather forecast", f"{weather.forecast_length(state)} meal{'s' if weather.forecast_length(state) > 1 else ''} ahead", ""],
+    ]}, {"title": "Speed of each kind of building, from your beast and ideology", "head": ["Kind", "Speed"],
+         "rows": [[name, pct(factor(cat))] for cat, name in CATEGORIES.items()]})
+
+    # ---- time and weather
+    wv = weather.view(state, state["updated"])
+    skies = {}
+    for a in wv["areas"]:
+        skies[a["now"]] = skies.get(a["now"], 0) + 1
+    section("weather", "Time and weather", {"rows": [
+        ["Time of day", f"{'Night' if wv['night'] else 'Day'}, {wv['clock']}", "on the player's own clock"],
+        [f"{'Day' if wv['night'] else 'Night'} comes in", {"dur": wv["switch_in"]}, ""],
+        ["Weather changes in", {"dur": wv["change_in"]}, "at the next meal"],
+        ["Areas with rare weather now", sum(n for w, n in skies.items() if weather.WEATHER[w].get("rare")), ""],
+        ["Areas the weather is slowing", len({j["area"] for j, e in zip(jobs, env) if e[0] < 1 and any("Night" not in n and "Day" not in n for n in e[2])}), ""],
+    ]}, {"title": "Weather in your areas now", "head": ["Weather", "Areas"],
+         "rows": sorted(([weather.WEATHER[w]["name"] + (" (rare)" if weather.WEATHER[w].get("rare") else ""), n] for w, n in skies.items()),
+                        key=lambda r: -r[1])})
+
+    # ---- beasts
+    hatched = [b for b in state["beasts"] if b["stage"] != "egg"]
+    act = beasts.active(state)
+    section("beasts", "Beasts", {"rows": [
+        ["Hatched beasts", len(hatched), ""],
+        ["Eggs", len(state["beasts"]) - len(hatched), ""],
+        ["Species owned", len({b["species"] for b in hatched}), f"of {len(beasts.SPECIES)} in the game"],
+        ["Active beast", f"{beasts.title(act)}, level {act['level']} of {beasts.max_level(act)}" if act and act["stage"] != "egg" else "none yet", ""],
+        ["Highest level", max((b["level"] for b in hatched), default=0), ""],
+        ["Levels in all", sum(b["level"] for b in hatched), ""],
+        ["Strongest (stats added up)", max((sum(b["stats"].values()) for b in hatched), default=0), ""],
+        ["Mission", (state.get("mission") or {}).get("text", "none"), "done" if (state.get("mission") or {}).get("complete") else ""],
+        ["Next mission in", {"dur": max(0, state["mission_at"] - now)} if hatched else "", ""],
+    ]}, {"title": "By rarity", "head": ["Rarity", "Beasts", "Eggs"],
+         "rows": [[r["name"], sum(1 for b in hatched if beasts.SPECIES[b["species"]]["rarity"] == k),
+                   sum(1 for b in state["beasts"] if b["stage"] == "egg" and beasts.SPECIES[b["species"]]["rarity"] == k)]
+                  for k, r in beasts.RARITIES.items()]})
+
+    # ---- lifetime
+    t = state.get("totals", {})
+    since = state.get("totals_since", state["founded"])
+    section("lifetime", "All time", {"rows": [["Counted since", {"time": since}, ""]] + [[label, t.get(key, 0), ""] for key, label in TALLIES]},
+            {"title": "Made, used and sent on expeditions", "head": ["Resource", "Made", "Used by buildings", "Sent with expeditions"],
+             "rows": [[RESOURCES[k], int(t.get("made:" + k, 0)), int(t.get("used:" + k, 0)), int(t.get("supplies:" + k, 0))] for k in RESOURCES]})
+    return sections
+
+
+def _group(items, value, key=lambda t: t["building"]):
+    """{key: (how many, value added up)} over items."""
+    out = {}
+    for it in items:
+        n, v = out.get(key(it), (0, 0))
+        out[key(it)] = (n + 1, v + value(it))
+    return out
 
 
 def summary(state):
