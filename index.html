@@ -201,6 +201,12 @@
   .statKv { display: grid; grid-template-columns: minmax(140px, max-content) minmax(0, 1fr); gap: 2px 16px; }
   .statKv > div:nth-child(odd) { color: var(--dim); }
   .statKv .note { color: var(--dim); font-size: 13px; }
+  .pin { background: none; border: none; padding: 0 4px; color: var(--dim); cursor: pointer; font: inherit; }
+  .pin.on { color: var(--hi); }
+  .statTable th[data-stat-sort] { cursor: pointer; }
+  .statTable th[data-stat-sort]:hover { text-decoration: underline; }
+  #statsBody .panel > .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #statsBody .panel > .head h2 { margin: 0; }
   #away, #report, #present, #ideologyPick { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
@@ -807,12 +813,14 @@
     <!-- Guide -->
     <div id="tab-stats" hidden>
       <div class="panel"><h2>Stats</h2>
-        <p class="dim small" style="margin-top:0">Everything about your city in numbers. "All time" counts from when stats began.</p>
+        <p class="dim small" style="margin-top:0">Everything about your city in numbers. Pick a section, or search. Click
+          <span class="hi">*</span> beside any stat to pin it to the top; click a table's heading to sort by it.</p>
         <div class="bar" style="margin-top:0">
           <input id="statsSearch" type="search" placeholder="Search the stats" style="flex:1 1 180px">
           <button id="statsRefresh" title="Work the stats out again now">Refresh</button>
           <span id="statsAge" class="dim small"></span>
         </div>
+        <div id="statsMatches" class="dim small"></div>
         <div id="statsViews" class="bar"></div>
       </div>
       <div id="statsBody"></div>
@@ -2089,6 +2097,7 @@ function landHint(env) {
     `${main.length && loot.length ? '; ' : ''}${loot.length ? 'may bring back extra ' + esc(loot.join(', ')) : ''}</span>` : '';
 }
 let statsView = settings.statsView || 'all';   // which section of the Stats tab shows (remembered)
+const statSort = {};    // table -> [column, descending], while the page is open
 function statValue(v) {
   if (v === null || v === undefined || v === '') return '';
   if (typeof v === 'number') return num(v);
@@ -2098,29 +2107,78 @@ function statValue(v) {
   if ('pct' in v) return `${Math.round(v.pct * 1000) / 10}%`;
   return esc(String(v));
 }
+// A value as a number for sorting (text sorts after numbers, alphabetically).
+const statNumber = v => typeof v === 'number' ? v : v && typeof v === 'object' ? (v.time ?? v.dur ?? v.pct ?? 0) : null;
+const statPins = () => settings.statPins || (settings.statPins = []);
 function renderStats() {
   if (!stats) { setHTML($('statsBody'), `<div class="panel"><p class="dim">Working out the stats...</p></div>`); return; }
   $('statsAge').textContent = `Worked out ${duration((performance.now() - statsAt) / 1000)} ago`;
-  if (!stats.some(s => s.id === statsView)) statsView = 'all';
-  setHTML($('statsViews'), [['all', 'Everything'], ...stats.map(s => [s.id, s.title])].map(([k, label]) =>
-    `<button data-stats-view="${k}" class="${statsView === k ? 'on' : ''}">${esc(label)}</button>`).join(''));
+  const pins = statPins();
+  const plain = v => v && typeof v === 'object' ? statValue(v) : String(v ?? '');
+  // Every stat that can be pinned: "section|block|label" -> [label, value, note, section title]
+  const all = new Map();
+  for (const s of stats) s.blocks.forEach((b, bi) => b.rows.forEach(r => {
+    const label = b.head ? `${b.title}: ${plain(r[0])}` : plain(r[0]);
+    all.set(`${s.id}|${b.title || ''}|${plain(r[0])}`, [label, b.head ? r.slice(1).map(plain).join(' / ') : r[1], b.head ? '' : r[2], s.title]);
+  }));
+  const pinned = pins.filter(k => all.has(k));
+  const views = [['all', 'Everything', ''], ...(pinned.length ? [['pinned', 'Pinned', `${pinned.length}`]] : []),
+                 ...stats.map(s => [s.id, s.title, s.headline || ''])];
+  if (!views.some(([k]) => k === statsView)) statsView = 'all';
+  setHTML($('statsViews'), views.map(([k, label, note]) =>
+    `<button data-stats-view="${k}" class="${statsView === k ? 'on' : ''}">${esc(label)}${note ? ` <span class="dim small">${esc(note)}</span>` : ''}</button>`).join(''));
+
   const words = $('statsSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const hit = text => words.every(w => text.toLowerCase().includes(w));
-  const plain = v => v && typeof v === 'object' ? statValue(v) : String(v ?? '');
-  const html = stats.filter(s => statsView === 'all' || words.length || s.id === statsView).map(s => {
-    const blocks = s.blocks.map(b => {
-      // with a search, a block keeps only the rows that match (all of them if its title matches)
-      const rows = words.length && !hit(s.title + ' ' + (b.title || '')) ? b.rows.filter(r => hit(r.map(plain).join(' '))) : b.rows;
-      if (!rows.length) return '';
-      const title = b.title ? `<div class="cat">${esc(b.title)}</div>` : '';
-      if (b.head) return title + `<div class="scroll"><table class="statTable"><tr>${b.head.map((h, i) => `<th class="${i ? 'n' : ''}">${esc(h)}</th>`).join('')}</tr>` +
-        rows.map(r => `<tr>${r.map((v, i) => `<td class="${i ? 'n' : ''}">${statValue(v)}</td>`).join('')}</tr>`).join('') + `</table></div>`;
-      return title + `<div class="statKv">` + rows.map(([label, v, note]) =>
-        `<div>${esc(label)}</div><div><span class="hi">${statValue(v)}</span>${note ? ` <span class="note">${statValue(note)}</span>` : ''}</div>`).join('') + `</div>`;
+  const pinButton = key => `<button class="pin ${pins.includes(key) ? 'on' : ''}" data-stat-pin="${esc(key)}" title="${pins.includes(key) ? 'Unpin' : 'Pin to the top'}">*</button>`;
+  let matches = 0;
+  const panel = (id, title, body) => `<div class="panel" id="stats-${id}"><div class="head"><h2>${esc(title)}</h2>` +
+    (statsView === 'all' && !words.length ? `<button class="pin" data-stats-top title="Back to the section buttons">top</button>` : '') + `</div>${body}</div>`;
+
+  const block = (s, b, bi) => {
+    // with a search, a block keeps only the rows that match (all of them if its title matches)
+    let rows = words.length && !hit(s.title + ' ' + (b.title || '')) ? b.rows.filter(r => hit(r.map(plain).join(' '))) : b.rows;
+    if (!rows.length) return '';
+    matches += rows.length;
+    const key = `${s.id}|${b.title || ''}`;
+    let body;
+    if (b.head) {
+      const [col, desc] = statSort[key] || [];
+      if (col !== undefined) rows = rows.slice().sort((x, y) => {
+        const a = statNumber(x[col]), c = statNumber(y[col]);
+        const order = a !== null && c !== null ? a - c : a !== null ? -1 : c !== null ? 1 : plain(x[col]).localeCompare(plain(y[col]));
+        return desc ? -order : order;
+      });
+      body = `<div class="scroll"><table class="statTable"><tr>` + b.head.map((h, i) =>
+        `<th class="${i ? 'n' : ''}" data-stat-sort="${esc(key)}" data-col="${i}" title="Sort by ${esc(h.toLowerCase())}">${esc(h)}${col === i ? (desc ? ' v' : ' ^') : ''}</th>`).join('') + `<th></th></tr>` +
+        rows.map(r => `<tr>${r.map((v, i) => `<td class="${i ? 'n' : ''}">${statValue(v)}</td>`).join('')}<td>${pinButton(`${key}|${plain(r[0])}`)}</td></tr>`).join('') + `</table></div>`;
+    } else {
+      body = `<div class="statKv">` + rows.map(([label, v, note]) =>
+        `<div>${pinButton(`${key}|${plain(label)}`)}${esc(label)}</div><div><span class="hi">${statValue(v)}</span>${note ? ` <span class="note">${statValue(note)}</span>` : ''}</div>`).join('') + `</div>`;
+    }
+    if (!b.title) return body;
+    // titled blocks fold away; long ones start folded unless a search is showing them
+    const fkey = 'stat:' + key;
+    return `<details class="fold" data-fold="${esc(fkey)}" ${words.length || isOpen(fkey, rows.length <= 12) ? 'open' : ''}>` +
+      `<summary class="cat">${esc(b.title)} <span class="dim">(${rows.length})</span></summary>${body}</details>`;
+  };
+
+  let html = '';
+  if (pinned.length && (statsView === 'pinned' || (statsView === 'all' && !words.length))) {
+    html += panel('pinned', 'Pinned', `<div class="statKv">` + pinned.map(k => {
+      const [label, v, note, where] = all.get(k);
+      return `<div>${pinButton(k)}${esc(label)}</div><div><span class="hi">${statValue(v)}</span>` +
+        `${note ? ` <span class="note">${statValue(note)}</span>` : ''} <span class="note">- ${esc(where)}</span></div>`;
+    }).join('') + `</div>`);
+  }
+  if (statsView !== 'pinned' || words.length) {
+    html += stats.filter(s => statsView === 'all' || words.length || s.id === statsView).map(s => {
+      const body = s.blocks.map((b, bi) => block(s, b, bi)).join('');
+      return body ? panel(s.id, s.title, body) : '';
     }).join('');
-    return blocks ? `<div class="panel"><h2>${esc(s.title)}</h2>${blocks}</div>` : '';
-  }).join('');
-  setHTML($('statsBody'), html || `<div class="panel"><p class="dim">No stats match.</p></div>`);
+  }
+  $('statsMatches').textContent = words.length ? `${matches} ${matches === 1 ? 'stat matches' : 'stats match'}, across every section` : '';
+  setHTML($('statsBody'), html || `<div class="panel"><p class="dim">${words.length ? 'No stats match.' : 'Nothing here.'}</p></div>`);
 }
 function renderFinder() {
   const found = view.found, out = $('findOut');
@@ -3171,6 +3229,25 @@ $('statsViews').onclick = e => {
   if (b) { statsView = settings.statsView = b.dataset.statsView; saveSettings(); renderStats(); }
 };
 $('statsSearch').oninput = () => { if (view) renderStats(); };
+$('statsBody').addEventListener('click', e => {
+  const pin = e.target.closest('[data-stat-pin]'), sort = e.target.closest('[data-stat-sort]');
+  if (e.target.closest('[data-stats-top]')) { $('tab-stats').scrollIntoView({ block: 'start' }); return; }
+  if (pin) {
+    const pins = statPins(), k = pin.dataset.statPin, i = pins.indexOf(k);
+    if (i >= 0) pins.splice(i, 1); else pins.push(k);
+    saveSettings();
+    renderStats();
+  } else if (sort) {
+    const key = sort.dataset.statSort, col = +sort.dataset.col, [was, desc] = statSort[key] || [];
+    // first click: biggest first for numbers (A to Z for names); again: the other way round
+    statSort[key] = was === col ? [col, !desc] : [col, col > 0];
+    renderStats();
+  }
+});
+$('tab-stats').addEventListener('toggle', e => {    // remember which tables are open
+  const key = e.target.dataset && e.target.dataset.fold;
+  if (key) foldState.set(key, e.target.open);
+}, true);
 $('statsRefresh').onclick = () => { statsAsk = true; refresh(); };
 $('presentBar').onclick = e => {
   if (e.target.dataset.presentOpen) act('present_open', { present: +e.target.dataset.presentOpen });

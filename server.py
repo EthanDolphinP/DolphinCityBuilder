@@ -285,7 +285,9 @@ def market_stats(state, now):
     names = all_city_names()
     board = [game.summary(c) for c in (get_city(n, now) for n in names) if c]
     rank = lambda key: 1 + sum(1 for c in board if key(c) > key(game.summary(state)))
-    return {"id": "market", "title": "Market and other cities", "blocks": [{"rows": [
+    pop_rank = rank(lambda c: c["population"])
+    return {"id": "market", "title": "Market and other cities", "headline": f"#{pop_rank} of {len(board)} by population",
+            "blocks": [{"rows": [
         ["Your open offers", sum(1 for o in MARKET["offers"] if o["city"] == name), f"of {len(MARKET['offers'])} on the market"],
         ["Finished offers kept", len(state.get("finished", [])), ""],
         ["Recent market trades you took part in", len(trades), f"of the last {len(MARKET['history'])} on the market"],
@@ -305,7 +307,7 @@ def market_stats(state, now):
         ["Presents waiting to be opened", sum(1 for p in state.get("presents", []) if not p["opened"]), ""],
         ["Cities in the game", len(names), ""],
         ["Cities online now", sum(1 for seen in ONLINE.values() if now - seen <= ONLINE_SECONDS), ""],
-        ["Rank by population", rank(lambda c: c["population"]), f"of {len(board)}"],
+        ["Rank by population", pop_rank, f"of {len(board)}"],
         ["Rank by tech level", rank(lambda c: c["tech"]), f"of {len(board)} (cities level with you share a rank)"],
         ["Rank by research", rank(lambda c: c["research"]), f"of {len(board)}"],
         ["Rank by buildings", rank(lambda c: c["buildings"]), f"of {len(board)}"],

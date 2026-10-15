@@ -4282,6 +4282,24 @@ def _city_stats(state, now, rates):
     section("lifetime", "All time", {"rows": [["Counted since", {"time": since}, ""]] + [[label, t.get(key, 0), ""] for key, label in TALLIES]},
             {"title": "Made, used and sent on expeditions", "head": ["Resource", "Made", "Used by buildings", "Sent with expeditions"],
              "rows": [[RESOURCES[k], int(t.get("made:" + k, 0)), int(t.get("used:" + k, 0)), int(t.get("supplies:" + k, 0))] for k in RESOURCES]})
+    # A few words for each section's button, so the player can see how things stand without opening it.
+    falling = [RESOURCES[k] for k in RESOURCES if rates.get(k, 0) < 0]
+    act = beasts.active(state)
+    heads = {
+        "overview": tech["name"],
+        "people": f"{state['population']} of {housing} beds" + (", hungry" if state["hungry"] else ""),
+        "resources": f"{len(falling)} falling" if falling else "all rising",
+        "buildings": f"{len(built)}" + (f", {len(jobs) - working} not working" if len(jobs) - working else ""),
+        "power": f"{round(power * 100)}% met" if demand else "none needed",
+        "land": f"{len(state['areas'])} areas, {n_tiles - len(built)} free tiles",
+        "research": f"{len(state['research'])} of {len(RESEARCH)}",
+        "bonuses": "",
+        "weather": f"{'Night' if wv['night'] else 'Day'}, {wv['clock']}",
+        "beasts": f"level {act['level']} {beasts.title(act)}" if act and act["stage"] != "egg" else f"{len(state['beasts'])} eggs",
+        "lifetime": "",
+    }
+    for s in sections:
+        s["headline"] = heads.get(s["id"], "")
     return sections
 
 
