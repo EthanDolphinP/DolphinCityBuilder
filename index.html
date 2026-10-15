@@ -201,6 +201,9 @@
   .statKv { display: grid; grid-template-columns: minmax(140px, max-content) minmax(0, 1fr); gap: 2px 16px; }
   .statKv > div:nth-child(odd) { color: var(--dim); }
   .statKv .note { color: var(--dim); font-size: 13px; }
+  .grade { font-weight: bold; font-size: 12px; padding: 0 3px; border-radius: 3px; border: 1px solid currentColor; }
+  .gS { color: #e6c35c; } .gA { color: #7fd17f; } .gB { color: #a6d96a; } .gC { color: #d9d36a; }
+  .gD { color: #e0a85a; } .gE { color: #e08a5a; } .gF { color: #e06a6a; }
   .pin { background: none; border: none; padding: 0 4px; color: var(--dim); cursor: pointer; font: inherit; }
   .pin.on { color: var(--hi); }
   .statTable th[data-stat-sort] { cursor: pointer; }
@@ -517,7 +520,7 @@
           <label class="dim">Sort by <select id="beastSort">
             <option value="level">Level</option><option value="name">Name</option><option value="rarity">Rarity</option>
             <option value="count">How many</option><option value="hp">Health</option><option value="atk">Attack</option>
-            <option value="def">Defense</option><option value="spd">Speed</option></select></label>
+            <option value="def">Defense</option><option value="spd">Speed</option><option value="grade">Grade</option></select></label>
         </div>
         <p class="dim small" style="margin:6px 0">Click a kind of beast to see every one of them you have.</p>
         <div id="beastList"></div>
@@ -549,11 +552,13 @@
       </details>
       <details class="panel" data-bst="overview">
         <summary class="cat">How beasts work</summary>
-        <p class="dim small" style="margin:0">Every egg has one small mission of its own, shown with the egg. It
-          hatches once it has been kept warm long enough and that mission is done. Egg missions never run out,
-          and you can do as many as you have eggs: they are separate from beast missions. Your active beast
+        <p class="dim small" style="margin:0">Every egg has missions of its own, shown with the egg: one for common and uncommon eggs,
+          up to three (one after another) for legendary ones. It hatches once it has been kept warm long enough,
+          longer for rarer eggs, and its missions are done. Egg missions never run out, and you can do as many
+          as you have eggs: they are separate from beast missions. There is no limit on how many eggs you can have. Your active beast
           sets the city one beast mission at a time, and a new one comes each day. Every completed beast
-          mission gives the beast experience; as it levels up, the bonus it gives the city grows.
+          mission gives the beast experience; as it levels up, the bonus it gives the city grows. Rarer beasts
+          grow to higher levels (common to 10, legendary to 20) and set harder missions that give more experience.
           What the bonus is depends on the kind of beast. Only the active beast sets missions and gives its
           bonus, and you can change which hatched beast is active at any time. Expeditions sometimes bring back more
           eggs, and rarer kinds are likelier the further from home they go. The Beast Den, Incubator,
@@ -563,7 +568,9 @@
           the winning beast gains a little experience. Each kind of beast likes one material, and betting
           that on it raises its stats the most.
           Every beast also has Health, Attack, Defense and Speed. They differ a little from one beast to the
-          next of the same kind, and they do not change anything in the city. Any beast or egg except your
+          next of the same kind, and they do not change anything in the city. Each is graded against the lowest
+          and highest its kind can have: F is the lowest, then E, D, C, B and A, and S is the best possible;
+          the overall grade averages all four. Any beast or egg except your
           active beast can be offered to other cities with its Trade button, for a material or for a beast
           of a kind and level you name.</p>
       </details>
@@ -1225,7 +1232,7 @@ const HOWTO = [
   ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
-  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
+  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
@@ -2247,12 +2254,33 @@ function renderBeastViews() {
     `<button data-beast-view="${k}" class="${beastView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
   for (const panel of document.querySelectorAll('#tab-beast [data-bst]')) panel.hidden = !beastShows(panel.dataset.bst);
 }
+// ---- stat grades: how good a stat is for its species. F to A from the lowest it can roll up, S the best ----
+const GRADES = ['F', 'E', 'D', 'C', 'B', 'A'];
+function statPlace(species, k, v) {     // 0 = the lowest this species can roll, 1 = the highest
+  const r = view.beast.species[species] && view.beast.species[species].range[k];
+  return !r ? null : r[1] === r[0] ? 1 : Math.max(0, Math.min(1, (v - r[0]) / (r[1] - r[0])));
+}
+function grade(place) {
+  return place === null ? '' : place >= 1 ? 'S' : GRADES[Math.min(5, Math.floor(place * 6))];
+}
+// One stat (k), or all four together (k null, v the stats): the average of where each falls.
+function gradeScore(species, stats) {
+  const places = Object.keys(view.beast.stats).map(k => statPlace(species, k, stats[k])).filter(p => p !== null);
+  return places.length ? places.reduce((a, b) => a + b, 0) / places.length : null;
+}
+function gradeTag(species, k, v) {
+  if (!species) return '';
+  const place = k ? statPlace(species, k, v) : gradeScore(species, v), g = grade(place);
+  return g ? ` <span class="grade g${g}" title="${k ? 'This stat' : 'All four stats together'}: ${Math.round(place * 100)}% of the way from the lowest a ${esc(view.beast.species[species].name)} can have to the highest">${g}</span>` : '';
+}
+const gradeText = (species, stats) => { const g = grade(gradeScore(species, stats)); return g ? `[${g}]` : ''; };
 function renderBeast() {
   renderBeastViews();
   const { state } = view, bv = view.beast, R = view.defs.resources, S = bv.stats, own = !visiting;
   const meter = (n, total, cls) => `<div class="meter"><div class="${cls || ''}" style="width:${total ? Math.min(100, n / total * 100) : 0}%"></div></div>`;
   const tick = ok => `<span class="${ok ? 'good' : 'bad'}">[${ok ? 'x' : ' '}]</span>`;
-  const statLine = st => Object.entries(S).map(([k, name]) => `<span class="dim">${esc(name)}</span> <span class="hi">${st[k]}</span>`).join(' &nbsp; ');
+  const statLine = (st, sp) => Object.entries(S).map(([k, name]) => `<span class="dim">${esc(name)}</span> <span class="hi">${st[k]}</span>${gradeTag(sp, k, st[k])}`).join(' &nbsp; ') +
+    (sp ? ` &nbsp; <span class="dim">Overall</span> ${gradeTag(sp, null, st)}` : '');
   const options = (list, cur) => list.map(([v, n]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
   if (!tradeDraft.species) tradeDraft.species = Object.keys(bv.species)[0];
   if (tradeFor !== null && !bv.beasts.some(b => b.id === tradeFor)) tradeFor = null;
@@ -2301,7 +2329,8 @@ function renderBeast() {
       kv([['Nature', esc(mine.nature)], ['Level', `<span class="hi">${mine.level}</span> of ${mine.cap} <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts grow to ${mine.cap})</span>`]]) +
       (mine.max_level ? `<div class="good small">Fully grown.</div>`
         : `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
-      `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats)}</div>` +
+      `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats, mine.species)}</div>` +
+      `<div class="opt dim small">Grades show how good each stat is for a ${esc(mine.name)}: F is the lowest it can roll, A near the top, S the best possible.</div>` +
       `<div class="opt dim small">Likes ${esc(R[mine.likes])}: bet it on this beast in the Arena below to make it fight harder.</div>` +
       (mine.home && mine.home.length ? `<div class="opt dim small">Its eggs are found most often in: ${esc(mine.home.join(', '))}.</div>` : '') +
       `<div class="cat">Gives the city</div>` + mine.bonus.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
@@ -2340,7 +2369,7 @@ function renderBeast() {
         `<div class="areaCards">` + eggs.map(b => `<div class="areaCard"><div class="info">${eggCard(b)}</div></div>`).join('') + `</div>`
       : `<p class="dim" style="margin:0">No eggs waiting to hatch.</p>`) +
     (bv.nest_at ? `<div class="opt">Nesting Ground: next egg in <span class="hi" data-timer="nest"></span>` +
-      (eggs.length >= bv.nest_full ? ` <span class="bad small">- none will be laid while you have ${bv.nest_full} or more eggs waiting</span>` : '') + `</div>` : '') +
+      `</div>` : '') +
     `<details class="fold" data-fold="egg:rarity" ${isOpen('egg:rarity', false) ? 'open' : ''}><summary>What each rarity takes</summary><div class="scroll">` +
       `<table><tr><th>Rarity</th><th>Kept warm</th><th class="n">Egg missions</th><th class="n">Grows to level</th><th>Missions ask for</th><th class="n">Experience per mission, before bonuses</th></tr>` +
       Object.values(bv.rarities).map(r => `<tr><td style="color:${esc(r.color)}">${esc(r.name)}</td><td>${duration(r.hatch * 3600 / (1 + bv.hatch_speed))}</td>` +
@@ -2364,7 +2393,7 @@ function renderBeast() {
   const words = $('beastSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = groups.filter(g => words.every(w =>
     `${g.name} ${g.rarity} ${g.nature} ${g.desc} ${g.list.map(b => b.bonus.join(' ') + ' level ' + b.level).join(' ')}`.toLowerCase().includes(w)));
-  const value = b => beastSort in S ? b.stats[beastSort] : b.level;       // what one beast is ordered by
+  const value = b => beastSort in S ? b.stats[beastSort] : beastSort === 'grade' ? gradeScore(b.species, b.stats) : b.level;       // what one beast is ordered by
   const best = g => Math.max(...g.list.map(value));
   for (const g of shown) g.list.sort((a, b) => value(b) - value(a) || b.level - a.level || a.id - b.id);
   shown.sort((a, b) => (beastSort === 'name' ? 0 : beastSort === 'rarity' ? rarityRank.indexOf(b.rarity) - rarityRank.indexOf(a.rarity)
@@ -2382,9 +2411,9 @@ function renderBeast() {
       `<div><div class="desc">${esc(g.desc)}</div>${kv([['Nature', esc(g.nature)], ['Likes', esc(R[g.list[0].likes]) + ' <span class="dim small">(bet it in a duel)</span>'],
         ...(g.list[0].home && g.list[0].home.length ? [['Home', esc(g.list[0].home.join(', ')) + ' <span class="dim small">(its eggs are likelier there)</span>']] : []),
         ['You have', g.list.length]])}</div></div>` +
-      `<div class="scroll"><table><tr>${th('level', 'Level')}<th>Experience</th>${Object.entries(S).map(([k, name]) => th(k, esc(name))).join('')}<th>Gives the city</th><th></th></tr>` +
+      `<div class="scroll"><table><tr>${th('level', 'Level')}<th>Experience</th>${Object.entries(S).map(([k, name]) => th(k, esc(name))).join('')}${th('grade', 'Grade')}<th>Gives the city</th><th></th></tr>` +
       g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed} <span class="small">(max ${b.cap})</span></td>` +
-        Object.keys(S).map(k => `<td>${b.stats[k]}</td>`).join('') + `<td class="dim small" style="white-space:normal;min-width:160px">${esc(b.bonus.join('; '))}</td><td>` +
+        Object.keys(S).map(k => `<td>${b.stats[k]}${gradeTag(b.species, k, b.stats[k])}</td>`).join('') + `<td>${gradeTag(b.species, null, b.stats)}</td>` + `<td class="dim small" style="white-space:normal;min-width:160px">${esc(b.bonus.join('; '))}</td><td>` +
         (b.active ? `<span class="good">active</span>` : !own ? ''
           : `<button data-beast-active="${b.id}">Make active</button> ` +
             (b.duel ? `<span class="dim small">waiting for a duel</span>` : `<button data-trade="${b.id}">Trade</button>`)) + `</td></tr>` +
@@ -2415,7 +2444,7 @@ function renderBeast() {
       }
       return `<tr class="${me ? 'me' : ''}"><td>${esc(o.city)}${me ? ' <span class="dim">(you)</span>' : ''}</td>` +
         `<td><span style="color:${esc(b.color)}">${esc(b.name)}</span>${b.egg ? '' : ` <span class="dim">level ${b.level}, ${esc(b.rarity.toLowerCase())}</span>`}</td>` +
-        `<td>${b.egg ? '<span class="dim">unknown until it hatches</span>' : statLine(b.stats)}</td>` +
+        `<td>${b.egg ? '<span class="dim">unknown until it hatches</span>' : statLine(b.stats, b.species)}</td>` +
         `<td>${esc(w.text)}</td><td class="dim">${clock(o.posted)}</td><td>${action}</td></tr>`;
     }).join('') + `</table>` : `<span class="dim">No beasts are on offer right now. Use the Trade button on one of yours to offer it.</span>`);
 }
@@ -2457,9 +2486,9 @@ function renderArena() {
   $('arenaPanel').hidden = !own || !beastShows('arena');
   if (!own) return;
   const fighters = bv.beasts.filter(b => !b.egg && !b.duel);
-  const stats = st => Object.keys(bv.stats).map(k => st[k]).join(' / ');
+  const stats = (st, sp) => Object.keys(bv.stats).map(k => st[k]).join(' / ') + (sp ? ' ' + gradeText(sp, st) : '');
   const names = `<option value="">a beast...</option>` + fighters.map(b =>
-    `<option value="${b.id}">${esc(b.name)} (${stats(b.stats)}, likes ${esc(R[b.likes])})</option>`).join('');
+    `<option value="${b.id}">${esc(b.name)} (${stats(b.stats, b.species)}, likes ${esc(R[b.likes])})</option>`).join('');
   const el = $('duelBeast'), was = el.value;
   if (el._html !== names) { setHTML(el, names); el.value = fighters.some(b => String(b.id) === was) ? was : ''; }
   if (!$('duelBetRes').options.length) {
@@ -2476,11 +2505,11 @@ function renderArena() {
   setHTMLKeep($('duels'), forMe.length ? `<table><tr><th>From</th>${head}<th>Their bet</th><th>Your answer</th></tr>` +
     forMe.map(d => {
       const picked = fighters.some(x => x.id === duelPick.get(d.id)) ? duelPick.get(d.id) : fighters.length && fighters[0].id;
-      return `<tr><td class="hi">${esc(d.city)}</td><td>${beastCell(d.beast)}</td><td>${stats(d.beast.stats)}</td>` +
+      return `<tr><td class="hi">${esc(d.city)}</td><td>${beastCell(d.beast)}</td><td>${statLine(d.beast.stats, d.beast.species)}</td>` +
         `<td class="dim">hidden until you accept</td><td style="white-space:normal">` +
         (fighters.length
           ? `<div class="buy"><select data-duel-pick="${d.id}" style="max-width:200px">` + fighters.map(x =>
-              `<option value="${x.id}" ${x.id === picked ? 'selected' : ''}>${esc(x.name)} (${stats(x.stats)})</option>`).join('') + `</select> bet ` +
+              `<option value="${x.id}" ${x.id === picked ? 'selected' : ''}>${esc(x.name)} (${stats(x.stats, x.species)})</option>`).join('') + `</select> bet ` +
             `<input data-duel-qty="${d.id}" data-k="duel${d.id}" type="number" min="1" step="1" style="width:90px"> ` +
             `<select data-duel-res="${d.id}">${materials}</select> ` +
             `<button data-duel-accept="${d.id}">Accept</button> <button data-duel-cancel="${d.id}">Decline</button></div>` +
@@ -2489,7 +2518,7 @@ function renderArena() {
     }).join('') + `</table>` : `<span class="dim">Nobody has challenged you.</span>`, fillDuels);
 
   setHTML($('duelsSent'), sent.length ? `<table><tr><th>To</th>${head}<th>Your bet</th><th>Sent</th><th></th></tr>` +
-    sent.map(d => `<tr><td class="hi">${esc(d.to)}</td><td>${beastCell(d.beast)}</td><td>${stats(d.beast.stats)} <span class="good">${boostText(d.boost)}</span></td>` +
+    sent.map(d => `<tr><td class="hi">${esc(d.to)}</td><td>${beastCell(d.beast)}</td><td>${statLine(d.beast.stats, d.beast.species)} <span class="good">${boostText(d.boost)}</span></td>` +
       `<td>${esc(d.bet.text)} <span class="dim small">(they can't see it)</span></td><td class="dim">${clock(d.posted)}</td>` +
       `<td><button data-duel-cancel="${d.id}">Withdraw</button></td></tr>`).join('') + `</table>`
     : `<span class="dim">You have no challenges waiting for an answer.</span>`);

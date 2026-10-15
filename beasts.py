@@ -56,8 +56,7 @@ RARER_PER_STEP = 0.25       # how much each step of distance favours the rarer s
 TAME_EGG_CHANCE = 0.06      # chance that taming a wild animal turns up an egg
 TECH_EGGS = ["common", "uncommon", "rare", "epic", "legendary"]   # the egg for reaching Village, Town, ...
 EGG_LEVELS = {5: 0, 10: 1, 15: 1, 20: 2}   # a beast reaching this level brings home an egg this many rarities above its own
-NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often...
-NEST_FULL = 3               # ...unless the city already has this many unhatched eggs
+NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often (there is no limit on eggs)
 NEST_WEIGHTS = {"common": 70, "uncommon": 25, "rare": 5}
 HOME_WEIGHT = 4             # a species is this many times likelier on an expedition into land it calls home
 WEATHER_EGG_CHANCE = 0.004  # chance, at each meal, that rare weather in an area turns up an egg there
@@ -602,6 +601,13 @@ def new_egg(state, now, species):
     return beast
 
 
+def stat_range(species):
+    """{stat: [lowest, highest]} a beast of this species can roll (see roll_stats); the page grades
+    each stat by where it falls: F to A from lowest up, S for the highest."""
+    return {key: [max(1, round(base * (1 - STAT_SPREAD))), max(1, round(base * (1 + STAT_SPREAD)))]
+            for key, base in zip(STATS, BASE_STATS[species])}
+
+
 def roll_stats(species, rng):
     """This one beast's stats: its species' base values, each a little higher or lower."""
     return {key: max(1, round(base * rng.uniform(1 - STAT_SPREAD, 1 + STAT_SPREAD)))
@@ -960,8 +966,6 @@ def _nest(state, now):
     if now < state["nest_at"]:
         return
     state["nest_at"] = now + NEST_TIME
-    if sum(1 for b in state["beasts"] if b["stage"] == "egg") >= NEST_FULL:
-        return
     rng = random.Random()
     rarity = rng.choices(list(NEST_WEIGHTS), weights=list(NEST_WEIGHTS.values()))[0]
     egg = new_egg(state, now, random_species(rng, rarity=rarity))
@@ -980,9 +984,7 @@ def expedition_egg(state, now, distance, rng, env=None):
 
 
 def weather_egg(state, now, rare_areas, rng):
-    """At a meal: rare weather in any of these areas may turn up an egg there (not while the city is full of eggs)."""
-    if sum(1 for b in state["beasts"] if b["stage"] == "egg") >= NEST_FULL:
-        return None
+    """At a meal: rare weather in any of these areas may turn up an egg there."""
     for ai in rare_areas:
         if rng.random() < WEATHER_EGG_CHANCE:
             area = state["areas"][ai]
@@ -1052,9 +1054,9 @@ def view(state, now):
         "egg_chance": round(min(EGG_CHANCE_MAX, EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
         "rarities": RARITIES,
         "stats": STATS,
-        "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"]} for k, s in SPECIES.items()},
+        "species": {k: {"name": s["name"], "rarity": RARITIES[s["rarity"]]["name"], "range": stat_range(k)} for k, s in SPECIES.items()},
         "duel": DUEL, "duel_xp": DUEL_XP,
-        "nest_at": state.get("nest_at"), "nest_time": NEST_TIME, "nest_full": NEST_FULL,
+        "nest_at": state.get("nest_at"), "nest_time": NEST_TIME,
         "tame_egg": round((TAME_EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
         "species_count": len(SPECIES),
         "duels": state.get("duels", []),
