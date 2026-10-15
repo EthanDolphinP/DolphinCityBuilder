@@ -4,8 +4,8 @@ Each ideology gives a bonus straight away, and then has perks of its own that
 fit it: the Old Faith's perks are blessings from its gods, Progress's are great
 inventions, and so on. Every tech level from Village up earns one point, spent
 on a perk whenever the player likes (Village earns 1, Megacity 5 in all). Each
-ideology has ten perks, two in each of five tiers; a perk can be taken once the
-city has reached its tier, so a city ends up with five of the ten.
+ideology has eleven perks spread over five tiers; a perk can be taken once the
+city has reached its tier, so a city ends up with five of the eleven.
 
 Effects, added up over the ideology and its perks taken:
 
@@ -16,6 +16,7 @@ Effects, added up over the ideology and its perks taken:
     attracts       extra arrivals per meal
     housing        people housed
     power          0.2 = generators give 20% more power
+    night_shelter / weather_shelter   0.5 = half of every slowdown night (or the weather) causes is gone
     beast_xp / beast_power / hatch_speed / egg_chance / mission_speed   as in beasts.py
 
 `game` imports this module and this module uses `game`, so nothing here may
@@ -30,6 +31,8 @@ IDEOLOGIES = {
         "desc": "The city keeps the old gods, and they keep the city. Their blessings reach every part of life.",
         "effects": {"speed": {"food": 0.10, "knowledge": 0.10}},
         "perks": {
+            "storm_father":   {"name": "Blessing of the Storm Father", "tier": 3, "effects": {"weather_shelter": 0.4, "speed": {"food": 0.05}},
+                               "desc": "The storms bow to the temple and pass the fields by."},
             "harvest_mother": {"name": "Blessing of the Harvest Mother", "tier": 1, "effects": {"speed": {"food": 0.15}},
                                "desc": "The fields are never quite empty."},
             "hearth_keeper":  {"name": "Blessing of the Hearth Keeper", "tier": 1, "effects": {"housing": 30},
@@ -57,6 +60,8 @@ IDEOLOGIES = {
         "desc": "Measure, test, improve. The city puts its faith in invention, and every age brings a great leap forward.",
         "effects": {"speed": {"materials": 0.15}},
         "perks": {
+            "gaslight":    {"name": "Gas Lighting", "tier": 2, "effects": {"night_shelter": 0.5},
+                            "desc": "Every street lit and every workshop open after dark."},
             "parts":       {"name": "Interchangeable Parts", "tier": 1, "effects": {"speed": {"materials": 0.15}},
                             "desc": "Any bolt fits any nut, so nothing waits for a smith."},
             "movable_type": {"name": "Movable Type", "tier": 1, "effects": {"speed": {"knowledge": 0.15}},
@@ -84,6 +89,8 @@ IDEOLOGIES = {
         "desc": "The city lives by trade. Its merchants buy charters that open new markets, routes and riches.",
         "effects": {"speed": {"trade": 0.20}},
         "perks": {
+            "insurance": {"name": "Insurance Charter", "tier": 3, "effects": {"weather_shelter": 0.4, "speed": {"trade": 0.05}},
+                          "desc": "Bad weather is somebody else's problem, for a small fee."},
             "guild":    {"name": "Merchant Guild Charter", "tier": 1, "effects": {"speed": {"trade": 0.15}},
                          "desc": "Fair weights, fair prices, and a cut for the guild."},
             "caravan":  {"name": "Caravan Charter", "tier": 1, "effects": {"explore_cost": 0.25},
@@ -111,6 +118,8 @@ IDEOLOGIES = {
         "desc": "The city lives alongside the animals and the great beasts, and makes pacts with the wild places around it.",
         "effects": {"beast_xp": 0.25, "wildlife_speed": 0.5},
         "perks": {
+            "moon_pact": {"name": "Pact of the Moon", "tier": 2, "effects": {"night_shelter": 0.4, "wildlife_speed": 0.25},
+                          "desc": "The night creatures work alongside the city until dawn."},
             "herd":    {"name": "Pact of the Herd", "tier": 1, "effects": {"speed": {"food": 0.10}, "wildlife_speed": 0.5},
                         "desc": "Wild herds graze closer to the city every year."},
             "nest":    {"name": "Pact of the Nest", "tier": 1, "effects": {"hatch_speed": 1.0, "egg_chance": 0.05},
@@ -139,6 +148,8 @@ IDEOLOGIES = {
         "desc": "Born explorers. The city looks over every horizon, and each age brings home something nobody has seen before.",
         "effects": {"explore_speed": 0.25, "explore_cost": 0.15},
         "perks": {
+            "sky_reading":   {"name": "Reading the Skies", "tier": 2, "effects": {"weather_shelter": 0.3, "explore_speed": 0.1},
+                              "desc": "Sailors' lore: always know what tomorrow's sky will do."},
             "star_charts":   {"name": "Star Charts", "tier": 1, "effects": {"explore_speed": 0.25},
                               "desc": "Nobody gets lost under a clear sky."},
             "strange_seeds": {"name": "Strange Seeds", "tier": 1, "effects": {"speed": {"food": 0.12}},
@@ -166,6 +177,8 @@ IDEOLOGIES = {
         "desc": "Everyone has a place, and everyone helps. The city grows its people and keeps its traditions.",
         "effects": {"housing": 15, "attracts": 1},
         "perks": {
+            "night_watch": {"name": "The Night Watch", "tier": 2, "effects": {"night_shelter": 0.4, "housing": 10},
+                            "desc": "Lamps on every corner and neighbours who look out for each other."},
             "festivals":  {"name": "Festival Days", "tier": 1, "effects": {"attracts": 1},
                            "desc": "Music in the square, and newcomers every season."},
             "hearths":    {"name": "Shared Hearths", "tier": 1, "effects": {"housing": 40},
@@ -241,6 +254,13 @@ ART = {
 }
 
 PERK_ART = {
+    # perks for night and weather
+    "storm_father":   [r" _~~~_ ", r"(_/|\_)", r"  /|   "],
+    "gaslight":       [r"  [*]  ", r"   |   ", r"  _|_  "],
+    "insurance":      [r" .---. ", r"| $ / |", r" '---' "],
+    "moon_pact":      [r"  _..  ", r" (  ') ", r"  '-'  "],
+    "sky_reading":    [r" ~ o ~ ", r"--( )--", r"  / \  "],
+    "night_watch":    [r"[*]  o  ", r" |  /|\ ", r"_|_ / \ "],
     # The Old Faith
     "harvest_mother": [r" \ | / ", r"  \|/  ", r" __|__ "],
     "hearth_keeper":  [r"  ( )  ", r" (   ) ", r" \___/ "],
@@ -403,6 +423,8 @@ def describe(eff):
         "hatch_speed": lambda x: f"Eggs hatch {pct(x)} faster",
         "egg_chance": lambda x: f"Expeditions {round(x * 100):g} points likelier to find an egg",
         "mission_speed": lambda x: f"Beast missions come {pct(x)} more often",
+        "night_shelter": lambda x: f"Night slows the city {pct(x)} less",
+        "weather_shelter": lambda x: f"Bad weather slows the city {pct(x)} less",
     }
     for key, x in eff.items():
         if key in words and x:

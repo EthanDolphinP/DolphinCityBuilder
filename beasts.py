@@ -15,7 +15,9 @@ Every beast also has four stats (STATS) and its species has a picture (ART).
 Beasts and eggs can be traded between cities: see the beast offers in
 market.py, which use take() and give() here to move a beast.
 
-More eggs come from expeditions (rarer species are likelier far from home),
+More eggs come from expeditions (rarer species are likelier far from home,
+and a species is likelier in the kinds of land it lives in, its "home"), from
+rare weather (now and then an egg turns up where it is passing),
 from taming wild animals (a small chance of a nest), from reaching a new tech
 level, from a beast reaching level 5 and level 10, and from a Nesting Ground
 building, which lays one every few days. Presents and trades can bring them too.
@@ -54,6 +56,8 @@ EGG_LEVELS = {5: 0, 10: 1}  # a beast reaching this level brings home an egg thi
 NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often...
 NEST_FULL = 3               # ...unless the city already has this many unhatched eggs
 NEST_WEIGHTS = {"common": 70, "uncommon": 25, "rare": 5}
+HOME_WEIGHT = 4             # a species is this many times likelier on an expedition into land it calls home
+WEATHER_EGG_CHANCE = 0.004  # chance, at each meal, that rare weather in an area turns up an egg there
 
 RARITIES = {    # weight: how often an egg found by an expedition is of this rarity
     "common":    {"name": "Common",    "weight": 60, "color": "#cfd8d3"},
@@ -70,85 +74,131 @@ RARITIES = {    # weight: how often an egg found by an expedition is of this rar
 #   power           generators give more
 #   housing         people housed, per level
 #   attracts        extra arrivals per meal, per level (rounded down in total)
+#   night_shelter / weather_shelter   share of night's (or the weather's) slowdowns the city is spared, per level
+# home: kinds of land (game.ENVIRONMENTS) where its eggs are likelier to be found.
 SPECIES = {
     "mossback":    {"name": "Mossback Tortoise", "rarity": "common", "nature": "Patient grower",
+                    "home": ["grassland", "floodplains"],
                     "bonus": {"speed": {"food": 0.02}},
                     "desc": "A slow, green-backed tortoise. Crops seem to like having it around."},
     "stonehorn":   {"name": "Stonehorn", "rarity": "common", "nature": "Tireless digger",
+                    "home": ["highlands", "karst"],
                     "bonus": {"speed": {"materials": 0.02}},
                     "desc": "A stocky, horned burrower that cannot leave a rock unturned."},
     "glimmerwing": {"name": "Glimmerwing", "rarity": "common", "nature": "Curious",
+                    "home": ["woodland", "moorland"],
                     "bonus": {"speed": {"knowledge": 0.02}},
                     "desc": "A moth the size of a cat, drawn to lamplight and open books."},
     "magpie_drake": {"name": "Magpie Drake", "rarity": "common", "nature": "Hoarder",
+                     "home": ["badlands", "outback"],
                      "bonus": {"speed": {"trade": 0.02}},
                      "desc": "A small drake with an eye for anything that glitters."},
     "trailhound":  {"name": "Trailhound", "rarity": "uncommon", "nature": "Pathfinder",
+                    "home": ["steppe", "savanna"],
                     "bonus": {"explore_speed": 0.06},
                     "desc": "A long-legged hound that always knows the way back."},
     "herdmother":  {"name": "Herdmother", "rarity": "uncommon", "nature": "Shepherd",
+                    "home": ["grassland", "steppe"],
                     "bonus": {"wildlife_speed": 0.1, "speed": {"food": 0.01}},
                     "desc": "A shaggy giant that other animals follow without being asked."},
     "sunscale":    {"name": "Sunscale Lizard", "rarity": "uncommon", "nature": "Basks in power",
+                    "home": ["desert", "outback"],
                     "bonus": {"power": 0.03},
                     "desc": "Its scales hum faintly near anything that turns or burns."},
     "hearth_lynx": {"name": "Hearth Lynx", "rarity": "rare", "nature": "Homely",
+                    "home": ["taiga", "woodland"],
                     "bonus": {"housing": 2, "attracts": 0.2},
                     "desc": "A great soft cat. People settle where it sleeps."},
     "stormcrest":  {"name": "Stormcrest Eagle", "rarity": "rare", "nature": "Inspiring",
+                    "home": ["highlands", "sea_cliffs"],
                     "bonus": {"speed": {"all": 0.015}},
                     "desc": "It circles the city at dawn, and everyone works a little harder."},
     "goldmaw":     {"name": "Goldmaw Toad", "rarity": "rare", "nature": "Lucky",
+                    "home": ["lakeland", "delta"],
                     "bonus": {"speed": {"trade": 0.05}},
                     "desc": "Merchants rub its head for luck. It seems to work."},
     "world_turtle": {"name": "World Turtle", "rarity": "epic", "nature": "Carries a village",
+                     "home": ["islands", "reef"],
                      "bonus": {"housing": 4, "speed": {"food": 0.02}},
                      "desc": "Big enough to build on, and it does not seem to mind."},
     "frost_wyrm":  {"name": "Frost Wyrm", "rarity": "epic", "nature": "Ancient mind",
+                    "home": ["tundra", "icefields"],
                     "bonus": {"speed": {"knowledge": 0.06}, "explore_speed": 0.03},
                     "desc": "Older than the hills, and willing to share some of what it remembers."},
     "sky_serpent": {"name": "Sky Serpent", "rarity": "legendary", "nature": "Sovereign",
+                    "home": ["sea_cliffs", "highlands"],
                     "bonus": {"speed": {"all": 0.03}, "explore_speed": 0.06, "attracts": 0.2},
                     "desc": "A ribbon of cloud and scale. Cities it favours are spoken of far away."},
     "burrow_hare": {"name": "Burrow Hare", "rarity": "common", "nature": "Skittish forager",
+                    "home": ["grassland", "moorland"],
                     "bonus": {"wildlife_speed": 0.08, "speed": {"food": 0.01}},
                     "desc": "Never still, and it knows where every wild thing in the valley sleeps."},
     "pebble_crab": {"name": "Pebble Crab", "rarity": "common", "nature": "Shore-comber",
+                    "home": ["coast", "reef"],
                     "bonus": {"speed": {"materials": 0.015, "trade": 0.01}},
                     "desc": "It carries home anything it can lift, and sorts it into neat piles."},
     "ember_newt":  {"name": "Ember Newt", "rarity": "common", "nature": "Warm-blooded",
+                    "home": ["volcanic"],
                     "bonus": {"power": 0.02},
                     "desc": "Warm to the touch. It sleeps wherever the city is hottest."},
     "reed_heron":  {"name": "Reed Heron", "rarity": "common", "nature": "Far-sighted",
+                    "home": ["delta", "lakeland", "floodplains"],
                     "bonus": {"explore_speed": 0.04},
                     "desc": "It stands very still for hours, then leaves in exactly the right direction."},
     "ironback_boar": {"name": "Ironback Boar", "rarity": "uncommon", "nature": "Rooter",
+                      "home": ["woodland", "jungle"],
                       "bonus": {"speed": {"materials": 0.035}},
                       "desc": "Its tusks turn up ore the miners walked straight past."},
     "lantern_owl": {"name": "Lantern Owl", "rarity": "uncommon", "nature": "Night scholar",
+                    "home": ["woodland", "karst"],
                     "bonus": {"speed": {"knowledge": 0.035}},
                     "desc": "Its eyes glow bright enough to read by, and it does not like being ignored."},
     "marsh_otter": {"name": "Marsh Otter", "rarity": "uncommon", "nature": "Playful dealer",
+                    "home": ["lakeland", "delta"],
                     "bonus": {"speed": {"trade": 0.03, "food": 0.01}},
                     "desc": "It trades shiny stones with anyone who will play along, and usually comes out ahead."},
     "thunder_ram": {"name": "Thunder Ram", "rarity": "rare", "nature": "Charged",
+                    "home": ["highlands", "moorland"],
                     "bonus": {"power": 0.05, "speed": {"materials": 0.02}},
                     "desc": "Its fleece crackles. Stand well back when it shakes itself dry."},
     "moon_stag":   {"name": "Moon Stag", "rarity": "rare", "nature": "Wayfinder",
+                    "home": ["taiga", "woodland"],
                     "bonus": {"explore_speed": 0.08, "wildlife_speed": 0.1},
                     "desc": "Other animals follow it, and so do travellers who have lost the road."},
     "amber_bear":  {"name": "Amber Bear", "rarity": "rare", "nature": "Provider",
+                    "home": ["taiga", "bamboo_valley"],
                     "bonus": {"speed": {"food": 0.05}, "housing": 1},
                     "desc": "Enormous, gentle, and never once seen hungry."},
     "coral_leviathan": {"name": "Coral Leviathan", "rarity": "epic", "nature": "Tide-bringer",
+                        "home": ["reef", "islands", "coast"],
                         "bonus": {"speed": {"food": 0.04, "trade": 0.04}},
                         "desc": "Shoals of fish and whole fleets of traders follow in its wake."},
     "ember_phoenix": {"name": "Ember Phoenix", "rarity": "epic", "nature": "Ever-burning",
+                      "home": ["volcanic", "desert"],
                       "bonus": {"power": 0.08, "speed": {"all": 0.01}},
                       "desc": "It has burned out and come back more times than the city has had rulers."},
     "elder_dragon": {"name": "Elder Dragon", "rarity": "legendary", "nature": "Hoard-keeper",
+                     "home": ["badlands", "karst"],
                      "bonus": {"speed": {"trade": 0.08, "all": 0.02}, "housing": 3},
                      "desc": "It has decided that this city is part of its hoard, and guards it accordingly."},
+    "dusk_moth":   {"name": "Dusk Moth", "rarity": "common", "nature": "Night-flier", "home": ["moorland", "woodland"],
+                    "bonus": {"night_shelter": 0.025, "speed": {"knowledge": 0.01}},
+                    "desc": "Grey by day, silver by night. Wherever it settles, people stay up late working."},
+    "rain_frog":   {"name": "Rain Frog", "rarity": "common", "nature": "Rain-caller", "home": ["floodplains", "delta", "bamboo_valley"],
+                    "bonus": {"weather_shelter": 0.025, "speed": {"food": 0.01}},
+                    "desc": "It sings before every shower, and the worst of the weather seems to pass the city by."},
+    "echo_bat":    {"name": "Echo Bat", "rarity": "uncommon", "nature": "Cave-dweller", "home": ["karst"],
+                    "bonus": {"speed": {"materials": 0.025}, "night_shelter": 0.02},
+                    "desc": "It hears the ore in the rock, and leads the night shift to it."},
+    "snow_lion":   {"name": "Snow Lion", "rarity": "rare", "nature": "Storm-walker", "home": ["icefields", "tundra", "highlands"],
+                    "bonus": {"weather_shelter": 0.05, "explore_speed": 0.03},
+                    "desc": "A great white cat that walks through blizzards as if they were spring rain."},
+    "crystal_drake": {"name": "Crystal Drake", "rarity": "epic", "nature": "Prism-hearted", "home": ["karst"],
+                      "bonus": {"speed": {"knowledge": 0.04}, "power": 0.04},
+                      "desc": "Light bends through its scales. Scholars and engineers both come to watch."},
+    "aurora_whale": {"name": "Aurora Whale", "rarity": "legendary", "nature": "Sky-swimmer", "home": ["icefields", "reef", "sea_cliffs"],
+                     "bonus": {"night_shelter": 0.05, "weather_shelter": 0.05, "speed": {"all": 0.02}},
+                     "desc": "It swims through the night sky trailing green light. Under it, night is never quite dark and storms never quite break."},
 }
 
 # Every beast has four stats of its own. They are for show and for trading:
@@ -183,6 +233,12 @@ BASE_STATS = {      # (health, attack, defense, speed)
     "coral_leviathan": (150, 30, 30, 10),
     "ember_phoenix": (95, 40, 18, 30),
     "elder_dragon": (170, 44, 34, 24),
+    "dusk_moth":    (38, 10, 6, 21),
+    "rain_frog":    (48, 11, 10, 15),
+    "echo_bat":     (52, 16, 9, 24),
+    "snow_lion":    (100, 28, 18, 24),
+    "crystal_drake": (120, 36, 36, 20),
+    "aurora_whale": (190, 38, 34, 22),
 }
 
 # A small picture of each species, drawn in text.
@@ -343,6 +399,42 @@ ART = {
         r"   \ v /   ___  \>",
         r"    VVV___/   \__\ ",
     ],
+    "dusk_moth": [
+        r"  \  .  /",
+        r" (\(oo)/)",
+        r"  \_||_/",
+        r"    /  \ ",
+    ],
+    "rain_frog": [
+        r"   ' ' '",
+        r"   (o)(o)",
+        r"  (  __  )",
+        r"  /_/  \_\ ",
+    ],
+    "echo_bat": [
+        r" /\  ^^  /\ ",
+        r"/  \(oo)/  \ ",
+        r"\_/\ \/ /\_/",
+        r"      vv",
+    ],
+    "snow_lion": [
+        r"  *  ,/|_  *",
+        r"   (=o.o=)___",
+        r"  * (  W   ) *~",
+        r"     |_|--|_|",
+    ],
+    "crystal_drake": [
+        r"   /\ <>  /\ ",
+        r"  <(o o)><//  >",
+        r"   \ v /<>___/",
+        r"    /\/\  /\ ",
+    ],
+    "aurora_whale": [
+        r" ~*~*~*~*~*~*~",
+        r"   ___________ \ ",
+        r"  (  o        >==",
+        r"   ~~~~~~~~~~~ /",
+    ],
 }
 
 # ---- Duels ----
@@ -360,6 +452,8 @@ LIKES = {
     "ironback_boar": "wood", "lantern_owl": "tools", "marsh_otter": "gold",
     "thunder_ram": "ore", "moon_stag": "wood", "amber_bear": "food",
     "coral_leviathan": "livestock", "ember_phoenix": "tools", "elder_dragon": "gold",
+    "dusk_moth": "wood", "rain_frog": "food", "echo_bat": "ore", "snow_lion": "livestock",
+    "crystal_drake": "electronics", "aurora_whale": "food",
 }
 DUEL = {
     "per": 50,       # every doubling past this much of the liked material...
@@ -410,6 +504,7 @@ MISSIONS = {
     "shiny":    {"text": "Bring it {n} Gold to sleep on", "pay": "gold", "base": 10, "per_level": 15, "min_level": 2},
     "research": {"text": "Research {n} new thing{s} to show it", "event": "research", "base": 1, "per_level": 0, "min_level": 2},
     "explore":  {"text": "Complete {n} expedition{s} and tell it what you saw", "event": "explore", "base": 1, "per_level": 0, "min_level": 3},
+    "weather":  {"text": "Watch {n} spell{s} of rare weather with it (any area, at a meal)", "event": "weather", "base": 1, "per_level": 0.2, "min_level": 4},
 }
 
 
@@ -473,13 +568,15 @@ def _egg_task(rng):
             "text": m["text"].format(n=need, s="" if need == 1 else "s")}
 
 
-def random_species(rng, distance=0, rarity=None):
-    """Pick a species: of the given rarity, or weighted by rarity (rarer ones likelier far from home)."""
+def random_species(rng, distance=0, rarity=None, env=None):
+    """Pick a species: of the given rarity, or weighted by rarity (rarer ones likelier far from home).
+    In land of kind `env`, the species that call it home are likelier."""
     names = list(RARITIES)
     if rarity is None:
         weights = [RARITIES[r]["weight"] * (1 + RARER_PER_STEP * distance * i) for i, r in enumerate(names)]
         rarity = rng.choices(names, weights=weights)[0]
-    return rng.choice([s for s, d in SPECIES.items() if d["rarity"] == rarity])
+    kinds = [s for s, d in SPECIES.items() if d["rarity"] == rarity]
+    return rng.choices(kinds, weights=[HOME_WEIGHT if env in SPECIES[s].get("home", []) else 1 for s in kinds])[0]
 
 
 def setup(state, now, rng=None):
@@ -740,12 +837,27 @@ def _nest(state, now):
 
 # ------------------------------------------------------------ expeditions --
 
-def expedition_egg(state, now, distance, rng):
-    """Maybe find an egg on an expedition `distance` steps from home. Returns the new beast or None."""
+def expedition_egg(state, now, distance, rng, env=None):
+    """Maybe find an egg on an expedition `distance` steps from home, into land of kind `env`.
+    Returns the new beast or None."""
     chance = min(EGG_CHANCE_MAX, EGG_CHANCE + EGG_CHANCE_PER_STEP * distance + game.city_stat(state, "egg_chance"))
     if rng.random() >= chance:
         return None
-    return new_egg(state, now, random_species(rng, distance))
+    return new_egg(state, now, random_species(rng, distance, env=env))
+
+
+def weather_egg(state, now, rare_areas, rng):
+    """At a meal: rare weather in any of these areas may turn up an egg there (not while the city is full of eggs)."""
+    if sum(1 for b in state["beasts"] if b["stage"] == "egg") >= NEST_FULL:
+        return None
+    for ai in rare_areas:
+        if rng.random() < WEATHER_EGG_CHANCE:
+            area = state["areas"][ai]
+            egg = new_egg(state, now, random_species(rng, abs(area["rx"]) + abs(area["ry"]), env=area["env"]))
+            game.log(state, now, f"*** The strange weather over {game.area_name(area)} left something behind: "
+                                 f"a {view_name(egg)}. See the Beast tab. ***")
+            return egg
+    return None
 
 
 # ------------------------------------------------------------------- view --
@@ -767,6 +879,10 @@ def _describe(per, level, power):
         out.append(f"Houses {int(per['housing'] * level * power)} people")
     if "attracts" in per:
         out.append(f"{int(per['attracts'] * level * power)} extra arrivals per meal")
+    if "night_shelter" in per:
+        out.append(f"Night slows the city {pct(per['night_shelter'])} less")
+    if "weather_shelter" in per:
+        out.append(f"Bad weather slows the city {pct(per['weather_shelter'])} less")
     return out
 
 
@@ -785,6 +901,7 @@ def view(state, now):
             entry.update(name=species["name"], nature=species["nature"], desc=species["desc"],
                          species=b["species"], stats=b["stats"], art="\n".join(ART[b["species"]]),
                          likes=LIKES[b["species"]], duel=bool(b.get("duel")),
+                         home=[game.ENVIRONMENTS[e]["name"] for e in species.get("home", [])],
                          xp=b["xp"], xp_needed=xp_needed(b["level"]), max_level=b["level"] >= MAX_LEVEL,
                          bonus=_describe(species["bonus"], b["level"], power),
                          next_bonus=_describe(species["bonus"], min(MAX_LEVEL, b["level"] + 1), power))

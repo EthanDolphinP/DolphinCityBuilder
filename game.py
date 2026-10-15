@@ -59,6 +59,7 @@ MIN = 60  # seconds
 #             kind: a `spread_from` tile with at least `need` neighbours that
 #             are (or count as) one of `near` becomes this, with that chance
 #   research  nothing can be built on it until this has been researched
+#   sheltered True - underground: day, night and weather make no difference here
 TERRAINS = {
     # ---- ordinary land ----
     "plains": {"name": "Plains", "glyph": ".", "color": "#9bc46b", "weight": 38,
@@ -199,6 +200,50 @@ TERRAINS = {
                "height": (1, 2), "fertility": (60, 90), "temp": 0,
                "boost": {"pasture": 1.4, "dairy": 1.3, "breeding_pen": 1.3},
                "desc": "Open flowering grassland. The best grazing there is: pastures and dairies work faster here."},
+    # ---- added with the wider world: tundra, moors, caves, reefs, cliffs ----
+    "tundra": {"name": "Tundra", "glyph": "°", "color": "#c8d8c8", "weight": 1, "groups": ["plains"],
+               "height": (1, 3), "fertility": (5, 25), "temp": -10,
+               "boost": {"hunting_lodge": 1.2, "forager_camp": 1.2, "shepherds_hut": 1.2},
+               "desc": "Frozen ground under moss and lichen. Crops barely grow, but foragers, hunters and herders get by."},
+    "scrubland": {"name": "Scrubland", "glyph": "¨", "color": "#c4b07a", "weight": 2, "groups": ["desert"],
+                  "height": (1, 3), "fertility": (5, 30), "temp": 6,
+                  "boost": {"forager_camp": 1.3, "ranch": 1.25},
+                  "desc": "Dry bush and red earth. Desert buildings stand here; foragers and ranchers do well."},
+    "cave": {"name": "Cave", "glyph": "◙", "color": "#8a7a6a",
+             "from": "hill", "chance": 0.08, "groups": ["hill"], "sheltered": True,
+             "height": (4, 7), "fertility": (0, 5), "temp": -4,
+             "boost": {"mine": 1.2, "quarry": 1.1},
+             "desc": "A cave mouth in the hillside. Day, night and weather never reach inside. Cave Dwellings and Mushroom Caves can be built here, and hill buildings too."},
+    "heath": {"name": "Heath", "glyph": "∴", "color": "#b48ab0",
+              "spread_from": ["plains", "foothills", "steppe"], "near": ["hill", "foothills"], "need": 1, "chance": 0.2,
+              "groups": ["plains"],
+              "height": (2, 4), "fertility": (15, 40), "temp": -2,
+              "boost": {"pasture": 1.2, "apiary": 1.4, "shepherds_hut": 1.3},
+              "desc": "Heather and gorse on high open ground. Poor for crops, loved by bees and sheep."},
+    "floodplain": {"name": "Floodplain", "glyph": "÷", "color": "#7fb86a",
+                   "spread_from": ["plains", "meadow", "marsh"], "near": ["river"], "need": 1, "chance": 0.35,
+                   "groups": ["plains", "fresh"],
+                   "height": (1, 1), "fertility": (85, 100), "temp": 1,
+                   "boost": {"farm": 1.2, "irrigated_farm": 1.2, "rice_paddy": 1.2},
+                   "desc": "Flat land the river floods each year, leaving rich silt behind. Superb farmland that waters the land around it."},
+    "kelp_forest": {"name": "Kelp Forest", "glyph": "∫", "color": "#3f8f6f",
+                    "spread_from": ["ocean"], "near": ["ocean"], "need": 2, "chance": 0.15,
+                    "groups": ["water"],
+                    "height": (0, 0), "fertility": (0, 0), "fish": (70, 95), "temp": -2,
+                    "boost": {"fishery": 1.1, "fishing_dock": 1.1},
+                    "desc": "Tall swaying weed under the waves, full of fish. Kelp can be gathered here for food."},
+    "cliffs": {"name": "Sea Cliffs", "glyph": "¦", "color": "#a89a8a",
+               "spread_from": ["hill", "foothills", "mountain"], "near": ["ocean"], "need": 1, "chance": 0.4,
+               "groups": ["hill"],
+               "height": (6, 9), "fertility": (0, 10), "temp": -2,
+               "boost": {"wind_turbine": 1.3},
+               "desc": "Rock walls over the sea, windy and high. Good for wind turbines, lookouts and weather stations."},
+    "crystal_cavern": {"name": "Crystal Cavern", "glyph": "◊", "color": "#c08af0",
+                       "spread_from": ["cave", "mountain"], "near": ["cave", "mountain"], "need": 1, "chance": 0.12,
+                       "groups": ["hill"], "research": "crystallography", "sheltered": True,
+                       "height": (8, 11), "fertility": (0, 0), "temp": -6,
+                       "boost": {"deep_mine": 1.3},
+                       "desc": "A hollow in the deep rock lined with crystal. Sheltered from all weather. A Crystal Mine can work it."},
 }
 GROUP_NAMES = {"water": "water", "fresh": "fresh water"}
 
@@ -308,6 +353,10 @@ CATEGORIES = {
 #   generates_modifiers   names from MODIFIERS that scale what it generates here
 #   power          power it needs. When the city generates less than its
 #                  buildings need, every powered building slows down in proportion
+#   sheltered      True - day, night and weather make no difference to it (indoors)
+#   weather_groups extra groups it belongs to for day, night and weather (see weather.py)
+#   night_shelter / weather_shelter   0.5 = night's (or the weather's) slowdowns halved
+#                  across the whole city; 1.0 = gone
 BUILDINGS = {
     # ---- Tribe ----
     "hut": {
@@ -704,7 +753,8 @@ BUILDINGS = {
         "name": "Greenhouse", "glyph": "u", "tech": 3, "category": "food", "power": 3, "research": "botany",
         "terrain": ["plains", "desert", "hill"],
         "cost": {"stone": 60, "tools": 15, "gold": 30}, "workers": 3, "time": 12 * MIN, "produces": {"food": 14},
-        "desc": "Heated glass houses that grow food anywhere, whatever the soil or weather.",
+        "sheltered": True,
+        "desc": "Heated glass houses that grow food anywhere, whatever the soil, weather or time of day.",
     },
     "laboratory": {
         "name": "Laboratory", "glyph": "J", "tech": 3, "category": "knowledge", "power": 5, "research": "scientific_method",
@@ -895,7 +945,8 @@ BUILDINGS = {
         "name": "Vertical Farm", "glyph": "4", "tech": 5, "category": "food", "power": 12, "research": "hydroponics",
         "terrain": ["plains", "desert", "hill"],
         "cost": {"stone": 300, "tools": 100, "electronics": 60}, "workers": 3, "time": 12 * MIN, "produces": {"food": 70},
-        "desc": "Floor upon floor of crops under lamps, anywhere, whatever the soil or weather.",
+        "sheltered": True,
+        "desc": "Floor upon floor of crops under lamps, anywhere, whatever the soil, weather or time of day.",
     },
     "robotics_factory": {
         "name": "Robotics Factory", "glyph": "7", "tech": 5, "category": "materials", "power": 20, "research": "robotics",
@@ -943,6 +994,195 @@ BUILDINGS = {
         "cost": {"stone": 600, "tools": 200, "electronics": 150, "gold": 800}, "explore_speed": 0.5, "attracts": 2,
         "speed_aura": {"for": ["shopping_mall", "drone_port", "trading_post", "research_institute", "data_centre"], "bonus": 0.2},
         "desc": "Floating trains. Expeditions travel 50% faster, two extra people arrive per meal, and shops and research on the 8 surrounding tiles work 20% faster.",
+    },
+    # ---- the wider world: caves, moors, reefs, ice, and shelter from the weather ----
+    "cave_dwelling": {
+        "name": "Cave Dwelling", "glyph": "κ", "tech": 0, "category": "housing",
+        "terrain": ["cave"],
+        "cost": {"wood": 10}, "housing": 5,
+        "desc": "A dry cave with a fire at the back. Houses 5, and costs almost nothing.",
+    },
+    "forager_camp": {
+        "name": "Forager's Camp", "glyph": "ε", "tech": 0, "category": "food",
+        "terrain": ["heath", "scrubland", "tundra", "meadow", "savanna", "steppe"],
+        "cost": {"wood": 10}, "workers": 1, "time": 10 * MIN, "produces": {"food": 3, "wood": 1},
+        "weather_groups": ["crops"],
+        "desc": "Gathers berries, roots and kindling from open land where farms do poorly. Works by daylight.",
+    },
+    "apiary": {
+        "name": "Apiary", "glyph": "ζ", "tech": 1, "category": "food", "research": "beekeeping",
+        "terrain": ["meadow", "heath", "plains", "forest"],
+        "cost": {"wood": 25}, "workers": 1, "time": 15 * MIN, "produces": {"food": 4, "gold": 2},
+        "speed_aura": {"for": ["farm", "orchard", "irrigated_farm", "terrace_farm"], "bonus": 0.1},
+        "weather_groups": ["crops"],
+        "desc": "Hives of bees: honey and wax to sell, and the farms and orchards on the 8 tiles around it work 10% faster. Bees only fly by day.",
+    },
+    "mushroom_cave": {
+        "name": "Mushroom Cave", "glyph": "ν", "tech": 1, "category": "food", "research": "caving",
+        "terrain": ["cave"],
+        "cost": {"wood": 30, "stone": 10}, "workers": 2, "time": 12 * MIN, "produces": {"food": 8},
+        "desc": "Beds of mushrooms in the dark. Never troubled by night or weather.",
+    },
+    "kelp_gatherers": {
+        "name": "Kelp Gatherers", "glyph": "ψ", "tech": 1, "category": "food",
+        "terrain": ["kelp_forest"],
+        "cost": {"wood": 25}, "workers": 1, "time": 12 * MIN, "produces": {"food": 5},
+        "modifiers": ["fish"],
+        "desc": "Small boats cutting kelp and netting the fish that live in it. Faster with more fish.",
+    },
+    "lookout_tower": {
+        "name": "Lookout Tower", "glyph": "ι", "tech": 1, "category": "support",
+        "terrain": ["cliffs", "mountain", "mesa", "hill"], "min_height": 6,
+        "cost": {"wood": 40, "stone": 30}, "explore_speed": 0.1, "wildlife_speed": 0.15,
+        "desc": "A tall tower on high ground. Expeditions travel 10% faster and wild animals are spotted 15% more often.",
+    },
+    "shepherds_hut": {
+        "name": "Shepherd's Hut", "glyph": "χ", "tech": 1, "category": "food", "research": "animal_husbandry",
+        "terrain": ["heath", "steppe", "tundra", "foothills"],
+        "cost": {"wood": 25, "stone": 10}, "workers": 1, "time": 15 * MIN, "housing": 2,
+        "herd": 6, "per_head": {"food": 0.5},
+        "desc": "A hut on rough grazing. Houses 2, keeps up to 6 of your livestock and farms them for food.",
+    },
+    "weather_station": {
+        "name": "Weather Station", "glyph": "τ", "tech": 2, "category": "knowledge", "research": "meteorology",
+        "terrain": ["hill", "mountain", "cliffs", "mesa", "tundra", "plains"],
+        "cost": {"wood": 40, "stone": 40, "ore": 15}, "workers": 2, "time": 20 * MIN, "produces": {"knowledge": 8},
+        "modifiers": ["height"], "weather_groups": ["weather_watch"],
+        "desc": "Gauges, vanes and a log book. Learns fastest in wild weather, and higher up.",
+    },
+    "night_market": {
+        "name": "Night Market", "glyph": "ρ", "tech": 2, "category": "trade", "research": "street_lighting",
+        "terrain": ["plains", "desert", "scrubland"],
+        "cost": {"wood": 60, "stone": 30, "gold": 30}, "workers": 3, "time": 15 * MIN, "produces": {"gold": 11},
+        "modifiers": ["customers"], "weather_groups": ["after_dark"],
+        "desc": "Lantern-lit stalls that open at dusk: slow by day, very busy at night. Faster with homes next to it.",
+    },
+    "pearl_divers": {
+        "name": "Pearl Divers", "glyph": "φ", "tech": 2, "category": "trade", "research": "pearl_diving",
+        "terrain": ["coral_reef", "kelp_forest"],
+        "cost": {"wood": 50, "stone": 20, "gold": 20}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 14},
+        "modifiers": ["fish"],
+        "desc": "Divers bring up pearls from the reef. Faster in richer water.",
+    },
+    "bamboo_workshop": {
+        "name": "Bamboo Workshop", "glyph": "θ", "tech": 2, "category": "materials",
+        "terrain": ["bamboo"],
+        "cost": {"wood": 40, "stone": 20}, "workers": 2, "time": 15 * MIN, "produces": {"wood": 6, "tools": 2},
+        "desc": "Cuts and splits cane into poles, mats and simple tools.",
+    },
+    "ice_works": {
+        "name": "Ice Works", "glyph": "υ", "tech": 2, "category": "trade",
+        "terrain": ["glacier", "tundra"],
+        "cost": {"wood": 50, "stone": 40}, "workers": 2, "time": 20 * MIN, "produces": {"gold": 8, "food": 4},
+        "weather_groups": ["ice"],
+        "desc": "Cuts ice to sell and to keep food fresh. Sells best in a heatwave.",
+    },
+    "ranch": {
+        "name": "Ranch", "glyph": "γ", "tech": 2, "category": "food", "research": "selective_breeding",
+        "terrain": ["scrubland", "savanna", "steppe"],
+        "cost": {"wood": 60, "stone": 20}, "workers": 2, "time": 15 * MIN,
+        "herd": 20, "per_head": {"food": 0.5, "gold": 0.1},
+        "desc": "Wide open range for a big herd: keeps up to 20 of your livestock, for food and a little gold.",
+    },
+    "crystal_mine": {
+        "name": "Crystal Mine", "glyph": "ξ", "tech": 3, "category": "materials", "power": 3, "research": "crystallography",
+        "terrain": ["crystal_cavern"],
+        "cost": {"stone": 150, "tools": 40, "gold": 60}, "workers": 4, "time": 25 * MIN,
+        "produces": {"gold": 18, "knowledge": 5},
+        "desc": "Cuts crystal for jewellers and lens makers. Sheltered from all weather.",
+    },
+    "ski_resort": {
+        "name": "Ski Resort", "glyph": "♦", "tech": 3, "category": "trade", "power": 2, "research": "alpine_sports",
+        "terrain": ["glacier", "mountain"],
+        "cost": {"wood": 150, "stone": 150, "gold": 120}, "workers": 4, "time": 20 * MIN,
+        "produces": {"gold": 24}, "attracts": 1, "weather_groups": ["snow_sports"],
+        "desc": "Lifts, lodges and slopes: gold, and one extra arrival per meal. Busiest in fresh snow; closed in a blizzard.",
+    },
+    "aquarium": {
+        "name": "Aquarium", "glyph": "@", "tech": 3, "category": "trade", "power": 2, "research": "marine_biology",
+        "terrain": ["beach", "plains"], "adjacent": "ocean",
+        "cost": {"stone": 160, "tools": 30, "gold": 120}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 18, "knowledge": 4}, "attracts": 1, "sheltered": True,
+        "desc": "Tanks of reef fish by the sea: gold, a little knowledge and one extra arrival per meal. Indoors, so the weather does not matter.",
+    },
+    "kelp_farm": {
+        "name": "Kelp Farm", "glyph": "/", "tech": 3, "category": "food", "power": 1, "research": "marine_biology",
+        "terrain": ["kelp_forest", "ocean"],
+        "cost": {"wood": 80, "stone": 40, "tools": 15}, "workers": 3, "time": 12 * MIN, "produces": {"food": 18},
+        "modifiers": ["fish"],
+        "desc": "Lines of kelp grown and harvested at sea. Faster in rich water.",
+    },
+    "biodome": {
+        "name": "Biodome", "glyph": "%", "tech": 4, "category": "food", "power": 6, "research": "climate_engineering",
+        "terrain": ["tundra", "glacier", "desert", "scrubland", "sand_dunes", "salt_flat"],
+        "cost": {"stone": 300, "tools": 100, "gold": 150}, "workers": 3, "time": 15 * MIN, "produces": {"food": 34},
+        "sheltered": True,
+        "desc": "A sealed dome with its own climate, for land nothing else will grow on. Weather and night make no difference.",
+    },
+    "storm_barrier": {
+        "name": "Storm Barrier", "glyph": "#", "tech": 4, "category": "support", "research": "climate_engineering", "unique": True,
+        "terrain": ["plains", "hill", "cliffs", "beach"],
+        "cost": {"stone": 1200, "tools": 300, "gold": 600}, "weather_shelter": 0.5,
+        "desc": "Walls, drains and wind breaks around the whole city: every slowdown the weather causes is halved. A city can have one.",
+    },
+    "planetarium": {
+        "name": "Planetarium", "glyph": "^", "tech": 4, "category": "knowledge", "power": 5, "research": "astrophysics",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 300, "tools": 100, "gold": 250}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 40}, "attracts": 1, "weather_groups": ["stargazing"],
+        "desc": "A dome of stars: knowledge, and one extra arrival per meal. Busiest at night and under a sky full of wonders.",
+    },
+    "theme_park": {
+        "name": "Theme Park", "glyph": "~", "tech": 4, "category": "trade", "power": 8, "unique": True,
+        "terrain": ["plains", "beach"],
+        "cost": {"stone": 600, "tools": 200, "gold": 800}, "workers": 6, "time": 20 * MIN,
+        "produces": {"gold": 70}, "attracts": 2, "modifiers": ["customers"],
+        "desc": "Rides, shows and fireworks after dark: gold, and two extra arrivals per meal. A city can have one.",
+    },
+    "offshore_wind": {
+        "name": "Offshore Wind Farm", "glyph": "|", "tech": 4, "category": "power", "research": "smart_grid",
+        "terrain": ["ocean"],
+        "cost": {"stone": 200, "tools": 120, "gold": 100}, "workers": 1, "generates": 28,
+        "desc": "Turbines out at sea, where the wind never stops. Gives most in windy weather.",
+    },
+    "polar_station": {
+        "name": "Polar Station", "glyph": ":", "tech": 4, "category": "knowledge", "power": 6, "research": "climate_engineering",
+        "terrain": ["glacier", "tundra"],
+        "cost": {"stone": 250, "tools": 120, "gold": 200}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 45}, "modifiers": ["cooling"],
+        "desc": "Scientists drilling ice cores and watching the sky. Faster the colder it is.",
+    },
+    "spaceport": {
+        "name": "Spaceport", "glyph": ";", "tech": 5, "category": "support", "power": 30, "research": "orbital_mechanics", "unique": True,
+        "terrain": ["plains", "desert", "scrubland"], "max_height": 2,
+        "cost": {"stone": 2000, "tools": 800, "electronics": 600, "gold": 3000}, "workers": 6, "time": 30 * MIN,
+        "produces": {"knowledge": 120, "gold": 100}, "attracts": 2, "explore_speed": 0.3,
+        "desc": "Rockets to orbit and back: knowledge, gold, two extra arrivals per meal, and expeditions 30% faster. Needs flat ground. A city can have one.",
+    },
+    "orbital_mirror": {
+        "name": "Orbital Mirror Array", "glyph": "-", "tech": 5, "category": "support", "research": "orbital_mechanics", "unique": True,
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"tools": 600, "electronics": 500, "gold": 2500}, "night_shelter": 0.75,
+        "desc": "Mirrors in orbit that light the city by night: three quarters of every slowdown the night causes is gone, solar farms included. A city can have one.",
+    },
+    "weather_control": {
+        "name": "Weather Control Tower", "glyph": "_", "tech": 5, "category": "support", "research": "weather_control", "unique": True,
+        "terrain": ["plains", "hill", "mountain"],
+        "cost": {"stone": 1500, "tools": 600, "electronics": 800, "gold": 4000}, "weather_shelter": 1.0,
+        "desc": "Seeds the clouds and turns the storms: the weather never slows anything in the city, not even a blizzard. Its good effects still count. A city can have one.",
+    },
+    "ocean_habitat": {
+        "name": "Ocean Habitat", "glyph": "○", "tech": 5, "category": "housing", "research": "marine_habitats",
+        "terrain": ["ocean", "coral_reef", "kelp_forest"],
+        "cost": {"stone": 600, "tools": 200, "electronics": 150, "gold": 500}, "housing": 60,
+        "desc": "A town of glass domes on the sea bed. Houses 60.",
+    },
+    "quantum_lab": {
+        "name": "Quantum Lab", "glyph": "∞", "tech": 5, "category": "knowledge", "power": 30, "research": "quantum_computing",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 500, "tools": 200, "electronics": 300, "gold": 800}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 260}, "modifiers": ["cooling"],
+        "desc": "Machines that think in many directions at once. Runs best on a cold tile.",
     },
 }
 
@@ -1277,6 +1517,73 @@ RESEARCH = {
         "name": "Fusion Power", "tech": 5, "building": "research_institute", "cost": {"knowledge": 1500},
         "desc": "A star in a bottle.",
     },
+    # ---- the wider world ----
+    "caving": {
+        "name": "Caving", "tech": 0, "building": "shaman_hut", "cost": {"knowledge": 12},
+        "desc": "Torches, ropes, and knowing which way is out.",
+    },
+    "beekeeping": {
+        "name": "Beekeeping", "tech": 1, "building": "school", "cost": {"knowledge": 25},
+        "desc": "Smoke, patience and a veil.",
+    },
+    "weather_lore": {
+        "name": "Weather Lore", "tech": 1, "building": "school", "cost": {"knowledge": 30},
+        "forecast": 2, "effect": "the weather can be seen two meals ahead in every area",
+        "desc": "Red sky at night, and the old sayings that are mostly right.",
+    },
+    "meteorology": {
+        "name": "Meteorology", "tech": 2, "building": "university", "cost": {"knowledge": 60},
+        "forecast": 4, "effect": "the weather can be seen four meals ahead in every area",
+        "desc": "Barometers, wind vanes and careful notes.",
+    },
+    "street_lighting": {
+        "name": "Street Lighting", "tech": 2, "building": "university", "cost": {"knowledge": 55},
+        "desc": "Lamps on poles, and someone to light them every evening.",
+    },
+    "pearl_diving": {
+        "name": "Pearl Diving", "tech": 2, "building": "university", "cost": {"knowledge": 50},
+        "desc": "Holding your breath, and knowing which shells to open.",
+    },
+    "crystallography": {
+        "name": "Crystallography", "tech": 3, "building": "university", "cost": {"knowledge": 140},
+        "effect": "crystal caverns can be built on",
+        "desc": "How crystals grow, and how to cut them without shattering them.",
+    },
+    "alpine_sports": {
+        "name": "Alpine Sports", "tech": 3, "building": "university", "cost": {"knowledge": 110},
+        "desc": "Skis, sledges and a great deal of hot chocolate.",
+    },
+    "marine_biology": {
+        "name": "Marine Biology", "tech": 3, "building": "university", "cost": {"knowledge": 120},
+        "boost": {"kelp_gatherers": 1.2, "pearl_divers": 1.2},
+        "desc": "What lives under the waves, and how to look after it.",
+    },
+    "climate_engineering": {
+        "name": "Climate Engineering", "tech": 4, "building": "laboratory", "cost": {"knowledge": 320},
+        "desc": "Domes, barriers and drains that keep the weather where it belongs.",
+    },
+    "astrophysics": {
+        "name": "Astrophysics", "tech": 4, "building": "laboratory", "cost": {"knowledge": 280},
+        "boost": {"observatory": 1.3},
+        "desc": "What the stars are made of, and how far away they are.",
+    },
+    "orbital_mechanics": {
+        "name": "Orbital Mechanics", "tech": 5, "building": "research_institute", "cost": {"knowledge": 1200},
+        "desc": "Getting up there, staying up there, and coming back down.",
+    },
+    "weather_control": {
+        "name": "Weather Control", "tech": 5, "building": "research_institute", "cost": {"knowledge": 1400},
+        "desc": "Telling the clouds where to rain.",
+    },
+    "marine_habitats": {
+        "name": "Marine Habitats", "tech": 5, "building": "research_institute", "cost": {"knowledge": 800},
+        "desc": "Living under the sea, with the air on the inside.",
+    },
+    "quantum_computing": {
+        "name": "Quantum Computing", "tech": 5, "building": "research_institute", "cost": {"knowledge": 1300},
+        "boost": {"data_centre": 1.2, "research_institute": 1.2},
+        "desc": "Bits that are both at once, until someone looks.",
+    },
 }
 
 # Additions are attached to a building that is already standing. Fields:
@@ -1446,9 +1753,9 @@ ADDITIONS = {
         "desc": "+10 Gold per cycle.",
     },
     "battery_bank": {
-        "name": "Battery Bank", "for": ["solar_farm", "wind_turbine", "tidal_array"], "research": "smart_grid",
-        "cost": {"ore": 80, "tools": 40}, "generates": 8,
-        "desc": "+8 power.",
+        "name": "Battery Bank", "for": ["solar_farm", "wind_turbine", "tidal_array", "offshore_wind"], "research": "smart_grid",
+        "cost": {"ore": 80, "tools": 40}, "generates": 8, "night_proof": 0.5,
+        "desc": "+8 power, and it stores the day's power: a solar farm keeps half its power at night.",
     },
     "express_link": {
         "name": "Express Link", "for": ["airport", "maglev_hub"],
@@ -1542,7 +1849,7 @@ ADDITIONS = {
         "desc": "25% faster. Costs 1 livestock.",
     },
     "sheepdogs": {
-        "name": "Sheepdogs", "for": ["pasture"], "research": "animal_taming",
+        "name": "Sheepdogs", "for": ["pasture", "shepherds_hut", "ranch"], "research": "animal_taming",
         "cost": {"food": 10, "livestock": 1}, "speed": 1.15, "herd": 2,
         "desc": "15% faster and holds 2 more livestock. Costs 1 livestock.",
     },
@@ -1667,7 +1974,7 @@ ADDITIONS = {
         "desc": "+4 power.",
     },
     "taller_mast": {
-        "name": "Taller Mast", "for": ["wind_turbine"],
+        "name": "Taller Mast", "for": ["wind_turbine", "offshore_wind"],
         "cost": {"stone": 40, "tools": 15}, "generates": 3,
         "desc": "+3 power.",
     },
@@ -1914,6 +2221,167 @@ ADDITIONS = {
         "cost": {"stone": 100, "tools": 20, "gold": 60}, "produces": {"knowledge": 6},
         "desc": "+6 Knowledge per cycle.",
     },
+    # ---- shelter from the night and the weather ----
+    # night_proof / weather_proof: share of the slowdowns night (or the weather) causes this building that it no longer has
+    "lanterns": {
+        "name": "Lanterns", "research": "street_lighting",
+        "for": ["lumber_camp", "quarry", "mine", "sawmill", "smithy", "trading_post", "caravanserai", "weaver",
+                "tannery", "glassworks", "salt_works", "peat_cutter", "reed_cutter", "bamboo_workshop", "cattle_market"],
+        "cost": {"wood": 20, "ore": 5, "gold": 10}, "night_proof": 1.0,
+        "desc": "Work goes on after dark: night no longer slows it.",
+    },
+    "work_lights": {
+        "name": "Work Lights", "research": "electricity",
+        "for": ["factory", "steel_mill", "deep_mine", "cement_works", "timber_yard", "electronics_plant", "recycling_centre",
+                "robotics_factory", "container_port", "harbor", "department_store", "shopping_mall", "crystal_mine"],
+        "cost": {"ore": 30, "tools": 20}, "night_proof": 1.0, "power": 1,
+        "desc": "Floodlit night shifts: night no longer slows it. Uses 1 more power.",
+    },
+    "cold_frames": {
+        "name": "Cold Frames", "research": "glassmaking",
+        "for": ["farm", "orchard", "terrace_farm", "irrigated_farm", "rice_paddy", "industrial_farm", "apiary", "forager_camp"],
+        "cost": {"wood": 30, "gold": 20}, "weather_proof": 1.0,
+        "desc": "Glass covers over the beds: bad weather no longer slows it.",
+    },
+    "field_lights": {
+        "name": "Field Lights", "research": "electricity",
+        "for": ["farm", "orchard", "terrace_farm", "irrigated_farm", "rice_paddy", "industrial_farm"],
+        "cost": {"ore": 30, "tools": 20}, "night_proof": 0.7, "power": 2,
+        "desc": "Lamps over the crops: most of night's slowdown is gone. Uses 2 power.",
+    },
+    "storm_hulls": {
+        "name": "Storm Hulls", "research": "navigation",
+        "for": ["fishing_dock", "fishery", "harbor", "pearl_divers", "kelp_gatherers", "kelp_farm"],
+        "cost": {"wood": 40, "ore": 10}, "weather_proof": 1.0,
+        "desc": "Boats built for rough water: bad weather no longer slows it.",
+    },
+    "covered_pens": {
+        "name": "Covered Pens", "research": "masonry",
+        "for": ["pasture", "dairy", "breeding_pen", "shepherds_hut", "ranch", "cattle_market"],
+        "cost": {"wood": 30, "stone": 20}, "weather_proof": 1.0,
+        "desc": "Shelter for the animals: bad weather no longer slows it.",
+    },
+    "snow_cannons": {
+        "name": "Snow Cannons", "for": ["ski_resort"], "research": "electricity",
+        "cost": {"tools": 40, "gold": 60}, "weather_proof": 1.0, "power": 2,
+        "desc": "Makes its own snow: bad weather no longer slows it (a blizzard still shuts it).",
+    },
+    # ---- for the buildings of the wider world ----
+    "carved_rooms": {
+        "name": "Carved Rooms", "for": ["cave_dwelling"], "research": "caving",
+        "cost": {"wood": 15, "stone": 10}, "housing": 3,
+        "desc": "Houses 3 more people.",
+    },
+    "foraging_baskets": {
+        "name": "Foraging Baskets", "for": ["forager_camp"],
+        "cost": {"wood": 10}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "more_hives": {
+        "name": "More Hives", "for": ["apiary"],
+        "cost": {"wood": 25}, "produces": {"food": 2, "gold": 2}, "aura_bonus": 0.05,
+        "desc": "+2 Food and +2 Gold per cycle, and the farms around it get a further 5% faster.",
+    },
+    "spore_beds": {
+        "name": "Spore Beds", "for": ["mushroom_cave"],
+        "cost": {"wood": 20, "food": 10}, "speed": 1.3,
+        "desc": "30% faster.",
+    },
+    "drying_lines": {
+        "name": "Drying Lines", "for": ["kelp_gatherers", "kelp_farm"],
+        "cost": {"wood": 20}, "produces": {"food": 3},
+        "desc": "+3 Food per cycle.",
+    },
+    "signal_fire": {
+        "name": "Signal Fire", "for": ["lookout_tower"],
+        "cost": {"wood": 30}, "explore_speed": 0.05,
+        "desc": "Expeditions a further 5% faster.",
+    },
+    "rain_gauges": {
+        "name": "Rain Gauges", "for": ["weather_station"],
+        "cost": {"ore": 10, "gold": 10}, "produces": {"knowledge": 3},
+        "desc": "+3 Knowledge per cycle.",
+    },
+    "radar_dish": {
+        "name": "Radar Dish", "for": ["weather_station"], "research": "electricity",
+        "cost": {"tools": 30, "gold": 40}, "speed": 1.3, "power": 2,
+        "desc": "30% faster, for 2 power.",
+    },
+    "lantern_alley": {
+        "name": "Lantern Alley", "for": ["night_market"],
+        "cost": {"wood": 30, "gold": 20}, "produces": {"gold": 4},
+        "desc": "+4 Gold per cycle.",
+    },
+    "diving_bells": {
+        "name": "Diving Bells", "for": ["pearl_divers"], "research": "engineering",
+        "cost": {"ore": 30, "tools": 10}, "speed": 1.3,
+        "desc": "30% faster.",
+    },
+    "bamboo_scaffolds": {
+        "name": "Bamboo Scaffolds", "for": ["bamboo_workshop"],
+        "cost": {"wood": 20}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "ice_cellar": {
+        "name": "Ice Cellar", "for": ["ice_works"],
+        "cost": {"stone": 30}, "produces": {"food": 3},
+        "desc": "+3 Food per cycle.",
+    },
+    "crystal_oscillators": {
+        "name": "Crystal Oscillators", "for": ["crystal_mine"], "research": "semiconductors",
+        "cost": {"tools": 60, "gold": 80}, "produces": {"electronics": 3},
+        "desc": "+3 Electronics per cycle.",
+    },
+    "chalets": {
+        "name": "Chalets", "for": ["ski_resort"],
+        "cost": {"wood": 80, "gold": 40}, "housing": 6,
+        "desc": "Houses 6 people.",
+    },
+    "shark_tunnel": {
+        "name": "Shark Tunnel", "for": ["aquarium"],
+        "cost": {"stone": 80, "tools": 20, "gold": 60}, "produces": {"gold": 6},
+        "desc": "+6 Gold per cycle.",
+    },
+    "climate_control": {
+        "name": "Climate Control", "for": ["biodome", "polar_station"], "research": "smart_grid",
+        "cost": {"tools": 60, "electronics": 20}, "speed": 1.2,
+        "desc": "20% faster.",
+    },
+    "star_shows": {
+        "name": "Star Shows", "for": ["planetarium", "observatory"],
+        "cost": {"gold": 80}, "produces": {"gold": 8},
+        "desc": "+8 Gold per cycle.",
+    },
+    "roller_coaster": {
+        "name": "Roller Coaster", "for": ["theme_park"],
+        "cost": {"tools": 150, "gold": 300}, "attracts": 1,
+        "desc": "One more extra arrival per meal.",
+    },
+    "night_parade": {
+        "name": "Night Parade", "for": ["theme_park", "night_market", "stadium"],
+        "cost": {"gold": 120}, "produces": {"gold": 10},
+        "desc": "+10 Gold per cycle.",
+    },
+    "ice_cores": {
+        "name": "Ice Core Store", "for": ["polar_station"],
+        "cost": {"tools": 40}, "produces": {"knowledge": 8},
+        "desc": "+8 Knowledge per cycle.",
+    },
+    "launch_pad": {
+        "name": "Second Launch Pad", "for": ["spaceport"],
+        "cost": {"tools": 300, "electronics": 200}, "produces": {"gold": 40}, "explore_speed": 0.1,
+        "desc": "+40 Gold per cycle, and expeditions a further 10% faster.",
+    },
+    "pressure_domes": {
+        "name": "Pressure Domes", "for": ["ocean_habitat"],
+        "cost": {"tools": 100, "electronics": 60}, "housing": 20,
+        "desc": "Houses 20 more people.",
+    },
+    "cryo_cooling": {
+        "name": "Cryo Cooling", "for": ["quantum_lab", "data_centre"],
+        "cost": {"tools": 80, "electronics": 60}, "speed": 1.25, "power": 4,
+        "desc": "25% faster, for 4 more power.",
+    },
 }
 
 # Kinds of area an expedition can find. Fields:
@@ -1922,6 +2390,8 @@ ADDITIONS = {
 #   river / lake / ocean   chance the area has one; rivers / lakes / oceans = how many tries
 #   temp     added to the home climate
 #   cost     what an expedition there needs, per step of distance from home
+#   loot     extra (resource, least, most) an expedition there may bring back, per step of distance
+#   The terrain multipliers also make land that forms beside its own kind (heath, kelp, ...) likelier.
 ENVIRONMENTS = {
     "homeland":  {"name": "Homeland",  "weight": 0, "terrain": {}, "temp": 0, "cost": {},
                   "river": 0.7, "lake": 0.5, "ocean": 0},
@@ -1940,7 +2410,7 @@ ENVIRONMENTS = {
     "desert":    {"name": "Desert",    "weight": 2, "terrain": {"desert": 6, "oasis": 1.5}, "temp": 8,
                   "river": 0.2, "lake": 0, "ocean": 0.02,
                   "cost": {"food": 80, "wood": 20}},
-    "tundra":    {"name": "Tundra",    "weight": 1, "terrain": {"hill": 1.5}, "temp": -16,
+    "tundra":    {"name": "Tundra",    "weight": 1, "terrain": {"desert": 0, "hill": 1.5, "tundra": 40, "plains": 0.3}, "temp": -16,
                   "river": 0.4, "lake": 0.5, "ocean": 0.04,
                   "cost": {"food": 60, "wood": 50}},
     "coast":     {"name": "Coast",     "weight": 1, "terrain": {}, "temp": 0,
@@ -1955,7 +2425,7 @@ ENVIRONMENTS = {
     "steppe":    {"name": "Steppe",    "weight": 2, "terrain": {"steppe": 14, "hill": 1.2}, "temp": -4,
                   "river": 0.3, "lake": 0.2, "ocean": 0,
                   "cost": {"food": 45, "wood": 20}},
-    "taiga":     {"name": "Taiga",     "weight": 2, "terrain": {"taiga": 20, "forest": 1.5}, "temp": -8,
+    "taiga":     {"name": "Taiga",     "weight": 2, "terrain": {"desert": 0, "taiga": 20, "forest": 1.5}, "temp": -8,
                   "river": 0.5, "lake": 0.5, "ocean": 0.02,
                   "cost": {"food": 50, "wood": 30}},
     "badlands":  {"name": "Badlands",  "weight": 1, "terrain": {"desert": 3, "hill": 2.5, "canyon": 5, "mesa": 5}, "temp": 5,
@@ -1971,10 +2441,35 @@ ENVIRONMENTS = {
     "islands":   {"name": "Islands",   "weight": 1, "terrain": {"jungle": 4}, "temp": 4,
                   "river": 0.2, "lake": 0.1, "ocean": 1, "oceans": 2,
                   "cost": {"food": 40, "wood": 70}},
+    "moorland":  {"name": "Moorland",  "weight": 2, "terrain": {"desert": 0, "hill": 2, "plains": 1.2, "heath": 3, "foothills": 2},
+                  "temp": -3, "river": 0.5, "lake": 0.4, "ocean": 0,
+                  "cost": {"food": 40, "wood": 25}, "loot": [("livestock", 1, 3)]},
+    "karst":     {"name": "Cave Country", "weight": 1, "terrain": {"desert": 0.3, "hill": 3, "plains": 0.6, "cave": 8, "canyon": 2, "crystal_cavern": 3},
+                  "temp": -1, "river": 0.4, "lake": 0.2, "ocean": 0,
+                  "cost": {"food": 50, "wood": 40}, "loot": [("ore", 10, 30), ("stone", 20, 40)]},
+    "floodplains": {"name": "Floodplains", "weight": 2, "terrain": {"plains": 2, "floodplain": 3, "marsh": 2, "meadow": 1.5},
+                    "temp": 1, "river": 1, "rivers": 2, "lake": 0.3, "ocean": 0,
+                    "cost": {"food": 30, "wood": 30}, "loot": [("food", 30, 60)]},
+    "reef":      {"name": "Reef Shallows", "weight": 1, "terrain": {"beach": 3, "coral_reef": 4, "kelp_forest": 3, "mangrove": 2},
+                  "temp": 5, "river": 0.1, "lake": 0, "ocean": 1, "oceans": 2,
+                  "cost": {"food": 40, "wood": 70}, "loot": [("gold", 10, 25)]},
+    "sea_cliffs": {"name": "Sea Cliffs", "weight": 1, "terrain": {"desert": 0, "hill": 3, "cliffs": 3, "foothills": 1.5, "mountain": 1.5},
+                   "temp": -2, "river": 0.3, "lake": 0.1, "ocean": 1,
+                   "cost": {"food": 40, "wood": 50}, "loot": [("food", 20, 40)]},
+    "outback":   {"name": "Outback",   "weight": 2, "terrain": {"scrubland": 25, "plains": 0.4, "forest": 0.2, "desert": 2, "savanna": 3, "mesa": 2},
+                  "temp": 7, "river": 0.15, "lake": 0.05, "ocean": 0,
+                  "cost": {"food": 70, "wood": 20}, "loot": [("gold", 10, 20)]},
+    "icefields": {"name": "Icefields", "weight": 1, "terrain": {"desert": 0, "tundra": 45, "plains": 0.2, "forest": 0.2, "hill": 1.5, "mountain": 2, "glacier": 3},
+                  "temp": -20, "river": 0.2, "lake": 0.4, "ocean": 0.1,
+                  "cost": {"food": 80, "wood": 60}, "loot": [("knowledge", 8, 15)]},
+    "bamboo_valley": {"name": "Bamboo Valley", "weight": 1, "terrain": {"desert": 0, "forest": 2, "bamboo": 4, "jungle": 2, "foothills": 1.5},
+                      "temp": 5, "river": 0.9, "lake": 0.4, "ocean": 0,
+                      "cost": {"food": 40, "wood": 20}, "loot": [("wood", 30, 60)]},
 }
 
 # Wild animals. terrain is where they appear; livestock is what one is worth
-# once tamed (the species is not remembered after that).
+# once tamed (the species is not remembered after that). night: True - mostly
+# seen at night (and rarely by day); False - rarely seen at night.
 WILDLIFE = {
     "rabbit":  {"name": "Rabbits",        "glyph": "r", "terrain": ["plains", "forest"], "livestock": 1, "weight": 4},
     "duck":    {"name": "Ducks",          "glyph": "k", "terrain": ["fresh"],            "livestock": 1, "weight": 3},
@@ -2008,6 +2503,16 @@ WILDLIFE = {
     "zebra":    {"name": "Zebras",        "glyph": "Z", "terrain": ["savanna"],            "livestock": 4, "weight": 4},
     "reindeer": {"name": "Reindeer",      "glyph": "R", "terrain": ["taiga", "steppe"],    "livestock": 4, "weight": 4},
     "saiga":    {"name": "Saiga Antelope", "glyph": "S", "terrain": ["steppe", "savanna"], "livestock": 3, "weight": 3},
+    "arctic_fox": {"name": "Arctic Foxes", "glyph": "A", "terrain": ["tundra", "glacier"], "livestock": 2, "weight": 3, "night": True},
+    "snowy_owl":  {"name": "Snowy Owls",   "glyph": "N", "terrain": ["tundra", "heath"],   "livestock": 1, "weight": 2, "night": True},
+    "grouse":     {"name": "Red Grouse",   "glyph": "G", "terrain": ["heath", "foothills"], "livestock": 1, "weight": 4},
+    "kangaroo":   {"name": "Kangaroos",    "glyph": "K", "terrain": ["scrubland", "savanna"], "livestock": 4, "weight": 4},
+    "emu":        {"name": "Emus",         "glyph": "E", "terrain": ["scrubland", "desert"], "livestock": 3, "weight": 3},
+    "otter":      {"name": "Sea Otters",   "glyph": "O", "terrain": ["kelp_forest", "river"], "livestock": 2, "weight": 3},
+    "bats":       {"name": "Cave Bats",    "glyph": "B", "terrain": ["cave", "crystal_cavern", "canyon"], "livestock": 1, "weight": 4, "night": True},
+    "puffin":     {"name": "Puffins",      "glyph": "P", "terrain": ["cliffs", "beach"],    "livestock": 1, "weight": 4, "night": False},
+    "walrus":     {"name": "Walruses",     "glyph": "W", "terrain": ["kelp_forest", "glacier"], "livestock": 6, "weight": 1},
+    "hedgehog":   {"name": "Hedgehogs",    "glyph": "H", "terrain": ["meadow", "plains", "floodplain"], "livestock": 1, "weight": 2, "night": True},
 }
 
 
@@ -2192,6 +2697,7 @@ def _spread_terrain(area, rng, cells=None):
     (dunes inside deserts, swamp by marshes, ...). `cells` limits it to those
     (x, y) positions; tiles with buildings are never changed."""
     n, tiles = area["size"], area["tiles"]
+    bias = ENVIRONMENTS[area["env"]]["terrain"]
     for terrain, t in TERRAINS.items():
         if "near" not in t:
             continue
@@ -2201,7 +2707,7 @@ def _spread_terrain(area, rng, cells=None):
                 tile = tiles[y][x]
                 if (cells is not None and (x, y) not in cells) or tile["building"]:
                     continue
-                if (tile["terrain"] in t["spread_from"] and rng.random() < t["chance"]
+                if (tile["terrain"] in t["spread_from"] and rng.random() < min(0.9, t["chance"] * bias.get(terrain, 1))
                         and _count_adjacent(area, x, y, alike) >= t.get("need", 1)):
                     tiles[y][x] = _make_tile(terrain, area["climate"], rng)
 
@@ -2702,6 +3208,15 @@ def advance_time(state, now):
         return
     state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
+    with _stats_cached():     # buildings and ideology don't change while time is caught up
+        _advance(state, now, remaining)
+    trip = state["expedition"]
+    if trip and now >= trip["arrive"]:
+        _arrive(state, trip)
+    beasts.tick(state, now)
+
+
+def _advance(state, now, remaining):
     res = state["resources"]
     jobs, housing, _ = work_plan(state)
     wildlife_speed = city_stat(state, "wildlife_speed") + beasts.bonus(state, "wildlife_speed")
@@ -2729,18 +3244,20 @@ def advance_time(state, now):
         state["meal"] += dt
         while state["meal"] >= MEAL_TIME:
             state["meal"] -= MEAL_TIME
-            if _meal(state, housing, now - remaining):
+            when = now - remaining
+            if _meal(state, housing, when):
                 jobs, housing, _ = work_plan(state)
+            # a new spell of weather starts in every area: rare weather is worth watching
+            rare = [i for i in range(len(state["areas"])) if weather.WEATHER[weather.weather_at(state, i, when + 1)].get("rare")]
+            if rare:
+                beasts.note(state, when, "weather")
+                beasts.weather_egg(state, when, rare, rng)
         state["wild"] += dt * (1 + wildlife_speed)
         while state["wild"] >= WILDLIFE_TIME:
             state["wild"] -= WILDLIFE_TIME
+            night = weather.is_night(state, now - remaining)
             for area in state["areas"]:
-                _spawn_animal(area, rng)
-
-    trip = state["expedition"]
-    if trip and now >= trip["arrive"]:
-        _arrive(state, trip)
-    beasts.tick(state, now)
+                _spawn_animal(area, rng, night)
 
 
 def build(state, now, area, x, y, bid):
@@ -2959,8 +3476,9 @@ def set_ban(state, now, target, banned):
 
 # ---- Wildlife ----
 
-def _spawn_animal(area, rng):
-    """A wild animal wanders onto a free tile, if the area has room for more."""
+def _spawn_animal(area, rng, night=None):
+    """A wild animal wanders onto a free tile, if the area has room for more.
+    night: True or False if it is night or day in the city (None: either)."""
     tiles = [t for row in area["tiles"] for t in row]
     if sum(1 for t in tiles if t["animal"]) >= MAX_WILDLIFE:
         return
@@ -2970,7 +3488,8 @@ def _spawn_animal(area, rng):
     tile = rng.choice(free)
     species = [s for s, w in WILDLIFE.items() if any(terrain_is(tile["terrain"], t) for t in w["terrain"])]
     if species:
-        tile["animal"] = rng.choices(species, weights=[WILDLIFE[s]["weight"] for s in species])[0]
+        when = lambda s: 1 if night is None or "night" not in WILDLIFE[s] else (3 if WILDLIFE[s]["night"] == night else 0.2)
+        tile["animal"] = rng.choices(species, weights=[WILDLIFE[s]["weight"] * when(s) for s in species])[0]
 
 
 def tame_cost(species):
@@ -3089,10 +3608,10 @@ def _arrive(state, trip):
     distance = abs(trip["rx"]) + abs(trip["ry"])
     loot = {}
     if rng.random() < EXPEDITION_LOOT_CHANCE:
-        res, least, most = rng.choice(EXPEDITION_LOOT)
+        res, least, most = rng.choice(EXPEDITION_LOOT + ENVIRONMENTS[env].get("loot", []) * 2)
         loot[res] = rng.randint(least, most) * distance
         state["resources"][res] += loot[res]
-    egg = beasts.expedition_egg(state, when, distance, rng)
+    egg = beasts.expedition_egg(state, when, distance, rng, env)
     if egg:
         log(state, when, "*** The expedition brought back a beast egg! See the Beast tab. ***")
     tiles = [t for row in area["tiles"] for t in row]

@@ -1051,7 +1051,7 @@ function icon(kind, cls = '') {
 }
 function terrainIcon(t) {
   const groups = t.groups || [];
-  return groups.includes('water') ? 'water' : groups.includes('forest') || /forest|jungle|taiga/i.test(t.name) ? 'tree' : /hill|mountain|volcan/i.test(t.name) ? 'hill' : /desert|sand/i.test(t.name) ? 'desert' : 'plains';
+  return groups.includes('water') ? 'water' : groups.includes('forest') || /forest|jungle|taiga/i.test(t.name) ? 'tree' : groups.includes('hill') || /hill|mountain|volcan|cave|cliff/i.test(t.name) ? 'hill' : groups.includes('desert') || /desert|sand|scrub/i.test(t.name) ? 'desert' : 'plains';
 }
 function buildingIcon(b) {
  const name = b.name.toLowerCase();
@@ -1186,7 +1186,8 @@ function lotPreview() {
 }
 // The written part of the Guide tab. [title, text]
 const HOWTO = [
-  ['Day, night and weather', 'Day and night follow the clock on your own device: night is from 20:00 to 06:00. In daylight crops grow 15% faster. At night they grow at under a third of the speed, solar farms stop, and mines, quarries, livestock and shops slow down a little, while night fishing, taverns, bath houses, stadiums and the like, observatories and shaman huts do better, and each tavern, bath house and resort brings one more arrival per meal. Every area also has its own weather, which changes at every meal. Rain helps fields and hurts quarries, wind drives turbines, snow and cold snaps slow everything outdoors, and each kind of land has its own likely weather: heatwaves and sandstorms in the desert, snow and blizzards in the tundra. A few kinds are rare: blizzards and sandstorms can stop work outdoors, while an aurora, a meteor shower or a rainbow helps. The line under the area switcher on the City tab shows the weather in that area, what it does and what comes next, and the area menu names each area\'s weather. A building\'s tile panel lists how the weather and the time of day change its speed.'],
+  ['Day, night and weather', 'Day and night follow the clock on your own device: night is from 20:00 to 06:00. In daylight crops grow 15% faster. At night they grow at under a third of the speed, solar farms stop, and mines, quarries, livestock and shops slow down a little, while night fishing, taverns, bath houses, stadiums and the like, observatories and shaman huts do better, and each tavern, bath house and resort brings one more arrival per meal. Every area also has its own weather, which changes at every meal. Rain helps fields and hurts quarries, wind drives turbines, snow and cold snaps slow everything outdoors, and each kind of land has its own likely weather: heatwaves and sandstorms in the desert, snow and blizzards in the tundra. A few kinds are rare: blizzards and sandstorms can stop work outdoors, while an aurora, a meteor shower or a rainbow helps. The line under the area switcher on the City tab shows the weather in that area, what it does and what comes next (Weather Lore and Meteorology let you see further ahead), and the area menu names each area\'s weather. A building\'s tile panel lists how the weather and the time of day change its speed. Rare weather is worth watching: older beasts ask to see it, and now and then it leaves an egg behind.'],
+  ['Shelter from night and weather', 'Some places and buildings ignore the sky entirely: anything built in a cave or crystal cavern, and indoor buildings such as the Greenhouse, Vertical Farm, Biodome and Aquarium. Additions protect one building: Lanterns and Work Lights stop night slowing it, Field Lights take away most of night\'s slowdown on farms, Cold Frames, Storm Hulls, Covered Pens and Snow Cannons stop bad weather slowing it, and a Battery Bank keeps half a solar farm\'s power at night. Some things protect the whole city: the Storm Barrier, the Orbital Mirror Array and the Weather Control Tower, a perk in every ideology, and beasts such as the Rain Frog, Dusk Moth, Snow Lion and Aurora Whale. Shelter only takes away slowdowns; the good effects of the weather and the night still count.'],
   ['The basics', 'Your city runs in real time, whether or not the game is open. Buildings work in cycles: each one takes its time, then pays out. Click a tile on the City tab to see the land and what can be built there. When you come back after a while, a window tells you what changed.'],
   ['First steps', 'Build a Lumber Camp on forest for Wood, something that makes Food (a Farm on plains, a Hunting Lodge in forest or a Fishing Dock on water), then a Hut so more people can move in. A Shaman Hut makes Knowledge for research. The Getting started list on the City tab walks through this.'],
   ['People and food', 'Everyone eats 1 Food at each meal, every 15 minutes. After a meal a new person arrives if there is a free bed and enough food left over for them. If food runs out nobody leaves, but every building that does not make food works at half speed. The People tab shows exactly what is holding growth back.'],
@@ -1195,8 +1196,8 @@ const HOWTO = [
   ['Additions', 'Click a finished building to attach additions to it. Each one improves that building: faster, more output, more beds. A building can hold two.'],
   ['Research', 'Knowledge buys research on the Research tab. Research unlocks buildings and additions, speeds buildings up, and lets you use difficult land. Each tech level\'s research needs its research building standing in your city: Shaman Hut, School, University, Laboratory, Research Institute.'],
   ['Tech levels', 'Tribe, Village, Town, City, Metropolis, Megacity. The list at the top of the City tab shows what the next one asks for: people, materials, research and areas. Advancing spends the materials, unlocks new buildings and research, and makes your home area bigger.'],
-  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It costs more the further from home, and takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. You can rename areas to keep track of them.'],
-  ['Wildlife and livestock', 'Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
+  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It costs more the further from home, and takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. Each kind of land has its own terrain, wildlife, likely weather and things an expedition may bring back: caves and crystal caverns in Cave Country, reefs and kelp in the Reef Shallows, tundra in the Icefields, heath on the Moorland, scrub in the Outback, and more. Each beast has home lands where its eggs are likelier to be found. You can rename areas to keep track of them.'],
+  ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
   ['Beasts', 'Each egg has a small mission of its own and hatches once that is done and it has been kept warm. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
@@ -1315,7 +1316,9 @@ function signOut(message) {
 // A small picture for each kind of weather (text style), and the line under the area switcher.
 const SKY = { clear: '\\o/', cloudy: '(~~)', rain: "(~~)''", windy: '~~>', fog: '===', heatwave: '(*)!', cold_snap: '*~*',
               snow: '* * *', storm: '(~~)/', blizzard: '***>', sandstorm: ':::>', monsoon: "''''", drought: '_/\\_',
-              aurora: '~*~*~', rainbow: '((( )))', meteors: '* - *', eclipse: '(@)' };
+              aurora: '~*~*~', rainbow: '((( )))', meteors: '* - *', eclipse: '(@)',
+              hail: 'o.o.o', dust: '..::>', warm_spell: '(o)~', frost: '*_*_', tornado: '\\\\//',
+              tidal_surge: '~^~^~', harvest_moon: '(O)' };
 const skyName = id => view.defs.weather.weather[id].name;
 function renderWeather() {
   const env = view.environment, W = view.defs.weather, here = env.areas[view.area];
@@ -1326,9 +1329,15 @@ function renderWeather() {
     `<div><span class="sky ${w.rare ? 'rareSky' : 'hi'}">${esc(SKY[here.now] || '')}</span> ` +
     `<span class="${w.rare ? 'rareSky' : 'hi'}">${esc(w.name)}</span>${w.rare ? ' <span class="rareSky">(rare)</span>' : ''} ` +
     `<span class="dim">here: ${effects(w.text)}.</span> ` +
-    `<span class="dim">Changes at the next meal, in ${duration(env.change_in)}, to</span> ${esc(next.name)}${next.rare ? ' <span class="rareSky">(rare)</span>' : ''}<span class="dim">.</span></div>` +
+    `<span class="dim">Changes at the next meal, in ${duration(env.change_in)}, to</span> ${esc(next.name)}${next.rare ? ' <span class="rareSky">(rare)</span>' : ''}` +
+    (here.forecast.length > 1 ? `<span class="dim">, then</span> ` + here.forecast.slice(1).map(id =>
+      `<span class="${W.weather[id].rare ? 'rareSky' : ''}">${esc(W.weather[id].name)}</span>`).join('<span class="dim">, </span>') : '') +
+    `<span class="dim">.</span></div>` +
     `<div><span class="hi">${dn.name}</span> <span class="dim">(${env.clock}${visiting ? ', their time' : ''}): ${effects(dn.text)}. ` +
-    `${env.night ? 'Day' : 'Night'} comes in ${duration(env.switch_in)}.</span></div>`);
+    `${env.night ? 'Day' : 'Night'} comes in ${duration(env.switch_in)}.</span></div>` +
+    (env.shelter[0] || env.shelter[1] ? `<div class="dim">The city is spared ` +
+      [env.shelter[0] ? `${Math.round(env.shelter[0] * 100)}% of night's slowdowns` : '', env.shelter[1] ? `${Math.round(env.shelter[1] * 100)}% of bad weather's` : '']
+        .filter(Boolean).join(' and ') + `.</div>` : ''));
 }
 function duration(sec) {
   sec = Math.max(0, Math.ceil(sec));
@@ -1688,6 +1697,9 @@ function buildingRows(b, cycle, produces, live) {
   if (b.wildlife_speed) rows.push(['Wildlife', `appears ${Math.round(b.wildlife_speed * 100)}% more often`]);
   if (b.livestock_speed) rows.push(['Herd', `faster the more livestock you own (${Math.floor(view.state.resources.livestock)} now)`]);
   if (b.fertility_aura) rows.push(['Nearby', `+${b.fertility_aura} fertility on the 8 tiles around it`]);
+  if (b.sheltered) rows.push(['Weather', '<span class="good">indoors: day, night and weather make no difference</span>']);
+  if (b.weather_shelter) rows.push(['Weather', `<span class="good">bad weather slows the whole city ${Math.round(b.weather_shelter * 100)}% less</span>`]);
+  if (b.night_shelter) rows.push(['Night', `<span class="good">night slows the whole city ${Math.round(b.night_shelter * 100)}% less</span>`]);
   if (b.speed_aura) rows.push(['Nearby', `${b.speed_aura.for.map(f => esc(view.defs.buildings[f].name)).join(', ')} ${Math.round(b.speed_aura.bonus * 100)}% faster`]);
   if (cycle && !b.generates) {
     const made = Object.keys(produces || {}).length ? `<span class="good">+${plain(produces)}</span>` : 'nothing yet';
@@ -2032,13 +2044,21 @@ function renderExplore() {
   const list = dests.filter(dfilters[destFilter][1]).sort(dorder);
   setHTML($('explore'), !list.length ? `<p class="dim">No destinations match.</p>`
     : `<table><tr><th>Where</th><th>Land</th><th class="n">Distance</th><th>Supplies needed</th><th>Travel time</th><th></th></tr>` +
-      list.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}</td>` +
+      list.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}${landHint(E[d.env])}</td>` +
         `<td class="n">${d.distance}</td><td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>` +
         (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
           : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>Send expedition</button>`) +
         `</td></tr>`).join('') + `</table>`);
 }
 
+// What a kind of land is mostly made of, and what an expedition there may bring back besides.
+function landHint(env) {
+  const T = view.defs.terrains, R = view.defs.resources;
+  const main = Object.entries(env.terrain).filter(([, x]) => x >= 1.5).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => T[k].name.toLowerCase());
+  const loot = (env.loot || []).map(([k]) => R[k]);
+  return (main.length || loot.length) ? `<br><span class="dim small">${main.length ? 'Mostly ' + esc(main.join(', ')) : ''}` +
+    `${main.length && loot.length ? '; ' : ''}${loot.length ? 'may bring back extra ' + esc(loot.join(', ')) : ''}</span>` : '';
+}
 function renderFinder() {
   const found = view.found, out = $('findOut');
   $('findClear').hidden = !finder.kind;
@@ -2161,6 +2181,7 @@ function renderBeast() {
         : `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${bv.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
       `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats)}</div>` +
       `<div class="opt dim small">Likes ${esc(R[mine.likes])}: bet it on this beast in the Arena below to make it fight harder.</div>` +
+      (mine.home && mine.home.length ? `<div class="opt dim small">Its eggs are found most often in: ${esc(mine.home.join(', '))}.</div>` : '') +
       `<div class="cat">Gives the city</div>` + mine.bonus.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
       (mine.max_level ? '' : `<div class="cat">At level ${mine.level + 1}</div>` + mine.next_bonus.map(t => `<div class="opt dim">${esc(t)}</div>`).join(''))
     : `<span class="dim">${eggs.length ? 'No beast has hatched yet. Your eggs are below.' : 'You have no beast.'}</span>`);
@@ -2229,7 +2250,9 @@ function renderBeast() {
       `<span class="big" style="color:${esc(g.color)}">${esc(g.name)}</span> <span class="dim small">${esc(g.rarity)}</span> ` +
       `<span class="hi">${stacks}</span>${g.list.some(b => b.active) ? ' <span class="good small">active</span>' : ''}</summary>` +
       `<div class="spcHead"><pre class="beastArt" style="color:${esc(g.color)}">${esc(g.art)}</pre>` +
-      `<div><div class="desc">${esc(g.desc)}</div>${kv([['Nature', esc(g.nature)], ['Likes', esc(R[g.list[0].likes]) + ' <span class="dim small">(bet it in a duel)</span>'], ['You have', g.list.length]])}</div></div>` +
+      `<div><div class="desc">${esc(g.desc)}</div>${kv([['Nature', esc(g.nature)], ['Likes', esc(R[g.list[0].likes]) + ' <span class="dim small">(bet it in a duel)</span>'],
+        ...(g.list[0].home && g.list[0].home.length ? [['Home', esc(g.list[0].home.join(', ')) + ' <span class="dim small">(its eggs are likelier there)</span>']] : []),
+        ['You have', g.list.length]])}</div></div>` +
       `<div class="scroll"><table><tr>${th('level', 'Level')}<th>Experience</th>${Object.entries(S).map(([k, name]) => th(k, esc(name))).join('')}<th>Gives the city</th><th></th></tr>` +
       g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed}</td>` +
         Object.keys(S).map(k => `<td>${b.stats[k]}</td>`).join('') + `<td class="dim small" style="white-space:normal;min-width:160px">${esc(b.bonus.join('; '))}</td><td>` +
