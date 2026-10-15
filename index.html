@@ -2424,9 +2424,20 @@ function ideologyCards(chooseable) {
     `<div class="ideoCard" style="--ideo:${esc(i.color)}"><pre class="ideoArt">${esc(i.art)}</pre>` +
     `<span class="name" style="color:${esc(i.color)}">${esc(i.name)}</span><span class="dim small">${esc(i.desc)}</span>` +
     `<div class="small good">${i.text.map(esc).join('<br>')}</div>` +
-    `<div class="small dim">Perks: ${esc(i.perk_plural.toLowerCase())}, such as ${esc(Object.values(i.perks).slice(0, 2).map(p => p.name).join(' and '))}.</div>` +
-    (chooseable ? `<button data-ideology-choose="${id}">Choose ${esc(i.name)}</button>` : '') + `</div>`).join('') + `</div>`;
+    perkPreview(id, i) +
+    (chooseable ? `<button data-ideology-choose="${id}">Choose ${esc(i.name)}</button>`
+      : view.ideology.id === id ? `<span class="good small">Your city's ideology</span>` : '') + `</div>`).join('') + `</div>`;
 }
+// All of an ideology's perks, tier by tier, folded away under one line.
+function perkPreview(id, i) {
+  const tech = view.defs.tech, perks = Object.values(i.perks);
+  return `<details class="fold" data-fold="ip:${id}" ${isOpen('ip:' + id, false) ? 'open' : ''}><summary>All ${perks.length} ${esc(i.perk_plural.toLowerCase())}</summary><div>` +
+    [...new Set(perks.map(p => p.tier))].sort((a, b) => a - b).map(tier => `<div class="cat" style="margin-top:6px">${esc(tech[tier].name)}</div>` +
+      perks.filter(p => p.tier === tier).map(p => `<div><span class="hi">${esc(p.name)}</span> <span class="good">${p.text.map(esc).join(', ')}</span></div>`).join('')).join('') +
+    `</div></details>`;
+}
+let ideoView = settings.ideoView || 'mine';   // which part of the Ideology tab shows (remembered)
+let perkFilter = 'all';
 function renderIdeology() {
   const { state, defs } = view, iv = view.ideology, I = defs.ideologies, own = !visiting;
   // The window that asks for a choice: once the city is a Village, until it has chosen or said "later".
@@ -2449,19 +2460,41 @@ function renderIdeology() {
   }
   const i = I[iv.id];
   const perks = Object.entries(i.perks);
-  const tiers = [...new Set(perks.map(([, p]) => p.tier))].sort((a, b) => a - b);
-  setHTML(box,
-    `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Ideology</h2><pre class="ideoArt">${esc(i.art)}</pre>` +
-      `<div class="head"><span class="big" style="color:${esc(i.color)}">${esc(i.name)}</span>` +
-      (own ? `<span class="${iv.points ? 'good' : 'dim'}">${iv.points} ${iv.points === 1 ? 'point' : 'points'} to spend</span>` : '') + `</div>` +
-      `<div class="dim small">${esc(i.desc)}</div>` +
-      `<div class="cat">Everything it gives the city now</div>` + iv.total.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
-      `<p class="dim small" style="margin-bottom:0">Every tech level from Village up earns one point (five in all, by Megacity). ` +
-      `Each tier opens at its tech level. There are ${perks.length} ${esc(i.perk_plural.toLowerCase())} and only five points, so choose carefully.</p></div>` +
-    `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.perk_plural)}</h2>` + tiers.map(tier => {
+  const can = ([id, p]) => own && !iv.perks.includes(id) && p.tier <= state.tech && iv.points > 0;
+  const pfilters = { all: ['All', () => true], can: ['Can take now', can], yours: ['Yours', ([id]) => iv.perks.includes(id)],
+                     later: ['Not open yet', ([, p]) => p.tier > state.tech] };
+  if (!pfilters[perkFilter]) perkFilter = 'all';
+  const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && iv.points ? `<span class="good">${iv.points} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
+                  compare: ['Compare all six', ''], all: ['Everything', ''] };
+  if (!parts[ideoView]) ideoView = 'mine';
+  const show = part => ideoView === 'all' || ideoView === part;
+
+  const header = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Ideology</h2><pre class="ideoArt">${esc(i.art)}</pre>` +
+    `<div class="head"><span class="big" style="color:${esc(i.color)}">${esc(i.name)}</span>` +
+    (own ? `<span class="${iv.points ? 'good' : 'dim'}">${iv.points} ${iv.points === 1 ? 'point' : 'points'} to spend</span>` : '') + `</div>` +
+    `<div class="dim small">${esc(i.desc)}</div>` +
+    `<div class="bar">` + Object.entries(parts).map(([k, [label, note]]) =>
+      `<button data-ideo-view="${k}" class="${ideoView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join('') + `</div></div>`;
+
+  const mine = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Everything it gives the city now</h2>` +
+    iv.total.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
+    `<div class="cat">Your ${esc(i.perk_plural.toLowerCase())} (${iv.perks.length})</div>` +
+    (iv.perks.length ? `<div class="ideoCards" style="margin-top:8px">` + iv.perks.map(id => i.perks[id]).filter(Boolean).map(p =>
+      `<div class="ideoCard perk taken"><pre class="perkArt lit">${esc(p.art)}</pre><span class="name" style="color:${esc(i.color)}">${esc(p.name)}</span>` +
+      `<div class="small good">${p.text.map(esc).join('<br>')}</div></div>`).join('') + `</div>`
+      : `<p class="dim">None yet.${own && iv.points ? ' Open Perks to spend your points.' : ''}</p>`) +
+    `<p class="dim small" style="margin-bottom:0">Every tech level from Village up earns one point (five in all, by Megacity). ` +
+    `Each tier opens at its tech level. There are ${perks.length} ${esc(i.perk_plural.toLowerCase())} and only five points, so choose carefully.</p></div>`;
+
+  const shown = perks.filter(pfilters[perkFilter][1]);
+  const tiers = [...new Set(shown.map(([, p]) => p.tier))].sort((a, b) => a - b);
+  const perkPanel = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.perk_plural)}</h2>` +
+    `<div class="bar" style="margin-top:0">` + Object.entries(pfilters).map(([k, [label, test]]) =>
+      `<button class="chip ${perkFilter === k ? 'on' : ''}" data-perk-filter="${k}">${label} <span class="dim">${perks.filter(test).length}</span></button>`).join('') + `</div>` +
+    (shown.length ? tiers.map(tier => {
       const open = tier <= state.tech;
       return `<div class="cat">${esc(defs.tech[tier].name)} ${open ? '' : `<span class="dim">- opens when your city is a ${esc(defs.tech[tier].name)}</span>`}</div>` +
-        `<div class="ideoCards" style="margin-top:8px">` + perks.filter(([, p]) => p.tier === tier).map(([id, p]) => {
+        `<div class="ideoCards" style="margin-top:8px">` + shown.filter(([, p]) => p.tier === tier).map(([id, p]) => {
           const taken = iv.perks.includes(id);
           return `<div class="ideoCard perk ${taken ? 'taken' : open ? '' : 'locked'}"><pre class="perkArt ${taken ? 'lit' : ''}">${esc(p.art)}</pre>` +
             `<span class="name" ${taken ? `style="color:${esc(i.color)}"` : ''}>${esc(p.name)}</span>` +
@@ -2470,7 +2503,12 @@ function renderIdeology() {
               : own && open ? `<button data-perk-take="${id}" ${iv.points ? '' : 'disabled'} title="${iv.points ? '' : 'Reach the next tech level for another point'}">Take this ${esc(i.perk_word.toLowerCase())}</button>` : '') +
             `</div>`;
         }).join('') + `</div>`;
-    }).join('') + `</div>`);
+      }).join('') : `<p class="dim">${perkFilter === 'can' ? (iv.points ? 'Nothing more is open yet.' : 'No points to spend. Each new tech level gives one.') : 'None.'}</p>`) + `</div>`;
+
+  const compare = `<div class="panel"><h2>All six ideologies</h2><p class="dim small" style="margin-top:0">For comparing; a city's ideology is chosen once and kept.</p>` +
+    ideologyCards(false) + `</div>`;
+
+  setHTML(box, header + (show('mine') ? mine : '') + (show('perks') ? perkPanel : '') + (show('compare') ? compare : ''));
 }
 let setView = settings.setView || 'display';   // which part of the Settings tab shows (remembered)
 // The parts of the Settings tab, and a search that shows only the settings whose words match.
@@ -2971,6 +3009,15 @@ document.addEventListener('click', e => {
   }
   else if (d.dataset.perkTake) act('perk_take', { perk: d.dataset.perkTake });
 });
+$('ideologyBody').addEventListener('click', e => {
+  const v = e.target.closest('[data-ideo-view]'), f = e.target.closest('[data-perk-filter]');
+  if (v) { ideoView = settings.ideoView = v.dataset.ideoView; saveSettings(); renderIdeology(); }
+  else if (f) { perkFilter = f.dataset.perkFilter; renderIdeology(); }
+});
+$('tab-ideology').addEventListener('toggle', e => {   // remember which perk lists are open
+  const key = e.target.dataset && e.target.dataset.fold;
+  if (key) foldState.set(key, e.target.open);
+}, true);
 $('presentBar').onclick = e => {
   if (e.target.dataset.presentOpen) act('present_open', { present: +e.target.dataset.presentOpen });
   else if (e.target.dataset.presentClose) act('present_close', { present: +e.target.dataset.presentClose });
