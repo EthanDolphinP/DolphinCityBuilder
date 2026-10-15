@@ -36,13 +36,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             return self.reply(403, b'{"error":"Foreign origins are not allowed."}')
         path = self.path.split("?", 1)[0]
         if self.command == "GET" and path == "/":
-            html = (ROOT / "index.html").read_text(encoding="utf-8")
-            banner = ('<div class="panel" style="border-color:var(--accent);margin-top:0">'
-                      '<strong>Live server preview</strong><br>'
-                      '<span class="small">Connected to mangoclaw119.pythonanywhere.com. '
-                      'Sign in with your existing city. Actions change your real city.</span></div>')
-            html = html.replace("<main>", "<main>" + banner, 1)
-            return self.reply(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return self.reply(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
         if path not in API_PATHS:
             return self.reply(404, b'{"error":"Not found."}')
         try:
