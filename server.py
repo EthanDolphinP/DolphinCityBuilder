@@ -39,6 +39,7 @@ from urllib.parse import parse_qs, urlparse
 import beasts
 import game
 import market
+import weather
 
 ROOT = Path(__file__).parent
 # Where the live game's data lives. Next to the code by default; a server can keep it elsewhere
@@ -287,6 +288,9 @@ def handle_get(path, query, token, now):
         if not signed_in(state, token):
             return 401, SIGN_IN
         ONLINE[name] = now
+        tz = query.get("tz", [""])[0]
+        if re.fullmatch(r"-?\d{1,3}", tz):
+            weather.set_timezone(state, int(tz))     # day and night follow the player's own clock
         out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0],
                         query.get("tile", [""])[0], query.get("defs", [""])[0])
         out["away"] = game.check_in(state, now)
@@ -327,6 +331,7 @@ def handle_post(path, data, token, now):
     if not signed_in(state, token):
         return 401, SIGN_IN
     ONLINE[name] = now
+    weather.set_timezone(state, data.get("tz"))
 
     if action == "restart":
         market.drop_city(MARKET, name)

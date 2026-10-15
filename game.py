@@ -35,6 +35,7 @@ import re
 
 import beasts
 import ideology
+import weather
 
 MIN = 60  # seconds
 
@@ -2602,17 +2603,18 @@ def _out_of_inputs(state, job):
             and bool(_missing(state, job["b"].get("consumes", {}))))
 
 
-def power_status(state, jobs):
-    """(power supplied, power needed, share of the need that is met) right now."""
-    supply = sum(j["power_out"] * j["ratio"] for j in jobs
+def power_status(state, jobs, env=None):
+    """(power supplied, power needed, share of the need that is met) right now.
+    env: weather.job_factors() for the jobs, if day, night and weather count."""
+    supply = sum(j["power_out"] * j["ratio"] * (env[i][1] if env else 1) for i, j in enumerate(jobs)
                  if j["power_out"] and not _out_of_inputs(state, j))
     demand = sum(j["power_in"] for j in jobs if j["power_in"] and j["ratio"])
     return supply, demand, (min(1.0, supply / demand) if demand else 1.0)
 
 
-def _speed(state, job, power=1.0):
-    """Seconds of work this building gets done per second right now."""
-    speed = job["ratio"]
+def _speed(state, job, power=1.0, env=1.0):
+    """Seconds of work this building gets done per second right now. env: what day or night and the weather do."""
+    speed = job["ratio"] * env
     if state["hungry"] and not job["feeds"]:
         speed *= HUNGRY_SPEED
     if job["power_in"]:
@@ -2633,7 +2635,7 @@ def _meal(state, housing, when):
     if state["hungry"]:
         state["hungry"] = False
         log(state, when, "Everyone is fed again.")
-    arrivals = _arrivals(pop, res["food"], housing, 1 + city_attracts(state))
+    arrivals = _arrivals(pop, res["food"], housing, 1 + city_attracts(state, when))
     state["population"] += arrivals
     return arrivals > 0
 
@@ -2666,9 +2668,10 @@ def city_stat(state, field):
     return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"]) + ideology.value(state, field)
 
 
-def city_attracts(state):
-    """Extra people who may arrive at each meal, from taverns and the like."""
-    return city_stat(state, "attracts") + int(beasts.bonus(state, "attracts"))
+def city_attracts(state, when=None):
+    """Extra people who may arrive at each meal, from taverns and the like (more at night, at time `when`)."""
+    return (city_stat(state, "attracts") + int(beasts.bonus(state, "attracts"))
+            + weather.night_attracts(state, state["updated"] if when is None else when))
 
 
 def _arrivals(pop, food_left, housing, tries):
@@ -2689,7 +2692,7 @@ def next_arrivals(state, housing):
     pop, food = state["population"], state["resources"]["food"]
     if food < pop:
         return 0
-    return _arrivals(pop, food - pop, housing, 1 + city_attracts(state))
+    return _arrivals(pop, food - pop, housing, 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]))
 
 
 def advance_time(state, now):
@@ -2697,6 +2700,7 @@ def advance_time(state, now):
     remaining = now - state["updated"]
     if remaining <= 0:
         return
+    state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
     res = state["resources"]
     jobs, housing, _ = work_plan(state)
@@ -2705,10 +2709,11 @@ def advance_time(state, now):
 
     while remaining > 0:
         dt = min(SIM_STEP, remaining)
+        env = weather.job_factors(state, jobs, now - remaining)    # day or night and the weather as this step starts
         remaining -= dt
-        power = power_status(state, jobs)[2]
-        for job in jobs:
-            speed = _speed(state, job, power)
+        power = power_status(state, jobs, env)[2]
+        for i, job in enumerate(jobs):
+            speed = _speed(state, job, power, env[i][0])
             if not speed or job["cycle"] is None:
                 continue
             tile, b = job["tile"], job["b"]
@@ -3208,6 +3213,7 @@ def defs():
             "environments": ENVIRONMENTS,
             "wildlife": WILDLIFE,
             "ideologies": ideology.defs(),
+            "weather": weather.defs(),
         }
     return DEFS
 
@@ -3221,9 +3227,13 @@ def _view(state, ai, detail):
     rates["food"] -= state["population"] * 3600 / MEAL_TIME
     food_made = 0.0
     here = {}
-    supply, demand, power = power_status(state, jobs)
-    for job in jobs:
-        job["speed"] = _speed(state, job, power)
+    env = weather.job_factors(state, jobs, state["updated"])
+    supply, demand, power = power_status(state, jobs, env)
+    for i, job in enumerate(jobs):
+        job["env"], job["power_env"] = env[i][0], env[i][1]
+        job["notes"] = job["notes"] + env[i][2]
+        job["env_notes"] = env[i][2]
+        job["speed"] = _speed(state, job, power, env[i][0])
         job["waiting"] = list(_missing(state, job["b"].get("consumes", {})))
         job["output"] = job_output(state, job)
         job["status"] = job_status(state, job, power)
@@ -3252,7 +3262,7 @@ def _view(state, ai, detail):
                             staff=job["staff"], need=job["need"], waiting=job["waiting"],
                             priority=job["priority"], status=job["status"],
                             produces=job["output"],
-                            power_in=job["power_in"], power_out=job["power_out"])
+                            power_in=job["power_in"], power_out=round(job["power_out"] * job.get("power_env", 1), 1))
                 if "herd" in job["b"]:
                     cell["herd"], cell["herd_room"] = job_herd(state, job), job["herd"]
             if tile["animal"]:
@@ -3306,7 +3316,8 @@ def _view(state, ai, detail):
                    "buildings": sum(1 for row in a["tiles"] for t in row if t["building"]),
                    "animals": sum(1 for row in a["tiles"] for t in row if t["animal"]),
                    # buildings that are not working properly
-                   "problems": sum(1 for j in jobs if j["area"] == i and j["status"] != "working")}
+                   "problems": sum(1 for j in jobs if j["area"] == i and j["status"] != "working"
+                                   and not j["status"].startswith("stopped:"))}
                   for i, a in enumerate(state["areas"])],
         "status": {
             "housing": housing,
@@ -3320,11 +3331,12 @@ def _view(state, ai, detail):
             "food_eaten": round(state["population"] * 3600 / MEAL_TIME, 1),
             "housing_from": housing_sources(state),
             "growth": growth_checks(state, housing),
-            "arrivals_max": 1 + city_attracts(state),
+            "arrivals_max": 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]),
             "advance": advance_view(state),
             "arrivals_next": next_arrivals(state, housing),
         },
         "tiles": tiles,
+        "environment": weather.view(state, state["updated"]),
         "research": [{"id": rid, "done": rid in state["research"],
                       "problem": research_problem(state, rid),
                       "affordable": not _missing(state, r["cost"])}
@@ -3360,6 +3372,9 @@ def job_status(state, job, power):
         return "waiting for " + ", ".join(RESOURCES[k] for k in missing)
     if job["power_in"] and power <= 0:
         return "no power"
+    stopped = [n.rsplit(" x", 1)[0] for n in job.get("env_notes", []) if n.endswith(" x0.00")]
+    if stopped:
+        return "stopped: " + ", ".join(stopped).lower()
     slow = []
     if job["staff"] < job["need"]:
         slow.append(f"short of workers ({job['staff']} of {job['need']})")
@@ -3389,7 +3404,10 @@ def find(state, kind, what):
         return {"locked": next(r["name"] for r in RESEARCH.values() if r.get("surveying"))}
     found = []   # (sort key, result)
     jobs, _, _ = work_plan(state)
-    power = power_status(state, jobs)[2]
+    env = weather.job_factors(state, jobs, state["updated"])
+    power = power_status(state, jobs, env)[2]
+    for i, job in enumerate(jobs):
+        job["env"], job["power_env"], job["env_notes"] = env[i][0], env[i][1], env[i][2]
     by_tile = {(j["area"], j["x"], j["y"]): j for j in jobs}
     for ai, area in enumerate(state["areas"]):
         for y, row in enumerate(area["tiles"]):
@@ -3400,7 +3418,7 @@ def find(state, kind, what):
                 job = by_tile.get((ai, x, y))
                 if kind in ("buildings", "problems") and bid and (not what or bid == what):
                     status = job_status(state, job, power) if job else ""
-                    if kind == "buildings" or (job and status != "working"):
+                    if kind == "buildings" or (job and status != "working" and not status.startswith("stopped:")):
                         hit(BUILDINGS[bid]["name"], status)
                 elif kind == "wildlife" and tile["animal"]:
                     w = WILDLIFE[tile["animal"]]

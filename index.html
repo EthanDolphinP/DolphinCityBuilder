@@ -71,6 +71,9 @@
   #areaPick { flex: 1 1 160px; min-width: 0; max-width: 340px; }
   .areaChips { margin: 8px 0 0; gap: 6px; align-items: center; max-height: 96px; overflow-y: auto; }
   .chip { padding: 2px 8px; font-size: 13px; }
+  #weatherBar { margin: 0 0 10px; line-height: 1.5; }
+  #weatherBar .sky { white-space: pre; font-weight: bold; }
+  .rareSky { color: #e8c547; }
   #findOut { max-height: 230px; overflow-y: auto; margin-top: 8px; }
   #findOut .row { padding: 5px 4px; border-top: 1px solid var(--line); cursor: pointer; }
   #findOut .row:hover { background: var(--button); color: var(--bright); }
@@ -432,6 +435,7 @@
         <div class="panel">
           <h2>Map</h2>
           <div id="areas" style="margin:0 0 10px"></div>
+          <div id="weatherBar" class="small"></div>
           <div class="scroll"><div id="map"></div></div>
           <div id="mapKey" class="dim small" style="margin-top:8px"></div>
           <div id="finder">
@@ -1182,6 +1186,7 @@ function lotPreview() {
 }
 // The written part of the Guide tab. [title, text]
 const HOWTO = [
+  ['Day, night and weather', 'Day and night follow the clock on your own device: night is from 20:00 to 06:00. In daylight crops grow 15% faster. At night they grow at under a third of the speed, solar farms stop, and mines, quarries, livestock and shops slow down a little, while night fishing, taverns, bath houses, stadiums and the like, observatories and shaman huts do better, and each tavern, bath house and resort brings one more arrival per meal. Every area also has its own weather, which changes at every meal. Rain helps fields and hurts quarries, wind drives turbines, snow and cold snaps slow everything outdoors, and each kind of land has its own likely weather: heatwaves and sandstorms in the desert, snow and blizzards in the tundra. A few kinds are rare: blizzards and sandstorms can stop work outdoors, while an aurora, a meteor shower or a rainbow helps. The line under the area switcher on the City tab shows the weather in that area, what it does and what comes next, and the area menu names each area\'s weather. A building\'s tile panel lists how the weather and the time of day change its speed.'],
   ['The basics', 'Your city runs in real time, whether or not the game is open. Buildings work in cycles: each one takes its time, then pays out. Click a tile on the City tab to see the land and what can be built there. When you come back after a while, a window tells you what changed.'],
   ['First steps', 'Build a Lumber Camp on forest for Wood, something that makes Food (a Farm on plains, a Hunting Lodge in forest or a Fishing Dock on water), then a Hut so more people can move in. A Shaman Hut makes Knowledge for research. The Getting started list on the City tab walks through this.'],
   ['People and food', 'Everyone eats 1 Food at each meal, every 15 minutes. After a meal a new person arrives if there is a free bed and enough food left over for them. If food runs out nobody leaves, but every building that does not make food works at half speed. The People tab shows exactly what is holding growth back.'],
@@ -1307,6 +1312,24 @@ function signOut(message) {
   $('loginMsg').textContent = message || '';
 }
 
+// A small picture for each kind of weather (text style), and the line under the area switcher.
+const SKY = { clear: '\\o/', cloudy: '(~~)', rain: "(~~)''", windy: '~~>', fog: '===', heatwave: '(*)!', cold_snap: '*~*',
+              snow: '* * *', storm: '(~~)/', blizzard: '***>', sandstorm: ':::>', monsoon: "''''", drought: '_/\\_',
+              aurora: '~*~*~', rainbow: '((( )))', meteors: '* - *', eclipse: '(@)' };
+const skyName = id => view.defs.weather.weather[id].name;
+function renderWeather() {
+  const env = view.environment, W = view.defs.weather, here = env.areas[view.area];
+  if (!here) { setHTML($('weatherBar'), ''); return; }
+  const w = W.weather[here.now], next = W.weather[here.next], dn = env.night ? W.night : W.day;
+  const effects = list => list.length ? list.map(esc).join(', ') : 'no effect';
+  setHTML($('weatherBar'),
+    `<div><span class="sky ${w.rare ? 'rareSky' : 'hi'}">${esc(SKY[here.now] || '')}</span> ` +
+    `<span class="${w.rare ? 'rareSky' : 'hi'}">${esc(w.name)}</span>${w.rare ? ' <span class="rareSky">(rare)</span>' : ''} ` +
+    `<span class="dim">here: ${effects(w.text)}.</span> ` +
+    `<span class="dim">Changes at the next meal, in ${duration(env.change_in)}, to</span> ${esc(next.name)}${next.rare ? ' <span class="rareSky">(rare)</span>' : ''}<span class="dim">.</span></div>` +
+    `<div><span class="hi">${dn.name}</span> <span class="dim">(${env.clock}${visiting ? ', their time' : ''}): ${effects(dn.text)}. ` +
+    `${env.night ? 'Day' : 'Night'} comes in ${duration(env.switch_in)}.</span></div>`);
+}
 function duration(sec) {
   sec = Math.max(0, Math.ceil(sec));
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
@@ -1325,14 +1348,15 @@ const tileParam = () => sel ? `${sel.x},${sel.y}` : '';
 // The content tables never change while the game runs, so after the first reply they are not sent again.
 const defsHave = () => view && view.defs ? view.defs_version || '' : '';
 let detailAsked = '';   // the tile whose details have been asked for, so they are asked for once
+const tzMinutes = () => -new Date().getTimezoneOffset();    // minutes ahead of UTC on this device
 async function api(action, extra) {
   const opts = action
     ? { method: 'POST', headers: {'Content-Type': 'application/json', 'X-Token': token},
-        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), tile: tileParam(), defs: defsHave(), ...extra }) }
+        body: JSON.stringify({ city, action, area: areaIdx, find: findParam(), tile: tileParam(), defs: defsHave(), tz: tzMinutes(), ...extra }) }
     : { headers: {'X-Token': token} };
   const res = await fetch(action ? '/api/action'
     : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}&tile=${tileParam()}&defs=${defsHave()}`
-    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}`, opts);
+    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}&tz=${tzMinutes()}`, opts);
   return res.json();
 }
 
@@ -1479,7 +1503,8 @@ function render() {
   $('visitBar').hidden = !visiting;
   $('visitName').textContent = visiting || '';
   $('status').textContent = `Tech level ${state.tech + 1} of ${defs.tech.length}  |  ` +
-    (view.ideology.id ? `${defs.ideologies[view.ideology.id].name}  |` : '') + `  ${state.areas.length} ${state.areas.length === 1 ? 'area' : 'areas'}  |  Founded ${clock(state.founded)}`;
+    (view.ideology.id ? `${defs.ideologies[view.ideology.id].name}  |` : '') + `  ${state.areas.length} ${state.areas.length === 1 ? 'area' : 'areas'}  |  ` +
+    `${view.environment.night ? 'Night' : 'Day'}, ${view.environment.clock}${visiting ? ' their time' : ''}  |  Founded ${clock(state.founded)}`;
 
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
@@ -1561,13 +1586,15 @@ function render() {
     `<div class="bar" style="margin:0"><button data-area="${(view.area + n - 1) % n}" title="Previous area">&lt;</button>` +
     `<select id="areaPick" title="Choose an area to view">` + view.areas.map((a, i) =>
       `<option value="${i}" ${i === view.area ? 'selected' : ''}>${esc(a.name)}` +
-      (hits ? (hits[i] ? ` - ${hits[i]} found` : '') : a.problems ? ` - ${a.problems} not working` : '') + `</option>`).join('') + `</select>` +
+      (hits ? (hits[i] ? ` - ${hits[i]} found` : '') : a.problems ? ` - ${a.problems} not working` : '') +
+      (view.environment.areas[i] ? ` - ${esc(skyName(view.environment.areas[i].now))}` : '') + `</option>`).join('') + `</select>` +
     `<button data-area="${(view.area + 1) % n}" title="Next area">&gt;</button>` +
     `<span class="dim small">${view.area + 1} of ${n}</span></div>` +
     (hits ? `<div class="bar areaChips"><span class="dim small">${withHits.length ? 'Found in' : 'Not found in any area'}</span>` +
         withHits.map(i => chip(i, hits[i], 'good', `${hits[i]} found here`)).join('') + `</div>`
       : withProblems.length ? `<div class="bar areaChips"><span class="dim small">Needs attention</span>` +
         withProblems.map(i => chip(i, view.areas[i].problems + '!', 'bad', 'Buildings here are not working properly')).join('') + `</div>` : ''));
+  renderWeather();
   const marked = new Set(((view.found && view.found.results) || []).filter(r => r.area === view.area).map(r => `${r.x},${r.y}`));
   $('areas').hidden = view.areas.length < 2;
 
@@ -1577,7 +1604,7 @@ function render() {
     const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
     const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' : '');
     const info = view.tiles[y][x];
-    const state_ = !('need' in info) ? '' : info.priority < 0 ? 'off' : info.status === 'working' ? '' : 'stop';
+    const state_ = !('need' in info) ? '' : info.priority < 0 || info.status.startsWith('stopped:') ? 'off' : info.status === 'working' ? '' : 'stop';
     const bar = timers[`${x},${y}`] ? `<i data-bar="${x},${y}"></i>` : '';
     const adds = t.additions.map(a => defs.additions[a].name);
     const label = `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">`;
@@ -1670,7 +1697,9 @@ function buildingRows(b, cycle, produces, live) {
     `each adds ${Object.entries(b.per_head).map(([k, v]) => `${v} ${esc(R[k])}`).join(', ')} per cycle`]);
   if (cycle && b.generates && b.consumes) rows.push(['Burns', `${plain(b.consumes)} every ${duration(cycle)}`]);
   else if (cycle) rows.push(['Every', `<span class="hi">${duration(cycle)}</span>` +
-    (cycle !== b.time ? ` <span class="dim">(normally ${duration(b.time)})</span>` : '')]);
+    (cycle !== b.time ? ` <span class="dim">(normally ${duration(b.time)})</span>` : '') +
+    // as things are right now: the time of day, the weather, staff and power
+    (live && live.speed && Math.abs(live.speed - 1) > 0.01 ? `<br><span class="dim">right now ${duration(cycle / live.speed)}</span>` : '')]);
   if (b.workers) rows.push(['Workers', live ? `${live.staff} of ${live.need}` : `${b.workers}`]);
   return rows;
 }
