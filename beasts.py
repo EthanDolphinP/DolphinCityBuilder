@@ -639,6 +639,7 @@ def give(state, now, beast):
     """Add a beast or egg that came from another city (or back from the market)."""
     state["beast_count"] = state.get("beast_count", 0) + 1
     beast["id"] = state["beast_count"]
+    beast.setdefault("sex", random.choice(SEXES))     # one from before breeding, held on the market
     state["beasts"].append(beast)
     tick(state, now)
     return beast
@@ -921,6 +922,9 @@ def deliver(state, now, egg_id=None):
 
 def tick(state, now):
     """Hatch eggs that are ready and hand out the next mission when it is due."""
+    for beast in state["beasts"]:
+        if "sex" not in beast:      # every beast is male or female, however it got here
+            beast["sex"] = random.choice(SEXES)
     for beast in state["beasts"]:
         if (beast["stage"] == "egg" and beast["missions"] >= tasks_needed(beast)
                 and now - beast["obtained"] >= hatch_time(state, beast)):

@@ -25,6 +25,7 @@ import hashlib
 import hmac
 import json
 import os
+import random
 import re
 import secrets
 import signal
@@ -179,6 +180,8 @@ def startup():
         MARKET.setdefault("bills", [])
         MARKET.setdefault("beast_offers", [])
         MARKET.setdefault("duels", [])
+        for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
+            offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
 
 
 def run_bills(now):
