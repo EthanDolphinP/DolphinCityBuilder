@@ -1366,6 +1366,7 @@ const HOWTO = [
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
   ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
+  ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving up to five times that makes it up to twice as strong and three times as long. Different rituals can run at once.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Stats', 'The Stats tab has everything about your city in numbers: people, every resource and what makes it, buildings, power, land, research, bonuses, time and weather, beasts, the market and your rank among other cities, and all-time counts of what the city has made, built and done since stats began. Pick a section along the top or search for any stat.'],
@@ -1670,6 +1671,8 @@ function render() {
   const bv = view.beast;
   if (bv.breeding.male) timers.breed = { cycle: bv.breed_time, progress: bv.breed_time - (bv.breeding.next - view.now), speed: 1, waiting: [] };
   if (bv.nest_at) timers.nest = { cycle: bv.nest_time, progress: bv.nest_time - (bv.nest_at - view.now), speed: 1, waiting: [] };
+  for (const [id, x] of Object.entries((view.ideology.rituals || {}).active || {}))
+    timers['ritual:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
   timers.mission = { cycle: bv.mission_period, progress: bv.mission_period - (bv.mission_at - view.now), speed: 1, waiting: [] };
   for (const b of bv.beasts) {
     if (b.egg && b.warm < b.warm_needed) timers['hatch' + b.id] = { cycle: b.warm_needed, progress: b.warm, speed: 1, waiting: [] };
@@ -2971,6 +2974,8 @@ function renderIdeology() {
                      later: ['Not open yet', ([, p]) => p.tier > state.tech] };
   if (!pfilters[perkFilter]) perkFilter = 'all';
   const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && iv.points ? `<span class="good">${iv.points} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
+                  rituals: [i.ritual_plural, Object.keys(iv.rituals.active).length ? `<span class="good">${Object.keys(iv.rituals.active).length} running</span>`
+                                              : iv.rituals.rank ? `${iv.rituals.rank} of 5 open` : 'need research'],
                   compare: ['Compare all six', ''], all: ['Everything', ''] };
   if (!parts[ideoView]) ideoView = 'mine';
   const show = part => ideoView === 'all' || ideoView === part;
@@ -3014,7 +3019,67 @@ function renderIdeology() {
   const compare = `<div class="panel"><h2>All six ideologies</h2><p class="dim small" style="margin-top:0">For comparing; a city's ideology is chosen once and kept.</p>` +
     ideologyCards(false) + `</div>`;
 
-  setHTML(box, header + (show('mine') ? mine : '') + (show('perks') ? perkPanel : '') + (show('compare') ? compare : ''));
+  setHTMLKeep(box, header + (show('mine') ? mine : '') + (show('rituals') ? ritualPanel(i, iv, own) : '') +
+    (show('perks') ? perkPanel : '') + (show('compare') ? compare : ''));
+}
+// ---- rituals: gold given to the ideology buys a bonus for a while ----
+let ritualGift = null;     // the gold typed in the gift box (kept while the page redraws)
+const ritualPct = x => `${Math.round(x * 100)}%`;
+// An effects dict in words, as ideology.describe() writes it on the server.
+function effectWords(eff) {
+  const C = view.defs.categories, out = [];
+  for (const [cat, x] of Object.entries(eff.speed || {})) out.push(`${cat === 'all' ? 'All buildings' : C[cat] + ' buildings'} ${ritualPct(x)} faster`);
+  const words = { explore_speed: x => `Expeditions travel ${ritualPct(x)} faster`, explore_cost: x => `Expeditions need ${ritualPct(x)} fewer supplies`,
+    wildlife_speed: x => `Wild animals appear ${ritualPct(x)} more often`, attracts: x => `${+x.toFixed(1)} more arrivals per meal`,
+    housing: x => `Houses ${Math.round(x)} more people`, power: x => `Generators give ${ritualPct(x)} more power`,
+    beast_xp: x => `Beast missions give ${ritualPct(x)} more experience`, beast_power: x => `Your beast's bonus is ${ritualPct(x)} stronger`,
+    hatch_speed: x => `Eggs hatch ${ritualPct(x)} faster`, egg_chance: x => `Expeditions ${Math.round(x * 100)} points likelier to find an egg`,
+    mission_speed: x => `Beast missions come ${ritualPct(x)} more often`, night_shelter: x => `Night slows the city ${ritualPct(Math.min(1, x))} less`,
+    weather_shelter: x => `Bad weather slows the city ${ritualPct(Math.min(1, x))} less` };
+  for (const [k, x] of Object.entries(eff)) if (words[k] && x) out.push(words[k](x));
+  return out;
+}
+const scaleEffects = (eff, s) => Object.fromEntries(Object.entries(eff).map(([k, v]) =>
+  [k, k === 'speed' ? Object.fromEntries(Object.entries(v).map(([c, x]) => [c, x * s])) : v * s]));
+// What a gift buys at the city's rank: [strength, seconds], as ideology.ritual_terms() works it out.
+function ritualTerms(r, gold) {
+  const share = gold / r.least - 1;
+  return [r.base_strength * (1 + r.gift_strength * share), r.base_time * (1 + r.gift_time * share)];
+}
+function ritualLine(gift, strength, seconds) {
+  const r = view.ideology.rituals;
+  return `A gift of <span class="hi">${num(gift)} Gold</span> makes it <span class="hi">${strength.toFixed(2)}x</span> as strong and last ` +
+    `<span class="hi">${duration(seconds)}</span>. <span class="dim">(Least ${num(r.least)}, most ${num(r.most)}; you have ${num(Math.floor(view.state.resources.gold))}.)</span>`;
+}
+function ritualPanel(i, iv, own) {
+  const r = iv.rituals, R = view.defs.research, gold = Math.floor(view.state.resources.gold);
+  const ranks = Object.entries(R).filter(([, x]) => x.ritual).sort((a, b) => a[1].ritual - b[1].ritual);
+  const next = ranks[r.rank];
+  let html = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.ritual_plural)}</h2>` +
+    `<p class="dim small" style="margin-top:0">Give Gold to ${esc(i.name)} to hold a ${esc(i.ritual_word.toLowerCase())}: a bonus for a while. ` +
+    `Giving more, up to ${r.least ? 5 : ''}x the least, makes it stronger and last longer. Different ones can run at once; holding one that is running starts it again.</p>` +
+    `<div class="opt">Ritual research: <span class="hi">rank ${r.rank} of ${ranks.length}</span>` +
+    (next ? ` <span class="dim">- next: ${esc(next[1].name)} (${esc(view.defs.tech[next[1].tech].name)}), which opens another and makes them all stronger and longer</span>` : ' <span class="good">- all done</span>') + `</div>`;
+  if (!r.rank) return html + `<p class="dim">Research ${esc(ranks[0][1].name)} on the Research tab to hold your first ${esc(i.ritual_word.toLowerCase())}.</p></div>`;
+  if (ritualGift === null || ritualGift < r.least || ritualGift > r.most) ritualGift = r.least;
+  const [strength, seconds] = ritualTerms(r, ritualGift);
+  if (own) html += `<div class="cat">Your gift</div><div class="bar">` +
+    `<input type="range" data-ritual-gift data-k="ritual-range" min="${r.least}" max="${r.most}" step="${Math.max(1, Math.round(r.least / 20))}" value="${ritualGift}" style="flex:1 1 200px">` +
+    `<input type="number" data-ritual-gift data-k="ritual-num" min="${r.least}" max="${r.most}" step="1" value="${ritualGift}" style="width:110px"> Gold` +
+    `<button data-ritual-preset="${r.least}">Least</button><button data-ritual-preset="${r.most}">Most</button></div>` +
+    `<div class="opt small" id="ritualLine">${ritualLine(ritualGift, strength, seconds)}</div>`;
+  html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(i.rituals).map(([id, x], n) => {
+    const open = n < r.rank, running = r.active[id];
+    const opens = ranks[n] && ranks[n][1];
+    return `<div class="ideoCard ${running ? 'on' : open ? '' : 'locked'}"><span class="name" ${running ? `style="color:${esc(i.color)}"` : ''}>${esc(x.name)}</span>` +
+      `<span class="dim small">${esc(x.desc)}</span>` +
+      (running ? `<div class="small good">Running: <span data-timer="ritual:${id}"></span> left</div><div class="small good">${running.text.map(esc).join('<br>')}</div>` : '') +
+      (open ? `<div class="small ${running ? 'dim' : 'good'}">${running ? 'With this gift: ' : ''}${effectWords(scaleEffects(x.effects, strength)).map(esc).join('<br>')}</div>` +
+              (own ? `<button data-ritual-start="${id}" ${gold >= ritualGift ? '' : 'disabled'}>${running ? 'Hold again' : 'Hold'} for ${num(ritualGift)} Gold</button>` : '')
+            : `<div class="small dim">${effectWords(x.effects).map(esc).join('<br>')} (at rank 1, least gift)</div>` +
+              `<span class="dim small">Opens with ${esc(opens ? opens.name : 'more research')}</span>`) + `</div>`;
+  }).join('') + `</div></div>`;
+  return html;
 }
 let setView = settings.setView || 'display';   // which part of the Settings tab shows (remembered)
 // The parts of the Settings tab, and a search that shows only the settings whose words match.
@@ -3547,7 +3612,7 @@ $('reportOk').onclick = () => { $('report').hidden = true; act('report_seen'); }
 $('tutorial').onclick = e => { if ('tutorialHide' in e.target.dataset) { settings.tutorial = false; saveSettings(); render(); } };
 // Choosing an ideology (in the window or on the tab), taking perks, and putting the choice off.
 document.addEventListener('click', e => {
-  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later]');
+  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-ritual-preset]');
   if (!d || visiting || !view) return;
   if ('ideologyLater' in d.dataset) { settings.ideologyLater = new Date().toDateString(); saveSettings(); render(); }
   else if (d.dataset.ideologyChoose) {
@@ -3555,7 +3620,23 @@ document.addEventListener('click', e => {
     if (confirm(`Choose ${name}? Your city keeps its ideology for good.`)) act('ideology_choose', { ideology: d.dataset.ideologyChoose });
   }
   else if (d.dataset.perkTake) act('perk_take', { perk: d.dataset.perkTake });
+  else if (d.dataset.ritualStart) {
+    const name = view.defs.ideologies[view.ideology.id].rituals[d.dataset.ritualStart].name;
+    if (confirm(`Give ${ritualGift} Gold to hold ${name}?`)) act('ritual_start', { ritual: d.dataset.ritualStart, gold: ritualGift });
+  }
+  else if (d.dataset.ritualPreset) { ritualGift = +d.dataset.ritualPreset; renderIdeology(); }
 });
+// While the gift is being dragged or typed only its line changes; the cards follow once it is let go of.
+$('ideologyBody').addEventListener('input', e => {
+  if (!('ritualGift' in e.target.dataset)) return;
+  const v = Math.floor(+e.target.value), r = view.ideology.rituals;
+  if (!(v >= r.least && v <= r.most)) return;
+  ritualGift = v;
+  for (const box of $('ideologyBody').querySelectorAll('[data-ritual-gift]')) if (box !== e.target) box.value = v;
+  const [strength, seconds] = ritualTerms(r, v);
+  $('ritualLine').innerHTML = ritualLine(v, strength, seconds);
+});
+$('ideologyBody').addEventListener('change', e => { if ('ritualGift' in e.target.dataset) renderIdeology(); });
 $('ideologyBody').addEventListener('click', e => {
   const v = e.target.closest('[data-ideo-view]'), f = e.target.closest('[data-perk-filter]');
   if (v) { ideoView = settings.ideoView = v.dataset.ideoView; saveSettings(); renderIdeology(); }

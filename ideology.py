@@ -17,6 +17,15 @@ Effects, added up over the ideology and its perks taken:
     housing        people housed
     power          0.2 = generators give 20% more power
     night_shelter / weather_shelter   0.5 = half of every slowdown night (or the weather) causes is gone
+
+Rituals: each ideology has five, opened one by one by the ritual research
+(game.RESEARCH entries with "ritual": rank, one per tech level from Village
+up). A ritual is started by donating gold to the ideology and gives its
+effects for a while. The gold asked for depends on the city's tech level
+(RITUAL_GOLD); giving up to RITUAL_MAX_GIFT times that makes the ritual
+stronger and longer (see ritual_scale). Each rank of research also makes
+every ritual stronger and longer. Different rituals can run at once; starting
+one that is running starts it again with the new gift.
     beast_xp / beast_power / hatch_speed / egg_chance / mission_speed   as in beasts.py
 
 `game` imports this module and this module uses `game`, so nothing here may
@@ -25,11 +34,33 @@ touch `game` at import time: only inside functions.
 
 import game
 
+HOUR = 3600
+RITUAL_GOLD = [0, 200, 800, 3000, 10000, 25000]   # least gold a ritual takes, by the city's tech level
+RITUAL_MAX_GIFT = 5          # a gift can be up to this many times the least...
+RITUAL_GIFT_STRENGTH = 0.25  # ...each extra share makes the ritual this much stronger (2x at 5x the gold)
+RITUAL_GIFT_TIME = 0.5       # ...and this much longer (3x at 5x the gold)
+RITUAL_RANK_STRENGTH = 0.25  # each rank of research past the first: this much stronger...
+RITUAL_TIME = 2 * HOUR       # ...a ritual at rank 1 with the least gold lasts this long...
+RITUAL_RANK_TIME = HOUR // 2 # ...and each rank past the first adds this
+
 IDEOLOGIES = {
     "faith": {
         "name": "The Old Faith", "perk_word": "Blessing", "perk_plural": "Blessings of the gods",
         "desc": "The city keeps the old gods, and they keep the city. Their blessings reach every part of life.",
         "effects": {"speed": {"food": 0.10, "knowledge": 0.10}},
+        "ritual_word": "Rite", "ritual_plural": "Rites of the temple",
+        "rituals": {
+            "first_fruits": {"name": "Feast of First Fruits", "effects": {"speed": {"food": 0.15}},
+                            "desc": "The first of every harvest goes to the gods, and the fields answer."},
+            "vigil": {"name": "Vigil of Lamps", "effects": {"night_shelter": 0.5, "speed": {"knowledge": 0.1}},
+                     "desc": "A thousand lamps burn all night; nobody sleeps and nobody minds."},
+            "stone_procession": {"name": "Procession of the Stone Father", "effects": {"speed": {"materials": 0.2}},
+                                "desc": "The priests carry the god's statue past every mine and quarry."},
+            "storm_litany": {"name": "Litany Against the Storm", "effects": {"weather_shelter": 0.5, "speed": {"food": 0.1}},
+                            "desc": "Chanted on the temple steps until the sky gives in."},
+            "holy_day": {"name": "High Holy Day", "effects": {"speed": {"all": 0.1}, "attracts": 1},
+                        "desc": "The whole city stops to give thanks, then works twice as hard."},
+        },
         "perks": {
             "storm_father":   {"name": "Blessing of the Storm Father", "tier": 3, "effects": {"weather_shelter": 0.4, "speed": {"food": 0.05}},
                                "desc": "The storms bow to the temple and pass the fields by."},
@@ -59,6 +90,19 @@ IDEOLOGIES = {
         "name": "Progress", "perk_word": "Breakthrough", "perk_plural": "Great breakthroughs",
         "desc": "Measure, test, improve. The city puts its faith in invention, and every age brings a great leap forward.",
         "effects": {"speed": {"materials": 0.15}},
+        "ritual_word": "Exhibition", "ritual_plural": "Exhibitions of progress",
+        "rituals": {
+            "science_fair": {"name": "Science Fair", "effects": {"speed": {"knowledge": 0.2}},
+                            "desc": "Prizes for the cleverest idea, and everyone wants one."},
+            "overtime": {"name": "Overtime Campaign", "effects": {"speed": {"materials": 0.15}, "night_shelter": 0.4},
+                        "desc": "Floodlights, bonuses and the factory whistle at midnight."},
+            "power_trial": {"name": "Power Surge Trial", "effects": {"power": 0.25},
+                           "desc": "Every generator pushed past its rating, for science."},
+            "survey_grant": {"name": "Survey Grant", "effects": {"explore_speed": 0.5, "explore_cost": 0.3},
+                            "desc": "Funding for every team that wants to map the unknown."},
+            "worlds_fair": {"name": "World's Fair", "effects": {"speed": {"all": 0.1}, "attracts": 1},
+                           "desc": "The marvels of the age, all in one city."},
+        },
         "perks": {
             "gaslight":    {"name": "Gas Lighting", "tier": 2, "effects": {"night_shelter": 0.5},
                             "desc": "Every street lit and every workshop open after dark."},
@@ -88,6 +132,19 @@ IDEOLOGIES = {
         "name": "Commerce", "perk_word": "Charter", "perk_plural": "Royal charters",
         "desc": "The city lives by trade. Its merchants buy charters that open new markets, routes and riches.",
         "effects": {"speed": {"trade": 0.20}},
+        "ritual_word": "Fair", "ritual_plural": "Merchant fairs",
+        "rituals": {
+            "sale_day": {"name": "Great Sale Day", "effects": {"speed": {"trade": 0.25}},
+                        "desc": "Everything must go, and somehow everything does."},
+            "harvest_auction": {"name": "Harvest Auction", "effects": {"speed": {"food": 0.15, "trade": 0.1}},
+                               "desc": "Farmers bid against each other for the best seed and the best land."},
+            "caravan_season": {"name": "Caravan Season", "effects": {"explore_speed": 0.3, "explore_cost": 0.4},
+                              "desc": "Merchants pay for the roads, and the scouts travel with them."},
+            "guild_holiday": {"name": "Guild Holiday", "effects": {"speed": {"materials": 0.15}, "attracts": 1},
+                             "desc": "The guilds show off their best work, and new apprentices arrive."},
+            "grand_exposition": {"name": "Grand Exposition", "effects": {"speed": {"all": 0.1, "trade": 0.15}},
+                                "desc": "Every merchant in the world wants a stall."},
+        },
         "perks": {
             "insurance": {"name": "Insurance Charter", "tier": 3, "effects": {"weather_shelter": 0.4, "speed": {"trade": 0.05}},
                           "desc": "Bad weather is somebody else's problem, for a small fee."},
@@ -117,6 +174,19 @@ IDEOLOGIES = {
         "name": "Kinship with the Wild", "perk_word": "Pact", "perk_plural": "Pacts with the wild",
         "desc": "The city lives alongside the animals and the great beasts, and makes pacts with the wild places around it.",
         "effects": {"beast_xp": 0.25, "wildlife_speed": 0.5},
+        "ritual_word": "Call", "ritual_plural": "Calls of the wild",
+        "rituals": {
+            "herd_call": {"name": "Call of the Herd", "effects": {"wildlife_speed": 1.0, "speed": {"food": 0.1}},
+                         "desc": "Drums on the plain, and the animals come to listen."},
+            "moon_howl": {"name": "Moon Howl", "effects": {"night_shelter": 0.6, "beast_power": 0.2},
+                         "desc": "The city howls with the wolves, and the night is friendly."},
+            "nesting_song": {"name": "Nesting Song", "effects": {"hatch_speed": 1.0, "egg_chance": 0.1},
+                            "desc": "Sung softly over every egg in the city."},
+            "storm_dance": {"name": "Storm Dance", "effects": {"weather_shelter": 0.6, "speed": {"materials": 0.1}},
+                           "desc": "Danced in the rain until the rain grows bored."},
+            "great_hunt": {"name": "The Great Hunt", "effects": {"speed": {"all": 0.08}, "beast_xp": 0.5},
+                          "desc": "The whole city follows the great beasts across the land."},
+        },
         "perks": {
             "moon_pact": {"name": "Pact of the Moon", "tier": 2, "effects": {"night_shelter": 0.4, "wildlife_speed": 0.25},
                           "desc": "The night creatures work alongside the city until dawn."},
@@ -147,6 +217,19 @@ IDEOLOGIES = {
         "name": "The Wayfarers", "perk_word": "Discovery", "perk_plural": "Great discoveries",
         "desc": "Born explorers. The city looks over every horizon, and each age brings home something nobody has seen before.",
         "effects": {"explore_speed": 0.25, "explore_cost": 0.15},
+        "ritual_word": "Ceremony", "ritual_plural": "Ceremonies of the road",
+        "rituals": {
+            "lantern_sendoff": {"name": "Lantern Send-off", "effects": {"explore_speed": 0.5},
+                               "desc": "Lanterns floated downriver for every team that leaves."},
+            "star_reading": {"name": "Star Reading", "effects": {"speed": {"knowledge": 0.2}, "weather_shelter": 0.3},
+                            "desc": "The navigators read the sky aloud for everyone."},
+            "trade_winds": {"name": "Rite of the Trade Winds", "effects": {"speed": {"trade": 0.2}, "explore_cost": 0.3},
+                           "desc": "Sails blessed, and the winds blow the right way."},
+            "homecoming": {"name": "Homecoming Feast", "effects": {"attracts": 1, "speed": {"food": 0.15}},
+                          "desc": "Every traveller who ever left comes back for one night, and some stay."},
+            "voyage_of_legends": {"name": "Voyage of Legends", "effects": {"speed": {"all": 0.1}, "egg_chance": 0.1},
+                                 "desc": "The old stories retold, and the young set out to make new ones."},
+        },
         "perks": {
             "sky_reading":   {"name": "Reading the Skies", "tier": 2, "effects": {"weather_shelter": 0.3, "explore_speed": 0.1},
                               "desc": "Sailors' lore: always know what tomorrow's sky will do."},
@@ -176,6 +259,19 @@ IDEOLOGIES = {
         "name": "Community", "perk_word": "Tradition", "perk_plural": "Traditions",
         "desc": "Everyone has a place, and everyone helps. The city grows its people and keeps its traditions.",
         "effects": {"housing": 15, "attracts": 1},
+        "ritual_word": "Gathering", "ritual_plural": "Community gatherings",
+        "rituals": {
+            "barn_dance": {"name": "Barn Dance", "effects": {"speed": {"food": 0.15}, "housing": 10},
+                          "desc": "Fiddles, hay bales and room for everyone."},
+            "work_bee": {"name": "Work Bee", "effects": {"speed": {"materials": 0.2}},
+                        "desc": "Everyone turns out to help, and the work flies."},
+            "lantern_night": {"name": "Lantern Night", "effects": {"night_shelter": 0.5, "speed": {"trade": 0.1}},
+                             "desc": "Every window lit, and the market stays open late."},
+            "town_meeting": {"name": "Town Meeting", "effects": {"speed": {"knowledge": 0.2}, "mission_speed": 0.5},
+                            "desc": "Everyone has their say, and some of it is even useful."},
+            "midsummer": {"name": "Midsummer Festival", "effects": {"speed": {"all": 0.1}, "attracts": 2},
+                         "desc": "The longest day, the biggest party, and the city's name on every tongue."},
+        },
         "perks": {
             "night_watch": {"name": "The Night Watch", "tier": 2, "effects": {"night_shelter": 0.4, "housing": 10},
                             "desc": "Lamps on every corner and neighbours who look out for each other."},
@@ -349,7 +445,8 @@ def effects(state):
     if not ideo:
         return {}
     total = {"speed": {}}
-    for eff in [ideo["effects"]] + [ideo["perks"][p]["effects"] for p in state.get("perks", []) if p in ideo["perks"]]:
+    for eff in ([ideo["effects"]] + [ideo["perks"][p]["effects"] for p in state.get("perks", []) if p in ideo["perks"]]
+                + [_scaled(ideo["rituals"][rid]["effects"], r["scale"]) for rid, r in active_rituals(state)]):
         for key, value in eff.items():
             if key == "speed":
                 for cat, x in value.items():
@@ -357,6 +454,68 @@ def effects(state):
             else:
                 total[key] = total.get(key, 0) + value
     return total
+
+
+# ---- rituals ----
+
+def ritual_rank(state):
+    """How many ranks of ritual research the city has: 0 to 5."""
+    return sum(1 for rid in state["research"] if game.RESEARCH[rid].get("ritual"))
+
+
+def _scaled(eff, scale):
+    return {k: ({c: x * scale for c, x in v.items()} if k == "speed" else v * scale) for k, v in eff.items()}
+
+
+def active_rituals(state):
+    """(id, ritual) for every ritual running at the moment being worked out (see game.advance_time)."""
+    t = state.get("ritual_now", state["updated"])
+    return [(rid, r) for rid, r in state.get("rituals", {}).items() if r["start"] <= t < r["until"]]
+
+
+def ritual_terms(state, gold):
+    """(strength, seconds) a gift of `gold` buys at the city's rank and tech level, or None if it is out of range."""
+    least = RITUAL_GOLD[state["tech"]]
+    rank = ritual_rank(state)
+    if not least or not rank or not least <= gold <= least * RITUAL_MAX_GIFT:
+        return None
+    share = gold / least - 1
+    strength = (1 + RITUAL_RANK_STRENGTH * (rank - 1)) * (1 + RITUAL_GIFT_STRENGTH * share)
+    seconds = (RITUAL_TIME + RITUAL_RANK_TIME * (rank - 1)) * (1 + RITUAL_GIFT_TIME * share)
+    return round(strength, 3), round(seconds)
+
+
+def start_ritual(state, now, ritual_id, gold):
+    ideo = chosen(state)
+    if not ideo:
+        return "Choose an ideology first."
+    order = list(ideo["rituals"])
+    if ritual_id not in ideo["rituals"]:
+        return f"That is not one of your ideology's {ideo['ritual_plural'].lower()}."
+    rank = ritual_rank(state)
+    if order.index(ritual_id) >= rank:
+        return f"That {ideo['ritual_word'].lower()} needs more ritual research first."
+    if not (isinstance(gold, int) and not isinstance(gold, bool)):
+        return "Say how much gold to give."
+    least = RITUAL_GOLD[state["tech"]]
+    terms = ritual_terms(state, gold)
+    if not terms:
+        return f"Give between {least} and {least * RITUAL_MAX_GIFT} Gold."
+    if state["resources"]["gold"] < gold:
+        return f"You don't have {gold} Gold."
+    state["resources"]["gold"] -= gold
+    strength, seconds = terms
+    state.setdefault("rituals", {})[ritual_id] = {"start": now, "until": now + seconds, "scale": strength, "gold": gold}
+    game.tally(state, "rituals")
+    game.log(state, now, f"*** {ideo['rituals'][ritual_id]['name']}: {gold} Gold given to {ideo['name']}. "
+                         f"For {seconds // 3600}h {seconds % 3600 // 60:02d}m: {', '.join(describe(_scaled(ideo['rituals'][ritual_id]['effects'], strength)))}. ***")
+    return None
+
+
+def tidy_rituals(state):
+    """Forget rituals that have finished."""
+    for rid in [rid for rid, r in state.get("rituals", {}).items() if r["until"] <= state["updated"]]:
+        del state["rituals"][rid]
 
 
 def value(state, key):
@@ -436,6 +595,9 @@ def defs():
     """The ideologies as the page shows them, with their effects in words."""
     return {iid: {"name": i["name"], "desc": i["desc"], "perk_word": i["perk_word"], "perk_plural": i["perk_plural"],
                   "text": describe(i["effects"]), "color": COLOURS[iid], "art": "\n".join(ART[iid]),
+                  "ritual_word": i["ritual_word"], "ritual_plural": i["ritual_plural"],
+                  "rituals": {rid: {"name": r["name"], "desc": r["desc"], "effects": r["effects"], "text": describe(r["effects"])}
+                              for rid, r in i["rituals"].items()},
                   "perks": {pid: {"name": p["name"], "tier": p["tier"], "desc": p["desc"], "text": describe(p["effects"]),
                                   "art": "\n".join(PERK_ART[pid])}
                             for pid, p in i["perks"].items()}}
@@ -443,5 +605,13 @@ def defs():
 
 
 def view(state):
-    return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state),
+    ideo, rank, least = chosen(state), ritual_rank(state), RITUAL_GOLD[state["tech"]]
+    rituals = {"rank": rank, "least": least, "most": least * RITUAL_MAX_GIFT,
+               "gift_strength": RITUAL_GIFT_STRENGTH, "gift_time": RITUAL_GIFT_TIME,
+               "base_strength": 1 + RITUAL_RANK_STRENGTH * (rank - 1) if rank else 0,
+               "base_time": RITUAL_TIME + RITUAL_RANK_TIME * (rank - 1) if rank else 0,
+               "active": {rid: {"until": r["until"], "scale": r["scale"], "gold": r["gold"],
+                                "text": describe(_scaled(ideo["rituals"][rid]["effects"], r["scale"]))}
+                          for rid, r in active_rituals(state)} if ideo else {}}
+    return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state), "rituals": rituals,
             "total": describe(effects(state)) if chosen(state) else []}

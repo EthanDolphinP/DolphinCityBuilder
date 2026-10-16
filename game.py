@@ -1584,6 +1584,32 @@ RESEARCH = {
         "boost": {"data_centre": 1.2, "research_institute": 1.2},
         "desc": "Bits that are both at once, until someone looks.",
     },
+    # ---- rituals (see ideology.py): one very expensive rank per tech level from Village up ----
+    "sacred_calendar": {
+        "name": "Sacred Calendar", "tech": 1, "building": "school", "cost": {"knowledge": 300, "gold": 300},
+        "ritual": 1, "effect": "your ideology's first ritual can be held",
+        "desc": "A calendar of holy days and feast days, and someone to keep it.",
+    },
+    "ceremonial_halls": {
+        "name": "Ceremonial Halls", "tech": 2, "building": "university", "cost": {"knowledge": 900, "gold": 1500},
+        "ritual": 2, "effect": "opens your ideology's ritual number 2, and every ritual is stronger and lasts longer",
+        "desc": "Great halls built for nothing but ceremony.",
+    },
+    "grand_rituals": {
+        "name": "Grand Rituals", "tech": 3, "building": "university", "cost": {"knowledge": 3000, "gold": 6000},
+        "ritual": 3, "effect": "opens your ideology's ritual number 3, and every ritual is stronger and lasts longer",
+        "desc": "Ceremonies big enough to move a whole city.",
+    },
+    "rituals_of_state": {
+        "name": "Rituals of State", "tech": 4, "building": "laboratory", "cost": {"knowledge": 8000, "gold": 20000},
+        "ritual": 4, "effect": "opens your ideology's ritual number 4, and every ritual is stronger and lasts longer",
+        "desc": "The state itself takes part: holidays, parades and broadcasts.",
+    },
+    "eternal_rituals": {
+        "name": "Eternal Rituals", "tech": 5, "building": "research_institute", "cost": {"knowledge": 20000, "gold": 60000},
+        "ritual": 5, "effect": "opens your ideology's ritual number 5, and every ritual is stronger and lasts longer",
+        "desc": "Ceremony perfected over a thousand years, and then improved.",
+    },
 }
 
 # Additions are attached to a building that is already standing. Fields:
@@ -3221,10 +3247,18 @@ def advance_time(state, now):
     remaining = now - state["updated"]
     if remaining <= 0:
         return
+    start = now - remaining
     state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
-    with _stats_cached():     # buildings and ideology don't change while time is caught up
-        _advance(state, now, remaining)
+    # Caught up in stretches that end where a ritual ends, so each counts for exactly as long as it ran.
+    ends = sorted({r["until"] for r in state.get("rituals", {}).values() if start < r["until"] < now})
+    for end in ends + [now]:
+        state["ritual_now"] = start
+        with _stats_cached():     # buildings and ideology don't change within a stretch
+            _advance(state, end, end - start)
+        start = end
+    state.pop("ritual_now", None)
+    ideology.tidy_rituals(state)
     trip = state["expedition"]
     if trip and now >= trip["arrive"]:
         _arrive(state, trip)
@@ -3375,6 +3409,12 @@ def research_problem(state, rid):
         return f"requires {TECH_LEVELS[r['tech']]['name']} tech"
     if r.get("building") and not has_building(state, r["building"]):
         return f"needs a {BUILDINGS[r['building']]['name']}"
+    if r.get("ritual"):
+        if not ideology.chosen(state):
+            return "choose an ideology first"
+        earlier = next((k for k, x in RESEARCH.items() if x.get("ritual") == r["ritual"] - 1), None)
+        if earlier and earlier not in state["research"]:
+            return f"research {RESEARCH[earlier]['name']} first"
     return None
 
 
@@ -3702,6 +3742,8 @@ def apply_action(state, now, action, data):
         return ideology.choose(state, now, data.get("ideology"))
     if action == "perk_take":
         return ideology.take(state, now, data.get("perk"))
+    if action == "ritual_start":
+        return ideology.start_ritual(state, now, data.get("ritual"), data.get("gold"))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":
@@ -4081,7 +4123,7 @@ TALLIES = [
     ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
-    ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+    ("rituals", "Rituals held"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
 ]
 
 
