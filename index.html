@@ -3461,8 +3461,9 @@ function tick() {
     const stuck = left[key] === null;
     el.classList.toggle('stuck', stuck);
     const progress = stuck ? 1 : Math.max(0, Math.min(1, 1 - left[key] * t.speed / t.cycle));
-    // A new production cycle resets immediately, then fills smoothly again.
-    el.style.transition = progress < Number(el.dataset.progress || 0) ? 'none' : '';
+    // A bar just drawn (the map was redrawn: a tile clicked, another area) jumps straight to its level,
+    // and so does a new production cycle starting again from empty; otherwise it fills smoothly.
+    el.style.transition = !('progress' in el.dataset) || progress < Number(el.dataset.progress) ? 'none' : '';
     el.style.transform = `scaleY(${progress})`;
     el.dataset.progress = progress;
   });
