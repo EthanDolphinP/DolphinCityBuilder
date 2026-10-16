@@ -2269,10 +2269,16 @@ function landHint(env) {
 }
 let statsView = settings.statsView || 'all';   // which section of the Stats tab shows (remembered)
 const statSort = {};    // table -> [column, descending], while the page is open
+// Numbers inside a piece of text ("495 of 2000 beds") written the way the number settings say.
+// Small whole numbers are left alone, so levels, ranks and times read as before.
+const numbersIn = text => String(text).replace(/\d[\d,]*(?:\.\d+)?/g, m => {
+  const n = parseFloat(m.replace(/,/g, ''));
+  return n >= 1000 ? num(n) : m;
+});
 function statValue(v) {
   if (v === null || v === undefined || v === '') return '';
   if (typeof v === 'number') return num(v);
-  if (typeof v !== 'object') return esc(String(v));
+  if (typeof v !== 'object') return esc(numbersIn(v));
   if (v.time) return esc(clock(v.time));
   if ('dur' in v) return esc(duration(v.dur));
   if ('pct' in v) return `${Math.round(v.pct * 1000) / 10}%`;
@@ -2297,7 +2303,7 @@ function renderStats() {
                  ...stats.map(s => [s.id, s.title, s.headline || ''])];
   if (!views.some(([k]) => k === statsView)) statsView = 'all';
   setHTML($('statsViews'), views.map(([k, label, note]) =>
-    `<button data-stats-view="${k}" class="${statsView === k ? 'on' : ''}">${esc(label)}${note ? ` <span class="dim small">${esc(note)}</span>` : ''}</button>`).join(''));
+    `<button data-stats-view="${k}" class="${statsView === k ? 'on' : ''}">${esc(label)}${note ? ` <span class="dim small">${esc(numbersIn(note))}</span>` : ''}</button>`).join(''));
 
   const words = $('statsSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const hit = text => words.every(w => text.toLowerCase().includes(w));
