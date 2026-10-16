@@ -655,7 +655,7 @@
         <form id="duelForm" class="bar" style="margin-top:0">
           <span class="pair">Send <select id="duelBeast"></select></span>
           <span class="pair">against <input id="duelTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px"></span>
-          <span class="pair">and bet <input id="duelBetQty" type="number" min="1" step="1" value="50" style="width:100px"> <select id="duelBetRes"></select></span>
+          <span class="pair">and bet <input id="duelBetQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="50" style="width:100px"> <select id="duelBetRes"></select></span>
           <button>Send challenge</button>
         </form>
         <p id="duelPreview" class="small hi" style="margin:4px 0 10px"></p>
@@ -797,10 +797,10 @@
       <details class="panel" open data-mkt="sell">
         <summary class="cat">Post an offer</summary>
         <form id="offerForm" class="bar" style="margin-top:0">
-          <span class="pair">I give <input id="giveQty" type="number" min="1" step="1" value="10"> <select id="giveRes"></select></span>
+          <span class="pair">I give <input id="giveQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="10" style="width:110px"> <select id="giveRes"></select></span>
           <button type="button" id="giveAll" title="Offer everything you have of it">All</button>
           <button type="button" id="swapSides" title="Swap what you give and what you want">&lt;&gt;</button>
-          <span class="pair">and want <input id="wantQty" type="number" min="1" step="1" value="5"> <select id="wantRes"></select></span>
+          <span class="pair">and want <input id="wantQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="5" style="width:110px"> <select id="wantRes"></select></span>
           <button>Post offer</button>
         </form>
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
@@ -825,9 +825,9 @@
         <div class="cat">Propose a bill</div>
         <form id="billForm" class="bar">
           <span class="pair">Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours</span>
-          <span class="pair">I send <input id="billGiveQty" type="number" min="1" step="1" value="10"> <select id="billGiveRes"></select></span>
+          <span class="pair">I send <input id="billGiveQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="10" style="width:110px"> <select id="billGiveRes"></select></span>
           <span class="pair">to <input id="billTo" list="cityList" maxlength="24" placeholder="city name"></span>
-          <span class="pair">and receive <input id="billWantQty" type="number" min="1" step="1" value="20"> <select id="billWantRes"></select></span>
+          <span class="pair">and receive <input id="billWantQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="20" style="width:110px"> <select id="billWantRes"></select></span>
           <button>Propose bill</button>
         </form>
         <datalist id="cityList"></datalist>
@@ -1092,6 +1092,13 @@
 
 <script id="gameScript">
 const $ = id => document.getElementById(id);
+const MAX_QTY = 1e12;     // the most of anything one trade, bill or bet can be (market.MAX_QUANTITY)
+// An amount typed into a box: "2500000", "2,500,000", "2.5m", "40k" and "1.2b" all work. NaN if it isn't one.
+function amount(text) {
+  const m = String(text).trim().replace(/[,_\s]/g, '').match(/^(\d+(?:\.\d+)?|\.\d+)([kmbt]?)$/i);
+  if (!m || (!m[2] && m[1].includes('.'))) return NaN;    // a fraction only with k, m, b or t after it
+  return Math.round(parseFloat(m[1]) * { '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2].toLowerCase()]);
+}
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // ---- settings: how this player likes the game shown. Kept in this browser only. ----
 const THEMES = {
@@ -1333,14 +1340,14 @@ function priceHint() {
   const each = o => o.want_qty / o.give_qty;     // what one of the thing on sale costs
   if (!same.length) { $('priceHint').textContent = `Nobody else is selling ${R[g]} for ${R[w]} right now, so you set the price.`; return; }
   const best = same.reduce((a, b) => each(a) <= each(b) ? a : b);
-  const mine = Math.floor(+$('wantQty').value) / Math.floor(+$('giveQty').value);
+  const mine = amount($('wantQty').value) / amount($('giveQty').value);
   $('priceHint').textContent = `${same.length} other ${same.length === 1 ? 'offer sells' : 'offers sell'} ${R[g]} for ${R[w]}; ` +
     `the cheapest asks ${+each(best).toFixed(3)} ${R[w]} for each ${R[g]} (${best.city}).` +
     (mine > 0 ? ` Yours asks ${+mine.toFixed(3)}, ${mine <= each(best) ? 'the best price on the market' : 'more than theirs, so theirs will likely sell first'}.` : '');
 }
 function lotPreview() {
   if (!view) return;
-  const R = view.defs.resources, give = Math.floor(+$('giveQty').value), want = Math.floor(+$('wantQty').value);
+  const R = view.defs.resources, give = amount($('giveQty').value), want = amount($('wantQty').value);
   if (!(give >= 1 && want >= 1)) { $('lotPreview').textContent = ''; return; }
   const l = lotOf({ give_qty: give, want_qty: want });
   priceHint();
@@ -2453,7 +2460,7 @@ function renderBeast() {
     return `<div class="tradeForm"><div class="small">Offer this ${esc(b.name)}${b.egg ? '' : ' (level ' + b.level + ')'} to other cities in exchange for:</div><div class="bar">` +
       `<select data-td="kind" data-k="td-kind">${options([['resource', 'a material'], ['beast', 'another beast']], d.kind)}</select>` +
       (d.kind === 'resource'
-        ? `<input data-td="qty" data-k="td-qty" type="number" min="1" step="1" style="width:110px"> ` +
+        ? `<input data-td="qty" data-k="td-qty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" style="width:110px"> ` +
           `<select data-td="res" data-k="td-res">${options(view.defs.tradeable.map(k => [k, R[k]]), d.res)}</select>`
         : `<select data-td="species" data-k="td-species">${options(Object.entries(bv.species).map(([k, s]) => [k, `${s.name} (${s.rarity})`]), d.species)}</select> ` +
           `of level <input data-td="level" data-k="td-level" type="number" min="1" max="${bv.max_level}" step="1" style="width:70px"> or higher`) +
@@ -2629,7 +2636,7 @@ const boostText = b => `+${Math.round((b - 1) * 100)}%`;
 // The line under the challenge form, and the line under each challenge's answer.
 function fillDuels() {
   const R = view.defs.resources, mine = view.beast.beasts.filter(b => !b.egg);
-  const b = mine.find(x => x.id === +$('duelBeast').value), qty = Math.floor(+$('duelBetQty').value);
+  const b = mine.find(x => x.id === +$('duelBeast').value), qty = amount($('duelBetQty').value);
   $('duelPreview').textContent = !b ? '' :
     `${b.name} likes ${R[b.likes]}. ` + (qty >= 1 ? `Betting ${qty} ${R[$('duelBetRes').value]} raises its stats by ${boostText(duelBoost(b.likes, $('duelBetRes').value, qty))}` +
       ($('duelBetRes').value === b.likes ? '.' : `; the same amount of ${R[b.likes]} would raise them by ${boostText(duelBoost(b.likes, b.likes, qty))}.`) : '') +
@@ -2786,7 +2793,7 @@ function renderArena() {
         (fighters.length
           ? `<div class="buy"><select data-duel-pick="${d.id}" style="max-width:200px">` + fighters.map(x =>
               `<option value="${x.id}" ${x.id === picked ? 'selected' : ''}>${esc(x.name)} (${stats(x.stats, x.species)})</option>`).join('') + `</select> bet ` +
-            `<input data-duel-qty="${d.id}" data-k="duel${d.id}" type="number" min="1" step="1" style="width:90px"> ` +
+            `<input data-duel-qty="${d.id}" data-k="duel${d.id}" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" style="width:90px"> ` +
             `<select data-duel-res="${d.id}">${materials}</select> ` +
             `<button data-duel-accept="${d.id}">Accept</button> <button data-duel-cancel="${d.id}">Decline</button></div>` +
             `<div data-duel-note="${d.id}" class="small"></div>`
@@ -3391,9 +3398,9 @@ function renderMarket() {
       const set = f.give_qty >= 1 && f.want_qty >= 1, ok = set && state.resources[f.give] >= f.give_qty;
       const scale = (label, mul, div) => {
         const g = f.give_qty * mul / div, w = f.want_qty * mul / div, by = mul + '/' + div;
-        const can = set && Number.isInteger(g) && Number.isInteger(w) && g >= 1 && w >= 1 && g <= 1e6 && w <= 1e6;
+        const can = set && Number.isInteger(g) && Number.isInteger(w) && g >= 1 && w >= 1 && g <= MAX_QTY && w <= MAX_QTY;
         return `<button data-scale="${f.id}" data-by="${by}" ${can ? '' : 'disabled'} ` +
-          `title="${can ? `Make it ${g} for ${w}` : 'Both amounts have to stay whole numbers from 1 to 1,000,000'}">${label}</button>`;
+          `title="${can ? `Make it ${g} for ${w}` : 'Both amounts have to stay whole numbers of at least 1'}">${label}</button>`;
       };
       return `<tr><td><div class="fin">${box(f, 'give_qty')} <span class="${ok || !set ? '' : 'bad'}">${esc(R[f.give])}</span></div></td>` +
         `<td><div class="fin">${box(f, 'want_qty')} ${esc(R[f.want])}</div></td>` +
@@ -3712,7 +3719,7 @@ $('tab-beast').onclick = e => {
   else if ('tradeClose' in e.target.dataset) { tradeFor = null; renderBeast(); }
   else if (e.target.dataset.tradePost) {
     const d = tradeDraft;
-    const want = d.kind === 'resource' ? { kind: 'resource', res: d.res, qty: Math.floor(+d.qty) }
+    const want = d.kind === 'resource' ? { kind: 'resource', res: d.res, qty: amount(d.qty) }
                                        : { kind: 'beast', species: d.species, level: Math.floor(+d.level) || 1 };
     tradeFor = null;
     act('beast_offer_post', { beast: +e.target.dataset.tradePost, want });
@@ -3772,7 +3779,7 @@ $('duelForm').onsubmit = e => {
   e.preventDefault();
   if (!$('duelBeast').value) { say('Pick which beast to send.'); return; }
   act('duel_post', { beast: +$('duelBeast').value, to: $('duelTo').value.trim(),
-                     bet: { res: $('duelBetRes').value, qty: Math.floor(+$('duelBetQty').value) } });
+                     bet: { res: $('duelBetRes').value, qty: amount($('duelBetQty').value) } });
 };
 $('duels').addEventListener('input', e => {
   const d = e.target.dataset;
@@ -3789,7 +3796,7 @@ $('duels').onclick = async e => {
     const id = +d.duelAccept, pick = $('duels').querySelector(`[data-duel-pick="${id}"]`);
     const newest = () => { const all = view.beast.duels || []; return all.length ? all[all.length - 1] : null; };
     const before = newest();
-    await act('duel_accept', { duel: id, beast: +pick.value, bet: { res: duelRes.get(id), qty: Math.floor(+duelQty.get(id)) } });
+    await act('duel_accept', { duel: id, beast: +pick.value, bet: { res: duelRes.get(id), qty: amount(duelQty.get(id)) } });
     const last = newest();
     if (last && (!before || last.id !== before.id)) {      // the fight happened: open its story
       foldState.set('duel:' + last.id, true);
@@ -4060,14 +4067,14 @@ $('offers').onclick = e => {
 };
 $('offerForm').onsubmit = e => {
   e.preventDefault();
-  act('offer_post', { give: $('giveRes').value, give_qty: Number($('giveQty').value),
-                      want: $('wantRes').value, want_qty: Number($('wantQty').value) });
+  act('offer_post', { give: $('giveRes').value, give_qty: amount($('giveQty').value),
+                      want: $('wantRes').value, want_qty: amount($('wantQty').value) });
 };
 $('billForm').onsubmit = e => {
   e.preventDefault();
   act('bill_propose', { to: $('billTo').value.trim(), hours: Number($('billHours').value),
-                        give: $('billGiveRes').value, give_qty: Number($('billGiveQty').value),
-                        want: $('billWantRes').value, want_qty: Number($('billWantQty').value) });
+                        give: $('billGiveRes').value, give_qty: amount($('billGiveQty').value),
+                        want: $('billWantRes').value, want_qty: amount($('billWantQty').value) });
 };
 $('bills').onclick = e => {
   if (e.target.dataset.billAccept) act('bill_accept', { bill: +e.target.dataset.billAccept });

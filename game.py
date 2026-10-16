@@ -267,7 +267,7 @@ RESOURCES = {
 }
 UNTRADEABLE = {"knowledge"}   # cannot be offered or asked for on the market
 
-START_RESOURCES = {"food": 50, "wood": 100, "stone": 25, "livestock": 3}
+START_RESOURCES = {"food": 200, "wood": 100, "stone": 25, "livestock": 3}   # food for 5 hours of the 10 starting people
 START_POPULATION = 10
 BASE_HOUSING = 10           # people who can live in the starting camp
 AREA_SIZE = 5
@@ -278,7 +278,9 @@ MAX_ADDITIONS = 2           # additions one building can carry
 
 MEAL_TIME = 15 * MIN        # everyone eats 1 food this often; a fed city also gains 1 person
 HUNGRY_SPEED = 0.5          # work speed of non-food buildings while the city is hungry
-SIM_STEP = 60               # seconds of game time simulated per step when catching up
+SIM_STEP = 60               # seconds of game time simulated per step when catching up...
+LONG_STEP = 300             # ...or this, while more than LONG_CATCH_UP is still to go (a week away is then quick)
+LONG_CATCH_UP = 6 * 3600
 
 EXPEDITION_TIME = 20 * MIN  # travel time per step of distance from home
 # What an expedition may bring back besides its map: (resource, least, most), per step of distance.
@@ -2939,7 +2941,7 @@ def log(state, now, text):
 
 
 def fmt_goods(goods):
-    return ", ".join(f"{v} {RESOURCES[k]}" for k, v in goods.items())
+    return ", ".join(f"{v:,} {RESOURCES[k]}" for k, v in goods.items())
 
 
 def _missing(state, cost):
@@ -3273,7 +3275,7 @@ def _advance(state, now, remaining):
     rng = random.Random()
 
     while remaining > 0:
-        dt = min(SIM_STEP, remaining)
+        dt = min(LONG_STEP if remaining > LONG_CATCH_UP else SIM_STEP, remaining)
         env = weather.job_factors(state, jobs, now - remaining)    # day or night and the weather as this step starts
         remaining -= dt
         power = power_status(state, jobs, env)[2]

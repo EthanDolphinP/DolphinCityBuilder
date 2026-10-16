@@ -33,6 +33,7 @@ import socket
 import sys
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -230,7 +231,7 @@ def send_present(args):
             egg = value
         elif key == "people" and value.isdigit() and 0 < int(value) <= 10_000:
             people += int(value)
-        elif key in game.RESOURCES and value.isdigit() and 0 < int(value) <= 1_000_000:
+        elif key in game.RESOURCES and value.isdigit() and 0 < int(value) <= 1_000_000_000_000:
             gifts[key] = gifts.get(key, 0) + int(value)
         else:
             return f"Did not understand '{word}'.\n{usage}"
@@ -370,8 +371,33 @@ def handle_get(path, query, token, now):
     return 404, {"error": "Not found."}
 
 
+# Fields of an action that name something (a building, a resource, a city...) must be text, or the game
+# would look a list or an object up in its tables. Anything else there is dropped, and the action then
+# says what is missing. "bet" (and a beast trade's "want") may be small objects, whose own name fields are checked too.
+NAME_FIELDS = {"action", "building", "addition", "research", "ideology", "perk", "ritual", "give", "want", "to", "text",
+               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city"}
+
+
+def _clean(data, inner=False):
+    out = {}
+    objects = {"bet", "want"} if data.get("action") == "beast_offer_post" else {"bet"}   # only a beast trade wants an object
+    for key, value in data.items():
+        if key in objects and isinstance(value, dict) and not inner:
+            out[key] = _clean(value, inner=True)
+        elif key == "target":
+            out[key] = value if isinstance(value, (str, int)) and not isinstance(value, bool) else None
+        elif key in NAME_FIELDS:
+            out[key] = value if isinstance(value, str) else None
+        else:
+            out[key] = value
+    return out
+
+
 def handle_post(path, data, token, now):
     """Answer a POST whose JSON body is `data`. Returns (status, body). Needs LOCK."""
+    if not isinstance(data, dict):
+        return 400, {"error": "Bad request."}
+    data = _clean(data)
     if path == "/api/login":
         return login(data.get("city"), data.get("password"), now)
     if path != "/api/action":
@@ -485,11 +511,16 @@ def respond(method, path, query="", token=None, body=b""):
             method = None
     with LOCK:
         if method in ("GET", "POST"):
-            run_bills(now)
-            if method == "GET":
-                status, reply = handle_get(path, parse_qs(query), token, now)
-            else:
-                status, reply = handle_post(path, data, token, now)
+            try:
+                run_bills(now)
+                if method == "GET":
+                    status, reply = handle_get(path, parse_qs(query), token, now)
+                else:
+                    status, reply = handle_post(path, data, token, now)
+            except Exception:
+                # A bug: say so to the player instead of dropping the connection, and keep the details for the admin.
+                traceback.print_exc()
+                status, reply = 500, {"error": "Something went wrong on the server. Try again; if it keeps happening, tell the admin."}
             if DIRTY and now - LAST_SAVE >= AUTOSAVE_SECONDS:
                 flush()
         else:

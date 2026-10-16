@@ -41,7 +41,7 @@ import game
 MAX_OFFERS_PER_CITY = 10
 MAX_BEAST_OFFERS_PER_CITY = 5
 MAX_DUELS_PER_CITY = 3
-MAX_QUANTITY = 1_000_000
+MAX_QUANTITY = 1_000_000_000_000   # any amount a city could have (the page uses the same limit)
 HISTORY_LENGTH = 20
 FINISHED_KEPT = 20      # sold-out offers remembered per city, for posting again
 SALES_KEPT = 50         # unseen sales remembered per city
@@ -86,11 +86,11 @@ def post(market, state, now, data):
     if give == want:
         return "You can't trade a material for itself."
     if not (_valid_qty(give_qty) and _valid_qty(want_qty)):
-        return "Amounts must be whole numbers of 1 or more."
+        return f"Amounts must be whole numbers from 1 to {MAX_QUANTITY:,}."
     if sum(1 for o in market["offers"] if o["city"] == state["name"]) >= MAX_OFFERS_PER_CITY:
         return f"You can have at most {MAX_OFFERS_PER_CITY} open offers."
     if state["resources"][give] < give_qty:
-        return f"You don't have {give_qty} {game.RESOURCES[give]} to offer."
+        return f"You don't have {give_qty:,} {game.RESOURCES[give]} to offer."
 
     state["resources"][give] -= give_qty   # held by the market until sold or cancelled
     market["offers"].append({
@@ -100,8 +100,8 @@ def post(market, state, now, data):
         "full_give": give_qty, "full_want": want_qty,
     })
     market["next_id"] += 1
-    game.log(state, now, f"Offered {give_qty} {game.RESOURCES[give]} "
-                         f"for {want_qty} {game.RESOURCES[want]} on the market.")
+    game.log(state, now, f"Offered {give_qty:,} {game.RESOURCES[give]} "
+                         f"for {want_qty:,} {game.RESOURCES[want]} on the market.")
     return None
 
 
@@ -111,7 +111,7 @@ def cancel(market, state, now, offer_id):
         return "That offer is no longer open."
     market["offers"].remove(offer)
     state["resources"][offer["give"]] += offer["give_qty"]
-    game.log(state, now, f"Withdrew an offer; {offer['give_qty']} "
+    game.log(state, now, f"Withdrew an offer; {offer['give_qty']:,} "
                          f"{game.RESOURCES[offer['give']]} returned.")
     return None
 
@@ -217,10 +217,10 @@ def accept(market, buyer, now, offer_id, get_city, lots=None, amount=None):
         return f"Only {left * lot_give} {selling} is left in that offer."
     give_qty, want_qty = lots * lot_give, lots * lot_want
     if buyer["resources"][offer["want"]] < want_qty:
-        return f"You don't have {want_qty} {game.RESOURCES[offer['want']]} to pay."
+        return f"You don't have {want_qty:,} {game.RESOURCES[offer['want']]} to pay."
 
-    got = f"{give_qty} {game.RESOURCES[offer['give']]}"
-    paid = f"{want_qty} {game.RESOURCES[offer['want']]}"
+    got = f"{give_qty:,} {game.RESOURCES[offer['give']]}"
+    paid = f"{want_qty:,} {game.RESOURCES[offer['want']]}"
     seller = get_city(offer["city"])
     offer["give_qty"] -= give_qty
     offer["want_qty"] -= want_qty
@@ -232,7 +232,7 @@ def accept(market, buyer, now, offer_id, get_city, lots=None, amount=None):
     game.log(buyer, now, f"Traded with {offer['city']}: paid {paid}, received {got}.")
     if seller:
         seller["resources"][offer["want"]] += want_qty
-        left_text = (f" {offer['give_qty']} {game.RESOURCES[offer['give']]} still on offer."
+        left_text = (f" {offer['give_qty']:,} {game.RESOURCES[offer['give']]} still on offer."
                      if offer["give_qty"] else " That offer is now sold out.")
         game.log(seller, now, f"{buyer['name']} bought from your offer: gave {got}, received {paid}.{left_text}")
         seller.setdefault("sales", []).append({
@@ -277,8 +277,8 @@ def _bill(market, bill_id):
 
 def bill_text(bill):
     hours = bill["every"] // 3600
-    return (f"{bill['from']} sends {bill['give_qty']} {game.RESOURCES[bill['give']]}, "
-            f"{bill['to']} sends {bill['want_qty']} {game.RESOURCES[bill['want']]}, "
+    return (f"{bill['from']} sends {bill['give_qty']:,} {game.RESOURCES[bill['give']]}, "
+            f"{bill['to']} sends {bill['want_qty']:,} {game.RESOURCES[bill['want']]}, "
             f"every {hours} hour{'s' if hours != 1 else ''}")
 
 
@@ -299,7 +299,7 @@ def propose_bill(market, state, now, data, get_city):
     if give == want:
         return "You can't trade a material for itself."
     if not (_valid_qty(give_qty) and _valid_qty(want_qty)):
-        return "Amounts must be whole numbers of 1 or more."
+        return f"Amounts must be whole numbers from 1 to {MAX_QUANTITY:,}."
     if not (_valid_qty(hours) and MIN_BILL_HOURS <= hours <= MAX_BILL_HOURS):
         return f"A bill repeats every {MIN_BILL_HOURS} to {MAX_BILL_HOURS} hours."
     for name in (state["name"], to):
@@ -413,7 +413,7 @@ def _valid_want(want):
 
 def want_text(want):
     if want["kind"] == "resource":
-        return f"{want['qty']} {game.RESOURCES[want['res']]}"
+        return f"{want['qty']:,} {game.RESOURCES[want['res']]}"
     return f"a {beasts.SPECIES[want['species']]['name']} of level {want['level']} or higher"
 
 
@@ -513,7 +513,7 @@ def _valid_stake(stake):
 
 
 def _goods(stake):
-    return f"{stake['qty']} {game.RESOURCES[stake['res']]}"
+    return f"{stake['qty']:,} {game.RESOURCES[stake['res']]}"
 
 
 def _duel(market, duel_id):
