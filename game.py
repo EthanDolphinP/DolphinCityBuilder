@@ -3528,7 +3528,7 @@ def tame_cost(species):
     return {"food": WILDLIFE[species]["livestock"] * TAME_FOOD_PER_HEAD}
 
 
-def tame(state, now, area, x, y):
+def tame(state, now, area, x, y, quiet=False):
     tile = area["tiles"][y][x]
     if not tile["animal"]:
         return "There are no animals there."
@@ -3546,7 +3546,34 @@ def tame(state, now, area, x, y):
     beasts.note(state, now, "tame")
     beasts.tame_egg(state, now, random.Random())
     tile["animal"] = None
-    log(state, now, f"Tamed {w['name'].lower()} in {area_name(area)}: +{w['livestock']} Livestock.")
+    if not quiet:
+        log(state, now, f"Tamed {w['name'].lower()} in {area_name(area)}: +{w['livestock']} Livestock.")
+    return None
+
+
+def tame_all(state, now, areas):
+    """Tame every wild animal in these areas that there is bait for, in map order. One line in the log."""
+    problem = _need_research(state, "taming", "Taming")
+    if problem:
+        return problem + "."
+    spots = [(area, x, y) for area in areas for y, row in enumerate(area["tiles"]) for x, t in enumerate(row) if t["animal"]]
+    if not spots:
+        return "There are no wild animals there to tame."
+    tamed, livestock, food, left = 0, 0, 0, 0
+    for area, x, y in spots:
+        species = area["tiles"][y][x]["animal"]
+        if _missing(state, tame_cost(species)):
+            left += 1
+            continue
+        tame(state, now, area, x, y, quiet=True)
+        tamed += 1
+        livestock += WILDLIFE[species]["livestock"]
+        food += tame_cost(species)["food"]
+    if not tamed:
+        return f"Not enough Food to tame any of them (the cheapest needs {min(tame_cost(a['tiles'][y][x]['animal'])['food'] for a, x, y in spots)})."
+    where = area_name(areas[0]) if len(areas) == 1 else "every area"
+    log(state, now, f"Tamed {tamed} wild {'animal' if tamed == 1 else 'animals'} in {where} for {food} Food: +{livestock} Livestock."
+        + (f" {left} more could not be tamed: not enough Food." if left else ""))
     return None
 
 
@@ -3721,6 +3748,13 @@ def apply_action(state, now, action, data):
         if not (isinstance(target, int) and 0 <= target < len(state["areas"])):
             return "Unknown area."
         return rename_area(state, now, state["areas"][target], data.get("name"))
+    if action == "tame_all":     # "area": an area's index, or "all" for every area
+        target = data.get("area")
+        if target == "all":
+            return tame_all(state, now, state["areas"])
+        if not (isinstance(target, int) and 0 <= target < len(state["areas"])):
+            return "Unknown area."
+        return tame_all(state, now, [state["areas"][target]])
     if action in ("build", "demolish", "add", "tame", "priority"):
         ai, x, y = data.get("area", 0), data.get("x"), data.get("y")
         if not (isinstance(ai, int) and 0 <= ai < len(state["areas"])):
@@ -3773,6 +3807,7 @@ def defs():
             "additions": ADDITIONS,
             "max_additions": MAX_ADDITIONS,
             "slaughter_food": SLAUGHTER_FOOD,
+            "tame_food": TAME_FOOD_PER_HEAD,
             "environments": ENVIRONMENTS,
             "wildlife": WILDLIFE,
             "ideologies": ideology.defs(),

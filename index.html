@@ -251,7 +251,7 @@
   .mobile .setGrid { grid-template-columns: 1fr; }
   .mobile .bar { gap: 6px; }
   .mobile #status { font-size: 12px; white-space: normal; }
-  .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame],
+  .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame], .visiting [data-tame-all],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
   details.spc { border-top: 1px solid var(--line); padding: 7px 0; }
@@ -563,6 +563,7 @@
           <div id="weatherBar" class="small"></div>
           <div class="scroll"><div id="map"></div></div>
           <div id="mapKey" class="dim small" style="margin-top:8px"></div>
+          <div id="tameHere" class="bar"></div>
           <div id="finder">
             <div class="cat">Find</div>
             <div class="bar" style="margin-top:8px">
@@ -727,6 +728,7 @@
           <select id="areaLook" title="How to show them"><option value="cards">Cards with maps</option><option value="list">Short list</option></select>
         </div>
         <div id="areaFilters" class="bar"></div>
+        <div id="tameEverywhere" class="bar"></div>
         <div id="known" class="scroll" style="margin-top:10px"></div>
       </div>
       <div class="panel" data-exp="send">
@@ -1808,6 +1810,7 @@ function render() {
       `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results.`);
   renderFinder();
   renderTile();
+  setHTML($('tameHere'), tameAllButton([view.area], 'Tame all animals here'));
   $('collectionPanel').hidden = !settings.collection;
   if (settings.collection && tab === 'city') renderCollection();
   // Only the tab on screen is drawn; the others are drawn when they are opened.
@@ -2155,6 +2158,7 @@ function renderResearch() {
 let expView = settings.expView || 'send';   // which part of the Explore tab shows (remembered)
 let areaFilter = 'all', destFilter = 'all';
 function renderExplore() {
+  setHTML($('tameEverywhere'), tameAllButton(view.state.areas.map((a, n) => n), 'Tame all animals in every area'));
   const { defs, explore, state } = view, E = defs.environments, T = defs.terrains;
   const trip = explore.expedition;
   const sendable = explore.destinations.filter(d => !d.problem && d.affordable).length;
@@ -2325,6 +2329,20 @@ function renderStats() {
   }
   $('statsMatches').textContent = words.length ? `${matches} ${matches === 1 ? 'stat matches' : 'stats match'}, across every section` : '';
   setHTML($('statsBody'), html || `<div class="panel"><p class="dim">${words.length ? 'No stats match.' : 'Nothing here.'}</p></div>`);
+}
+// The "Tame all" buttons: wild animals in some areas, what taming them all costs, and what there is bait for.
+function tameAllButton(areaIdxs, label) {
+  const { state, defs } = view;
+  if (visiting) return '';
+  const animals = areaIdxs.flatMap(i => state.areas[i].tiles.flat().filter(t => t.animal).map(t => defs.wildlife[t.animal]));
+  if (!animals.length) return '';
+  const taming = view.research.some(r => r.done && defs.research[r.id].taming);
+  const food = animals.reduce((n, w) => n + w.livestock * defs.tame_food, 0), worth = animals.reduce((n, w) => n + w.livestock, 0);
+  const have = Math.floor(state.resources.food);
+  const target = areaIdxs.length === 1 ? areaIdxs[0] : 'all';
+  return `<button data-tame-all="${target}" ${taming && have >= Math.min(...animals.map(w => w.livestock * defs.tame_food)) ? '' : 'disabled'}>${label} (${animals.length})</button>` +
+    `<span class="dim small">${!taming ? 'Research Animal Taming first.'
+      : `${num(food)} Food for ${worth} Livestock` + (have < food ? ` <span class="bad">- you have ${num(have)}, so only some will be tamed</span>` : '')}</span>`;
 }
 function renderFinder() {
   const found = view.found, out = $('findOut');
@@ -3547,6 +3565,10 @@ $('tab-ideology').addEventListener('toggle', e => {   // remember which perk lis
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
 }, true);
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-tame-all]');
+  if (b && !visiting) act('tame_all', { area: b.dataset.tameAll === 'all' ? 'all' : +b.dataset.tameAll });
+});
 $('statsViews').onclick = e => {
   const b = e.target.closest('[data-stats-view]');
   if (b) { statsView = settings.statsView = b.dataset.statsView; saveSettings(); renderStats(); }
