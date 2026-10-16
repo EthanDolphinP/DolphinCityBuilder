@@ -1273,8 +1273,8 @@ const TUTORIAL = [
     c => c.has('farm', 'hunting_lodge', 'fishing_dock')],
   ['Make room for people', 'Build a Hut. A new person arrives at each meal while there is a free bed and food to spare.',
     c => c.has('hut')],
-  ['Reach 6 people', 'Buildings need workers, so more people means more can run at once. The People tab shows what is holding growth back.',
-    c => c.state.population >= 6],
+  ['Reach 15 people', 'Buildings need workers, so more people means more can run at once. The People tab shows what is holding growth back.',
+    c => c.state.population >= 15],
   ['Start learning', 'Build a Shaman Hut. It makes Knowledge, which pays for research.',
     c => c.has('shaman_hut')],
   ['Research something', 'Open the Research tab and buy your first research. Surveying and Stone Tools are cheap and useful.',
@@ -1333,8 +1333,9 @@ function renderPresent() {
     `<pre class="beastArt ${p.opened ? 'good' : 'hi'}" style="text-align:left;display:inline-block">${esc(p.opened ? PRESENT_OPEN : PRESENT_SHUT)}</pre>` +
     (p.message ? `<p class="big" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(p.message)}</p>` : '') +
     (p.opened
-      ? `<h2>Inside</h2>` + (gifts.length || p.egg
+      ? `<h2>Inside</h2>` + (gifts.length || p.egg || p.people
           ? gifts.map(([k, v]) => `<div class="opt good">+${num(v)} ${esc(R[k])}</div>`).join('') +
+            (p.people ? `<div class="opt good">+${num(p.people)} ${p.people === 1 ? 'person has' : 'people have'} moved in.</div>` : '') +
             (p.egg ? `<div class="opt good">A ${esc(view.beast.rarities[p.egg].name.toLowerCase())} beast egg. It is waiting on the Beast tab.</div>` : '') +
             `<p class="dim small">Added to your stores.</p>`
           : `<p class="dim">Just the note this time.</p>`)

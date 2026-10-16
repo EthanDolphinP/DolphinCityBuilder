@@ -38,7 +38,7 @@ case "${1:-}" in
     cat <<'USAGE'
 dolphincity update                     get the latest code from GitHub and restart
 dolphincity restart | status | logs    the game service
-dolphincity present City "message" wood=100 egg=rare   (or "all" instead of a city)
+dolphincity present City "message" wood=100 egg=rare people=5   (or "all" instead of a city)
 dolphincity reset-password City        the next person to sign in to City picks its password
 dolphincity backup                     save a backup now (one is made every night; 14 are kept)
 dolphincity restore file.tar.gz        replace the game's data with a backup

@@ -268,8 +268,8 @@ RESOURCES = {
 UNTRADEABLE = {"knowledge"}   # cannot be offered or asked for on the market
 
 START_RESOURCES = {"food": 50, "wood": 100, "stone": 25, "livestock": 3}
-START_POPULATION = 3
-BASE_HOUSING = 3            # people who can live in the starting camp
+START_POPULATION = 10
+BASE_HOUSING = 10           # people who can live in the starting camp
 AREA_SIZE = 5
 MAP_GROWTH_PER_TECH = 2     # the home area gains a ring of new land on each advance
 DEGREES_PER_HEIGHT = 2      # temperature drop per height level
@@ -3435,13 +3435,14 @@ MAX_PRESENT_MESSAGE = 300
 MAX_SOCIAL_LIST = 200       # cities one city can mark as ally or enemy (the lists do nothing in the game)
 
 
-def give_present(state, now, message, gifts, egg=None):
-    """Leave a wrapped present in the city. `gifts` is {resource: amount}; `egg` a rarity or None."""
+def give_present(state, now, message, gifts, egg=None, people=0):
+    """Leave a wrapped present in the city. `gifts` is {resource: amount}; `egg` a rarity or None;
+    `people` new arrivals (they move in even if every bed is taken)."""
     state["present_count"] = state.get("present_count", 0) + 1
     state.setdefault("presents", []).append({
         "id": state["present_count"], "t": now, "message": str(message or "")[:MAX_PRESENT_MESSAGE],
         "gifts": {k: v for k, v in gifts.items() if k in RESOURCES and v > 0},
-        "egg": egg if egg in beasts.RARITIES else None, "opened": False})
+        "egg": egg if egg in beasts.RARITIES else None, "people": max(0, int(people or 0)), "opened": False})
     log(state, now, "A present has arrived for the city.")
 
 
@@ -3456,6 +3457,10 @@ def open_present(state, now, present_id):
     for k, v in present["gifts"].items():
         state["resources"][k] += v
     got = [fmt_goods(present["gifts"])] if present["gifts"] else []
+    if present.get("people"):
+        state["population"] += present["people"]
+        tally(state, "arrivals", present["people"])
+        got.append(f"{present['people']} new {'person' if present['people'] == 1 else 'people'}")
     if present["egg"]:
         beasts.new_egg(state, now, beasts.random_species(random.Random(), rarity=present["egg"]))
         got.append(f"a {beasts.RARITIES[present['egg']]['name'].lower()} beast egg")

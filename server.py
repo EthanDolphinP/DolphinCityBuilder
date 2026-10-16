@@ -209,23 +209,27 @@ def deliver_presents(now):
         for name in names:
             state = find_city(name, now)
             if state:
-                game.give_present(state, now, present["message"], present["gifts"], present.get("egg"))
+                game.give_present(state, now, present["message"], present["gifts"], present.get("egg"),
+                                  present.get("people", 0))
     flush()
 
 
 def send_present(args):
     """The --present command. Returns what to print."""
-    usage = ("Usage: python server.py --present CityName|all \"message\" wood=100 food=50 egg=rare\n"
-             f"  materials: {', '.join(game.RESOURCES)}\n  egg: {', '.join(beasts.RARITIES)}")
+    usage = ("Usage: python server.py --present CityName|all \"message\" wood=100 food=50 egg=rare people=5\n"
+             f"  materials: {', '.join(game.RESOURCES)}\n  egg: {', '.join(beasts.RARITIES)}\n"
+             "  people: new arrivals (they move in even if every bed is taken)")
     if len(args) < 2:
         return usage
-    to, message, gifts, egg = args[0], args[1], {}, None
+    to, message, gifts, egg, people = args[0], args[1], {}, None, 0
     if to != "all" and not (CITY_NAME.match(to) and (SAVES / f"{to}.json").exists()):
         return f"There is no city called {to}. City names are case-sensitive: {', '.join(all_city_names()) or 'none yet'}."
     for word in args[2:]:
         key, _, value = word.partition("=")
         if key == "egg" and value in beasts.RARITIES:
             egg = value
+        elif key == "people" and value.isdigit() and 0 < int(value) <= 10_000:
+            people += int(value)
         elif key in game.RESOURCES and value.isdigit() and 0 < int(value) <= 1_000_000:
             gifts[key] = gifts.get(key, 0) + int(value)
         else:
@@ -233,9 +237,10 @@ def send_present(args):
     if "=" in message and not args[2:]:
         return f"The message comes before the gifts, in quotes.\n{usage}"
     waiting = json.loads(PRESENTS_FILE.read_text(encoding="utf-8")) if PRESENTS_FILE.exists() else []
-    waiting.append({"to": to, "message": message[:game.MAX_PRESENT_MESSAGE], "gifts": gifts, "egg": egg})
+    waiting.append({"to": to, "message": message[:game.MAX_PRESENT_MESSAGE], "gifts": gifts, "egg": egg, "people": people})
     _write(PRESENTS_FILE, waiting)
-    inside = [f"{v} {game.RESOURCES[k]}" for k, v in gifts.items()] + ([f"a {egg} egg"] if egg else [])
+    inside = ([f"{v} {game.RESOURCES[k]}" for k, v in gifts.items()] + ([f"a {egg} egg"] if egg else [])
+              + ([f"{people} people"] if people else []))
     return (f"Present for {'every city' if to == 'all' else to}: {', '.join(inside) or 'nothing but the message'}.\n"
             "It is handed out the next time anyone uses the game.")
 

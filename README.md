@@ -232,7 +232,8 @@ python server.py --present all "Sorry about the downtime." food=100 egg=rare
 The message goes in quotes, then as many `material=amount` gifts as you like:
 `food`, `wood`, `stone`, `ore`, `tools`, `gold`, `electronics`, `livestock`,
 `knowledge`. `egg=` adds a beast egg: `common`, `uncommon`, `rare`, `epic` or
-`legendary`. Use `all` instead of a city name to send it to everyone.
+`legendary`. `people=` adds new arrivals, who move in even if every bed is taken.
+Use `all` instead of a city name to send it to everyone.
 
 ### A forgotten password
 
