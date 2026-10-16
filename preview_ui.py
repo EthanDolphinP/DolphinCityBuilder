@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import game
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -36,13 +37,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             return self.reply(403, b'{"error":"Foreign origins are not allowed."}')
         path = self.path.split("?", 1)[0]
         if self.command == "GET" and path == "/":
-            html = (ROOT / "index.html").read_text(encoding="utf-8")
-            banner = ('<div class="panel" style="border-color:var(--accent);margin-top:0">'
-                      '<strong>Live server preview</strong><br>'
-                      '<span class="small">Connected to mangoclaw119.pythonanywhere.com. '
-                      'Sign in with your existing city. Actions change your real city.</span></div>')
-            html = html.replace("<main>", "<main>" + banner, 1)
-            return self.reply(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return self.reply(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
         if path not in API_PATHS:
             return self.reply(404, b'{"error":"Not found."}')
         try:
@@ -58,7 +53,15 @@ class PreviewHandler(BaseHTTPRequestHandler):
         request = Request(UPSTREAM + self.path, data=body, headers=headers, method=self.command)
         try:
             with urlopen(request, timeout=25) as response:
-                self.reply(response.status, response.read(), response.headers.get("Content-Type", "application/json"))
+                payload = response.read()
+                # Derive new display metrics locally from the returned snapshot only.
+                # The hosted city and its saved state are never changed here.
+                if path in {"/api/state", "/api/action", "/api/visit", "/api/login"}:
+                    data = json.loads(payload)
+                    if "state" in data and "status" in data and "food_potential" not in data["status"]:
+                        data["status"]["food_potential"] = game.view(data["state"], data.get("area", 0))["status"]["food_potential"]
+                        payload = json.dumps(data).encode()
+                self.reply(response.status, payload, response.headers.get("Content-Type", "application/json"))
         except HTTPError as error:
             if error.code >= 500:
                 self.reply(error.code, json.dumps({"error": f"Live server returned HTTP {error.code}. Try again shortly."}).encode())

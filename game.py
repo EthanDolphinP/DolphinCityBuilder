@@ -3789,6 +3789,7 @@ def _view(state, ai, detail):
     rates = {k: 0.0 for k in RESOURCES}   # expected change per hour, whole city
     rates["food"] -= state["population"] * 3600 / MEAL_TIME
     food_made = 0.0
+    food_potential = 0.0
     here = {}
     env = weather.job_factors(state, jobs, state["updated"])
     supply, demand, power = power_status(state, jobs, env)
@@ -3799,6 +3800,8 @@ def _view(state, ai, detail):
         job["speed"] = _speed(state, job, power, env[i][0])
         job["waiting"] = list(_missing(state, job["b"].get("consumes", {})))
         job["output"] = job_output(state, job)
+        if job["cycle"]:
+            food_potential += job["output"].get("food", 0) * 3600 / job["cycle"] * env[i][0]
         job["status"] = job_status(state, job, power)
         if job["speed"] and not job["waiting"] and job["cycle"]:
             per_hour = 3600 / job["cycle"] * job["speed"]
@@ -3891,6 +3894,7 @@ def _view(state, ai, detail):
             "rates": {k: round(v, 1) for k, v in rates.items()},
             "meal_time": MEAL_TIME,
             "food_made": round(food_made, 1),
+            "food_potential": round(food_potential, 1),
             "food_eaten": round(state["population"] * 3600 / MEAL_TIME, 1),
             "housing_from": housing_sources(state),
             "growth": growth_checks(state, housing),
