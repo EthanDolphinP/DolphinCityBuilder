@@ -3484,7 +3484,7 @@ function renderBoard() {
   const all = [...general, ...Object.entries(R)];
   const views = { overview: ['Overview', general], materials: ['Materials', Object.entries(R)], all: ['Everything', all] };
   const val = (c, k) => k in R ? c.resources[k] : c[k];
-  const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : val(c, k);
+  const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : num(val(c, k));   // follows the number settings
   const sortLabel = all.find(([k]) => k === boardSort)[1];
 
   // Ranks come from the whole list, so searching doesn't renumber anyone.
@@ -3506,8 +3506,8 @@ function renderBoard() {
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   const leader = ranked[0], me = ranked.find(c => c.name === city);
   setHTML($('boardSummary'),
-    stat('Cities', board.length, '') +
-    (me ? stat('Your rank', `#${rank.get(city)} of ${board.length}`, `by ${esc(sortLabel.toLowerCase())}`) : '') +
+    stat('Cities', num(board.length), '') +
+    (me ? stat('Your rank', `#${num(rank.get(city))} of ${num(board.length)}`, `by ${esc(sortLabel.toLowerCase())}`) : '') +
     (leader ? stat('In the lead', esc(leader.name), `${show(leader, boardSort)} ${boardSort === 'tech' ? '' : esc(sortLabel.toLowerCase())}`) : '') +
     stat('Banned by you', myBanned.length, myBanned.length ? esc(myBanned.join(', ')) : 'nobody'));
   setHTML($('boardViews'), `<span class="dim">Columns</span>` + Object.entries(views).map(([k, [label]]) =>
