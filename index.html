@@ -281,6 +281,7 @@
   .heart .crack.lit { color: #ffd36a; text-shadow: 0 0 8px #ffd36a; }
   .mobile .breedRow { grid-template-columns: 1fr; justify-items: center; }
   .mobile .breedSlot { width: 100%; }
+  .stat.go { cursor: pointer; } .stat.go:hover { border-color: var(--accent); }
   .pin { background: none; border: none; padding: 0 4px; color: var(--dim); cursor: pointer; font: inherit; }
   .pin.on { color: var(--hi); }
   .statTable th[data-stat-sort] { cursor: pointer; }
@@ -788,6 +789,11 @@
           <input id="mktSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
           <select id="mktGives"></select>
           <select id="mktWants"></select>
+          <select id="mktSort" title="Order">
+            <option value="auto">Best price when comparing one thing for another, else newest</option>
+            <option value="newest">Newest first</option><option value="cheapest">Cheapest for one first</option>
+            <option value="biggest">Biggest first</option><option value="oldest">Oldest first</option></select>
+          <button type="button" id="mktClear" title="Show every offer again">Clear</button>
         </div>
         <div id="mktSelling" class="bar areaChips"></div>
         <div id="mktFilters" class="bar"></div>
@@ -839,7 +845,8 @@
 
       <details class="panel" data-mkt="history">
         <summary class="cat">Recent trades <span id="tradesCount" class="count"></span></summary>
-        <div class="bar" style="margin-top:0"><label class="check"><input id="tradesMine" type="checkbox"> Only trades my city took part in</label></div>
+        <div class="bar" style="margin-top:0"><input id="tradesSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
+          <label class="check"><input id="tradesMine" type="checkbox"> Only trades my city took part in</label></div>
         <div id="trades" class="small"></div>
       </details>
     </div>
@@ -1246,12 +1253,16 @@ function num(n) {
   if (typeof n !== 'number' || !isFinite(n)) return n;
   const size = Math.abs(n);
   if (settings.abbreviate && size >= 10000) {
-    const [unit, letter] = size >= 1e9 ? [1e9, 'B'] : size >= 1e6 ? [1e6, 'M'] : [1e3, 'k'];
+    const [unit, letter] = size >= 1e12 ? [1e12, 'T'] : size >= 1e9 ? [1e9, 'B'] : size >= 1e6 ? [1e6, 'M'] : [1e3, 'k'];
     return (n / unit).toFixed(size / unit >= 100 ? 0 : 1).replace(/\.0$/, '') + letter;
   }
   const v = Math.round(n * 10) / 10;
   return settings.separators ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : String(v);
 }
+// An amount and what it is ("1.5M Gold"), following the number settings.
+const qty = (n, res) => `${num(n)} ${esc(view.defs.resources[res])}`;
+// What one of something costs, to three significant figures ("0.833", "1,250").
+const each = x => x >= 1000 ? num(Math.round(x)) : String(+x.toPrecision(3));
 // An amount per hour, shown per hour, per meal or per minute as the player chose.
 function rateText(perHour) {
   const [v, unit] = settings.rate === 'meal' ? [perHour * (view ? view.status.meal_time : 900) / 3600, 'meal']
@@ -1311,14 +1322,14 @@ function fillOffers() {
     if (box.value !== typed) box.value = typed;
     const out = $('offers').querySelector(`[data-cost="${id}"]`);
     if (!o || !out) continue;
-    const l = lotOf(o), b = buyOf(o, +typed), have = view.state.resources[o.want];
+    const l = lotOf(o), b = buyOf(o, amount(typed)), have = view.state.resources[o.want];
     if (typed === '') { out.className = 'dim small'; out.textContent = ''; }
-    else if (!b.lots) { out.className = 'bad small'; out.textContent = `The least you can buy is ${l.give} ${R[o.give]}.`; }
+    else if (!b.lots) { out.className = 'bad small'; out.textContent = isNaN(amount(typed)) ? 'Type a number, such as 500, 2.5m or 40k.' : `The least you can buy is ${num(l.give)} ${R[o.give]}.`; }
     else {
       const short = b.pay > have;
       out.className = (short ? 'bad' : 'good') + ' small';
-      out.textContent = (b.get !== +typed ? `Rounds to ${b.get} ${R[o.give]}: costs ` : 'Costs ') + `${b.pay} ${R[o.want]}` +
-        (short ? ` (you have ${Math.floor(have)})` : '');
+      out.textContent = (b.get !== amount(typed) ? `Rounds to ${num(b.get)} ${R[o.give]}: costs ` : 'Costs ') + `${num(b.pay)} ${R[o.want]}` +
+        (short ? ` (you have ${num(Math.floor(have))})` : '');
     }
   }
 }
@@ -1337,13 +1348,13 @@ const lotOf = o => {
 function priceHint() {
   const R = view.defs.resources, g = $('giveRes').value, w = $('wantRes').value;
   const same = view.market.offers.filter(o => o.city !== view.state.name && o.give === g && o.want === w);
-  const each = o => o.want_qty / o.give_qty;     // what one of the thing on sale costs
+  const unit = o => o.want_qty / o.give_qty, eachText = each;     // what one of the thing on sale costs
   if (!same.length) { $('priceHint').textContent = `Nobody else is selling ${R[g]} for ${R[w]} right now, so you set the price.`; return; }
-  const best = same.reduce((a, b) => each(a) <= each(b) ? a : b);
+  const best = same.reduce((a, b) => unit(a) <= unit(b) ? a : b);
   const mine = amount($('wantQty').value) / amount($('giveQty').value);
   $('priceHint').textContent = `${same.length} other ${same.length === 1 ? 'offer sells' : 'offers sell'} ${R[g]} for ${R[w]}; ` +
-    `the cheapest asks ${+each(best).toFixed(3)} ${R[w]} for each ${R[g]} (${best.city}).` +
-    (mine > 0 ? ` Yours asks ${+mine.toFixed(3)}, ${mine <= each(best) ? 'the best price on the market' : 'more than theirs, so theirs will likely sell first'}.` : '');
+    `the cheapest asks ${eachText(unit(best))} ${R[w]} for each ${R[g]} (${best.city}).` +
+    (mine > 0 ? ` Yours asks ${eachText(mine)}, ${mine <= unit(best) ? 'the best price on the market' : 'more than theirs, so theirs will likely sell first'}.` : '');
 }
 function lotPreview() {
   if (!view) return;
@@ -1352,7 +1363,7 @@ function lotPreview() {
   const l = lotOf({ give_qty: give, want_qty: want });
   priceHint();
   $('lotPreview').textContent = l.lots > 1
-    ? `Price: ${l.give} ${R[$('giveRes').value]} for ${l.want} ${R[$('wantRes').value]}. Buyers can take any amount${l.give > 1 ? ' in steps of ' + l.give : ''}, up to all ${give}.`
+    ? `Price: ${each(want / give)} ${R[$('wantRes').value]} for each ${R[$('giveRes').value]}. Buyers can take any amount${l.give > 1 ? ' in steps of ' + num(l.give) : ''}, up to all ${num(give)}.`
     : `These amounts share no common factor, so this can only be bought all at once. Round numbers can be bought a part at a time.`;
 }
 // The written part of the Guide tab. [title, text]
@@ -3316,17 +3327,18 @@ function renderMarket() {
     if (!$(id).options.length) $(id).innerHTML = `<option value="">${any}</option>` +
       defs.tradeable.map(k => `<option value="${esc(k)}">${id === 'mktGives' ? 'Gives' : 'Wants'} ${esc(R[k])}</option>`).join('');
   }
-  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
+  const stat = (k, v, r, go) => `<div class="stat ${go ? 'go' : ''}" ${go ? `data-mkt-go="${go}" role="button" tabindex="0" title="Show these"` : ''}>` +
+    `<div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   const mine = o => o.city === state.name;
   const canAccept = o => !mine(o) && state.resources[o.want] >= lotOf(o).want;   // at least one lot
   const myBills = market.bills.filter(b => b.from === state.name || b.to === state.name);
   const asked = myBills.filter(b => b.status === 'proposed' && b.to === state.name).length;
   setHTML($('mktSummary'),
-    stat('Open offers', market.offers.length, `${market.offers.filter(mine).length} posted by you`) +
-    stat('You can accept', market.offers.filter(canAccept).length, 'with what you have') +
+    stat('Open offers', market.offers.length, `${market.offers.filter(mine).length} posted by you`, 'buy:all') +
+    stat('You can accept', market.offers.filter(canAccept).length, 'with what you have', 'buy:afford') +
     stat('Your bills', myBills.filter(b => b.status === 'active').length + ' running',
-      asked ? `<span class="bad">${asked} waiting for your answer</span>` : `${myBills.filter(b => b.status === 'proposed').length} proposed`) +
-    stat('Trades made', market.history.length, 'recently, by anyone'));
+      asked ? `<span class="bad">${asked} waiting for your answer</span>` : `${myBills.filter(b => b.status === 'proposed').length} proposed`, 'bills') +
+    stat('Trades made', market.history.length, 'recently, by anyone', 'history'));
 
   // ---- which part of the market shows ----
   const forMe = myBills.filter(b => b.status === 'proposed' && b.to === state.name).length;
@@ -3364,34 +3376,38 @@ function renderMarket() {
   setHTML($('mktFilters'), Object.entries(filters).map(([k, [label, test]]) =>
     `<button data-filter="${k}" class="${k === mktFilter ? 'on' : ''}">${label} (${narrowed.filter(test).length})</button>`).join(''));
   const price = o => o.want_qty / o.give_qty;
-  // Newest first, unless one material is being compared for another: then the best price first.
-  const offers = narrowed.filter(filters[mktFilter][1]).sort((a, b) => gives && wants ? price(a) - price(b) : b.posted - a.posted);
+  // The order chosen; "Best price" only makes sense for one material sold for one other, so it falls back to newest otherwise.
+  const sorts = { newest: (a, b) => b.posted - a.posted, cheapest: (a, b) => price(a) - price(b) || b.posted - a.posted,
+                  biggest: (a, b) => b.give_qty - a.give_qty, oldest: (a, b) => a.posted - b.posted };
+  let sortBy = $('mktSort').value;
+  if (sortBy === 'auto') sortBy = gives && wants ? 'cheapest' : 'newest';
+  const offers = narrowed.filter(filters[mktFilter][1]).sort(sorts[sortBy]);
   $('offersCount').textContent = `(${offers.length}${offers.length === market.offers.length ? '' : ' of ' + market.offers.length})`;
-  setHTMLKeep($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Price</th><th>Posted</th><th>Buy</th></tr>` +
+  setHTMLKeep($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Price for one</th><th>Posted</th><th>Buy</th></tr>` +
     offers.map(o => {
       const l = lotOf(o), max = buyOf(o, 0).max;
       return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
-        `<td>${o.give_qty} ${esc(R[o.give])}</td>` +
-        `<td class="${mine(o) || max ? '' : 'bad'}">${o.want_qty} ${esc(R[o.want])}</td>` +
-        `<td class="dim">${l.give} ${esc(R[o.give])} for ${l.want} ${esc(R[o.want])}` +
-        (l.lots > 1 ? '' : l.give < o.give_qty || o.full_give > o.give_qty ? ' (last of it)' : ' (all at once)') + `</td>` +
+        `<td>${qty(o.give_qty, o.give)}` + (o.full_give > o.give_qty ? `<div class="dim small">${Math.round((1 - o.give_qty / o.full_give) * 100)}% sold</div>` : '') + `</td>` +
+        `<td class="${mine(o) || max ? '' : 'bad'}">${qty(o.want_qty, o.want)}</td>` +
+        `<td><span class="hi">${each(price(o))}</span> <span class="dim">${esc(R[o.want])} each</span>` +
+        `<div class="dim small">${l.lots > 1 ? `in steps of ${qty(l.give, o.give)}` : l.give < o.give_qty || o.full_give > o.give_qty ? 'the last of it' : 'all at once'}</div></td>` +
         `<td class="dim">${clock(o.posted)}</td><td>` +
         (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
           : l.lots > 1
-            ? `<div class="buy"><input data-amount="${o.id}" data-k="buy${o.id}" type="number" min="${l.give}" max="${o.give_qty}" step="${l.give}" ` +
+            ? `<div class="buy"><input data-amount="${o.id}" data-k="buy${o.id}" type="text" inputmode="decimal" autocomplete="off" style="width:100px" ` +
                 `placeholder="${esc(R[o.give])}" title="How much ${esc(R[o.give])} to buy${l.give > 1 ? ', in steps of ' + l.give : ''}"> ` +
               `<button data-accept="${o.id}">Buy</button> ` +
-              `<button data-max="${o.id}" ${max ? '' : 'disabled'} title="${max ? `Buy ${max} ${esc(R[o.give])}: all you can afford` : 'You cannot afford any of this'}">Max${max ? ' (' + max + ')' : ''}</button></div>` +
+              `<button data-max="${o.id}" ${max ? '' : 'disabled'} title="${max ? `Buy ${num(max)} ${esc(R[o.give])}: all you can afford` : 'You cannot afford any of this'}">Max${max ? ' (' + num(max) + ')' : ''}</button></div>` +
               `<div data-cost="${o.id}" class="dim small"></div>`
             : `<button data-max="${o.id}" ${max ? '' : 'disabled'}>Buy all</button>`) + `</td></tr>`;
-    }).join('') + `</table>` + (gives && wants ? `<p class="dim small">Best price first.</p>` : '')
+    }).join('') + `</table>`
     : `<span class="dim">${market.offers.length ? 'No offers match.' : 'Nobody is offering anything right now.'}</span>`, fillOffers);
   lotPreview();
 
   // ---- offers of this city's that sold out, ready to post again ----
   const finished = (state.finished || []).slice().reverse();
   $('finishedCount').textContent = `(${finished.length})`;
-  const box = (f, side) => `<input data-fin="${f.id}" data-side="${side}" data-k="fin${f.id}:${side}" type="number" min="1" step="1" ` +
+  const box = (f, side) => `<input data-fin="${f.id}" data-side="${side}" data-k="fin${f.id}:${side}" type="text" inputmode="decimal" autocomplete="off" style="width:110px" ` +
     `value="${f[side] || ''}" title="Type a new amount">`;
   setHTMLKeep($('finished'), finished.length ? `<table><tr><th>You give</th><th>You want</th><th>Change both</th><th>Sold out</th><th></th></tr>` +
     finished.map(f => {
@@ -3400,10 +3416,11 @@ function renderMarket() {
         const g = f.give_qty * mul / div, w = f.want_qty * mul / div, by = mul + '/' + div;
         const can = set && Number.isInteger(g) && Number.isInteger(w) && g >= 1 && w >= 1 && g <= MAX_QTY && w <= MAX_QTY;
         return `<button data-scale="${f.id}" data-by="${by}" ${can ? '' : 'disabled'} ` +
-          `title="${can ? `Make it ${g} for ${w}` : 'Both amounts have to stay whole numbers of at least 1'}">${label}</button>`;
+          `title="${can ? `Make it ${num(g)} for ${num(w)}` : 'Both amounts have to stay whole numbers of at least 1'}">${label}</button>`;
       };
       return `<tr><td><div class="fin">${box(f, 'give_qty')} <span class="${ok || !set ? '' : 'bad'}">${esc(R[f.give])}</span></div></td>` +
-        `<td><div class="fin">${box(f, 'want_qty')} ${esc(R[f.want])}</div></td>` +
+        `<td><div class="fin">${box(f, 'want_qty')} ${esc(R[f.want])}</div>` +
+        (set ? `<div class="dim small">${each(f.want_qty / f.give_qty)} ${esc(R[f.want])} for each ${esc(R[f.give])}</div>` : '') + `</td>` +
         `<td><div class="fin" style="flex-wrap:nowrap">${scale('&divide;100', 1, 100)}${scale('&divide;10', 1, 10)}${scale('&times;10', 10, 1)}${scale('&times;100', 100, 1)}</div></td>` +
         `<td class="dim">${clock(f.finished)}</td><td>` +
         `<button data-reactivate="${f.id}" ${ok ? '' : 'disabled'} title="${ok ? 'Post it again with these amounts' : set ? 'You do not have enough in stock to post it again' : 'Fill in both amounts first'}">Reactivate</button> ` +
@@ -3415,11 +3432,11 @@ function renderMarket() {
   $('mktSales').hidden = !sales.length;
   if (sales.length) {
     const total = (key, qty) => Object.entries(sales.reduce((sum, s) => (sum[s[key]] = (sum[s[key]] || 0) + s[qty], sum), {}))
-      .map(([k, n]) => `${n} ${esc(R[k])}`).join(', ');
+      .map(([k, n]) => qty(n, k)).join(', ');
     setHTML($('salesBody'),
       kv([['Sales', sales.length], ['You received', `<span class="good">${total('want', 'want_qty')}</span>`], ['You sold', total('give', 'give_qty')]]) +
       `<div class="list">` + sales.slice().reverse().map(s => `<div class="opt small"><span class="dim">[${clock(s.t)}]</span> <span class="hi">${esc(s.buyer)}</span> bought ` +
-        `${s.give_qty} ${esc(R[s.give])} for ${s.want_qty} ${esc(R[s.want])} <span class="dim">(${s.left ? s.left + ' left on that offer then' : 'sold out'})</span></div>`).join('') + `</div>`);
+        `${qty(s.give_qty, s.give)} for ${qty(s.want_qty, s.want)} <span class="dim">(${s.left ? num(s.left) + ' left on that offer then' : 'sold out'})</span></div>`).join('') + `</div>`);
   }
 
   setHTML($('cityList'), view.cities.filter(c => c !== state.name).map(c => `<option value="${esc(c)}">`).join(''));
@@ -3439,18 +3456,20 @@ function renderMarket() {
         : sent ? `<button data-bill-cancel="${b.id}">Withdraw</button>`
         : `<button data-bill-accept="${b.id}">Accept</button> <button data-bill-cancel="${b.id}">Decline</button>`;
       return `<tr class="${waiting(b) ? 'me' : ''}"><td>${esc(other)}</td>` +
-        `<td class="${state.resources[send[0]] >= send[1] ? '' : 'bad'}">${send[1]} ${esc(R[send[0]])}</td>` +
-        `<td>${get[1]} ${esc(R[get[0]])}</td><td>${duration(b.every)}</td><td>${status}</td><td>${buttons}</td></tr>`;
+        `<td class="${state.resources[send[0]] >= send[1] ? '' : 'bad'}">${qty(send[1], send[0])}</td>` +
+        `<td>${qty(get[1], get[0])}</td><td>${duration(b.every)}</td><td>${status}</td><td>${buttons}</td></tr>`;
     }).join('') + `</table>` : `<span class="dim">You have no bills.</span>`);
 
   $('tradesCount').textContent = `(${market.history.length})`;
-  const history = market.history.filter(t => !$('tradesMine').checked || t.seller === state.name || t.buyer === state.name);
+  const hwords = $('tradesSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const history = market.history.filter(t => (!$('tradesMine').checked || t.seller === state.name || t.buyer === state.name) &&
+    hwords.every(w => `${t.seller} ${t.buyer} ${R[t.give]} ${R[t.want]}`.toLowerCase().includes(w)));
   setHTML($('trades'), history.length ? history.slice().reverse().map(t => {
     const involved = t.seller === state.name || t.buyer === state.name;
     return `<div class="opt ${involved ? 'hi' : 'dim'}"><span class="dim">[${clock(t.t)}]</span> ${esc(t.seller)} gave ` +
-      `${t.give_qty} ${esc(R[t.give])} to ${esc(t.buyer)} for ${t.want_qty} ${esc(R[t.want])}</div>`;
+      `${qty(t.give_qty, t.give)} to ${esc(t.buyer)} for ${qty(t.want_qty, t.want)} <span class="dim">(${each(t.want_qty / t.give_qty)} each)</span></div>`;
   }).join('') + `<p class="dim">Trades your city took part in are shown in white.</p>`
-    : `<span class="dim">${market.history.length ? 'Your city has not traded recently.' : 'No trades yet.'}</span>`);
+    : `<span class="dim">${!market.history.length ? 'No trades yet.' : hwords.length ? 'No trades match.' : 'Your city has not traded recently.'}</span>`);
 }
 
 async function loadBoard() {
@@ -4015,7 +4034,7 @@ $('finished').addEventListener('change', e => {
   const f = (view.state.finished || []).find(x => x.id === +d.fin);
   finInput.delete(d.k);
   if (!f) return;
-  const now = { give_qty: f.give_qty, want_qty: f.want_qty, [d.side]: Math.floor(+e.target.value) };
+  const now = { give_qty: f.give_qty, want_qty: f.want_qty, [d.side]: amount(e.target.value) };
   if (now[d.side] >= 1) act('offer_edit', { offer: f.id, ...now });
   else { say('Amounts must be whole numbers of 1 or more.'); $('finished')._html = null; renderMarket(); }
 });
@@ -4034,6 +4053,18 @@ $('mktSelling').onclick = e => {
   renderMarket();
 };
 $('tradesMine').onchange = () => renderMarket();
+$('tradesSearch').oninput = () => { if (view) renderMarket(); };
+$('mktSort').onchange = () => { if (view) renderMarket(); };
+$('mktClear').onclick = () => { $('mktSearch').value = ''; $('mktGives').value = ''; $('mktWants').value = ''; $('mktSort').value = 'auto'; renderMarket(); };
+$('mktSummary').onclick = e => {
+  const b = e.target.closest('[data-mkt-go]');
+  if (!b) return;
+  const [part, filter] = b.dataset.mktGo.split(':');
+  mktView = settings.mktView = part; saveSettings();
+  if (filter) mktFilter = filter;
+  renderMarket();
+  $('tab-market').querySelector(`[data-mkt~="${part}"]`)?.scrollIntoView({ block: 'start' });
+};
 $('mktViews').onclick = e => {
   const b = e.target.closest('[data-mkt-view]');
   if (b) { mktView = settings.mktView = b.dataset.mktView; saveSettings(); renderMarket(); }
@@ -4050,9 +4081,9 @@ $('offers').onclick = e => {
   if (id && !o) return;
   if (e.target.dataset.accept) {
     // Buy the amount typed, rounded down to what the offer's price allows.
-    const R = view.defs.resources, typed = lotInput.get(id) || '', b = buyOf(o, +typed);
+    const R = view.defs.resources, typed = lotInput.get(id) || '', b = buyOf(o, amount(typed));
     if (typed === '') { say(`Type how much ${R[o.give]} to buy, or press Max.`); return; }
-    if (!b.lots) { say(`The least you can buy from that offer is ${lotOf(o).give} ${R[o.give]}.`); return; }
+    if (!b.lots) { say(`The least you can buy from that offer is ${num(lotOf(o).give)} ${R[o.give]}.`); return; }
     lotInput.delete(id);
     act('offer_accept', { offer: id, amount: b.get });
   }
