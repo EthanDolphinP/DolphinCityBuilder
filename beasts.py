@@ -20,7 +20,7 @@ and a species is likelier in the kinds of land it lives in, its "home"), from
 rare weather (now and then an egg turns up where it is passing), from
 breeding (a male and a female of one species lay an egg every BREED_TIME, its
 stats a mix of theirs: see "Breeding" below),
-from taming wild animals (a small chance of a nest), from reaching a new tech
+from taming wild animals (a small chance of a nest, a few a day at most), from reaching a new tech
 level, from a beast reaching level 5 and level 10, and from a Nesting Ground
 building, which lays one every few days. Presents and trades can bring them too.
 
@@ -55,7 +55,10 @@ EGG_CHANCE = 0.15           # chance an expedition finds an egg...
 EGG_CHANCE_PER_STEP = 0.05  # ...plus this for every step of distance from home
 EGG_CHANCE_MAX = 0.6
 RARER_PER_STEP = 0.25       # how much each step of distance favours the rarer species
-TAME_EGG_CHANCE = 0.06      # chance that taming a wild animal turns up an egg
+TAME_EGG_CHANCE = 0.015     # chance that taming a wild animal turns up an egg...
+TAME_EGG_BONUS = 0.25       # ...plus this share of the city's egg_chance bonuses (they are meant for expeditions)...
+TAME_EGG_MAX = 0.03         # ...at most this...
+TAME_EGGS_PER_DAY = 2       # ...and no more than this many nest eggs in a day
 TECH_EGGS = ["common", "uncommon", "rare", "epic", "legendary"]   # the egg for reaching Village, Town, ...
 EGG_LEVELS = {5: 0, 10: 1, 15: 1, 20: 2}   # a beast reaching this level brings home an egg this many rarities above its own
 NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often (there is no limit on eggs)
@@ -951,10 +954,19 @@ def tick(state, now):
 
 # ------------------------------------------------------- other egg sources --
 
+def tame_egg_chance(state):
+    return min(TAME_EGG_MAX, TAME_EGG_CHANCE + TAME_EGG_BONUS * game.city_stat(state, "egg_chance"))
+
+
 def tame_egg(state, now, rng):
     """Maybe find an egg in the nest of a wild animal that was just tamed. Returns the egg or None."""
-    if rng.random() >= TAME_EGG_CHANCE + game.city_stat(state, "egg_chance"):
+    day = int(now // (24 * HOUR))
+    found = state.get("tame_eggs", {})
+    if found.get("day") != day:
+        found = state["tame_eggs"] = {"day": day, "count": 0}
+    if found["count"] >= TAME_EGGS_PER_DAY or rng.random() >= tame_egg_chance(state):
         return None
+    found["count"] += 1
     egg = new_egg(state, now, random_species(rng))
     game.log(state, now, f"There was a {view_name(egg)} hidden in the animal's nest. See the Beast tab.")
     return egg
@@ -1182,7 +1194,7 @@ def view(state, now):
         "duel": DUEL, "duel_xp": DUEL_XP,
         "nest_at": state.get("nest_at"), "nest_time": NEST_TIME,
         "breeding": _breeding_view(state), "breed_time": BREED_TIME, "breed_mutation": BREED_MUTATION,
-        "tame_egg": round((TAME_EGG_CHANCE + game.city_stat(state, "egg_chance")) * 100),
+        "tame_egg": round(tame_egg_chance(state) * 100, 1), "tame_eggs_per_day": TAME_EGGS_PER_DAY,
         "species_count": len(SPECIES),
         "duels": state.get("duels", []),
     }
