@@ -67,8 +67,25 @@ CITIES = {}               # name -> state
 DIRTY = set()             # names changed since the last write to disk
 MARKET = None
 FAILED = {}               # name -> [wrong passwords in a row, locked until]
-ONLINE = {}               # name -> when its own player's page last asked for it
-ONLINE_SECONDS = 45       # a city not heard from for this long has no window open (pages ask every 3-20s)
+ONLINE = {}               # name -> when its own player's page last asked for it (in use or not)
+ACTIVE = {}               # name -> when its page last asked while being used (on screen, touched lately)
+ONLINE_SECONDS = 45       # used this lately: online (a page in use asks every 3-20s)
+IDLE_SECONDS = 180        # heard from this lately but not used: idle (a page in the background checks in once a minute)
+
+
+def presence(name, now):
+    """"online", "idle" or None (offline) for a city's player."""
+    if now - ACTIVE.get(name, 0) <= ONLINE_SECONDS:
+        return "online"
+    if now - ONLINE.get(name, 0) <= IDLE_SECONDS:
+        return "idle"
+    return None
+
+
+def _seen(name, now, idle):
+    ONLINE[name] = now
+    if not idle:
+        ACTIVE[name] = now
 LAST_SAVE = 0             # when everything was last written to disk
 
 
@@ -274,7 +291,8 @@ def city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=Fa
     out["now"] = now
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]))
     out["cities"] = all_city_names()
-    out["online"] = sorted(n for n, seen in ONLINE.items() if now - seen <= ONLINE_SECONDS)
+    out["online"] = sorted(n for n in ONLINE if presence(n, now) == "online")
+    out["idle"] = sorted(n for n in ONLINE if presence(n, now) == "idle")
     # Bills are part of what the city gains and loses per hour.
     rates = out["status"]["rates"]
     for k, v in market.bill_rates(MARKET, state["name"]).items():
@@ -317,7 +335,7 @@ def market_stats(state, now):
         ["Messages kept", len(mail), f"{sum(1 for m in mail if not m['read'])} unread"],
         ["Presents waiting to be opened", sum(1 for p in state.get("presents", []) if not p["opened"]), ""],
         ["Cities in the game", len(names), ""],
-        ["Cities online now", sum(1 for seen in ONLINE.values() if now - seen <= ONLINE_SECONDS), ""],
+        ["Cities online now", sum(1 for n in ONLINE if presence(n, now) == "online"), f"{sum(1 for n in ONLINE if presence(n, now) == 'idle')} more idle"],
         ["Rank by population", pop_rank, f"of {len(board)}"],
         ["Rank by tech level", rank(lambda c: c["tech"]), f"of {len(board)} (cities level with you share a rank)"],
         ["Rank by research", rank(lambda c: c["research"]), f"of {len(board)}"],
@@ -342,7 +360,7 @@ def handle_get(path, query, token, now):
         state = get_city(name, now)
         if not signed_in(state, token):
             return 401, SIGN_IN
-        ONLINE[name] = now
+        _seen(name, now, query.get("idle", [""])[0] == "1")
         tz = query.get("tz", [""])[0]
         if re.fullmatch(r"-?\d{1,3}", tz):
             weather.set_timezone(state, int(tz))     # day and night follow the player's own clock
@@ -351,6 +369,16 @@ def handle_get(path, query, token, now):
         out["away"] = game.check_in(state, now)
         out["discord_code"] = discord_bot.link_code(name)      # for /claim; only this city's player sees it
         return 200, out
+
+    if path == "/api/ping":    # a page in the background: still open, not in use
+        name = query.get("city", [""])[0]
+        if not CITY_NAME.match(name):
+            return 400, {"error": BAD_NAME}
+        state = CITIES.get(name)          # no need to load or bring a city up to date just to say hello
+        if not state or not signed_in(state, token):
+            return 401, SIGN_IN
+        _seen(name, now, query.get("idle", ["1"])[0] == "1")
+        return 200, {}
 
     if path == "/api/visit":   # read-only look at someone else's city
         name, viewer = (query.get(k, [""])[0] for k in ("city", "viewer"))
@@ -411,7 +439,7 @@ def handle_post(path, data, token, now):
     state = get_city(name, now)
     if not signed_in(state, token):
         return 401, SIGN_IN
-    ONLINE[name] = now
+    _seen(name, now, False)
     weather.set_timezone(state, data.get("tz"))
 
     if action == "restart":
@@ -430,6 +458,7 @@ def handle_post(path, data, token, now):
             error = None
     elif action == "sign_out":
         ONLINE.pop(name, None)
+        ACTIVE.pop(name, None)
         state["sessions"].remove(_token_hash(token))
         flush()
         return 200, {"error": None}

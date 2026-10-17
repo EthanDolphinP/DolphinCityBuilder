@@ -1609,6 +1609,20 @@ const tileParam = () => sel ? `${sel.x},${sel.y}` : '';
 const defsHave = () => view && view.defs ? view.defs_version || '' : '';
 let detailAsked = '';   // the tile whose details have been asked for, so they are asked for once
 const tzMinutes = () => -new Date().getTimezoneOffset();    // minutes ahead of UTC on this device
+// Idle: the game is in the background, or nobody has touched it for IDLE_AFTER. Other players then see
+// "idle" instead of "online". A page in the background still checks in once a minute (pingIdle), so it
+// doesn't flick between online and offline.
+const IDLE_AFTER = 5 * 60 * 1000;
+let lastInput = performance.now();
+for (const kind of ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove'])
+  addEventListener(kind, () => { lastInput = performance.now(); }, { passive: true, capture: true });
+const isIdle = () => document.hidden || performance.now() - lastInput > IDLE_AFTER;
+let lastPing = 0;
+async function pingIdle() {
+  if (!city || visiting || performance.now() - lastPing < 55000) return;
+  lastPing = performance.now();
+  try { await fetch(`/api/ping?city=${encodeURIComponent(city)}&idle=1`, { headers: { 'X-Token': token } }); } catch {}
+}
 // The stats are the most work of any reply, so they are asked for only while the Stats tab is open:
 // when it opens, on Refresh, and then once a minute.
 let stats = null, statsAt = 0, statsAsk = false;
@@ -1621,7 +1635,7 @@ async function api(action, extra) {
     : { headers: {'X-Token': token} };
   const res = await fetch(action ? '/api/action'
     : visiting ? `/api/visit?city=${encodeURIComponent(visiting)}&viewer=${encodeURIComponent(city)}&area=${areaIdx}&tile=${tileParam()}&defs=${defsHave()}`
-    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}&tz=${tzMinutes()}${wantStats() ? '&stats=1' : ''}`, opts);
+    : `/api/state?city=${encodeURIComponent(city)}&area=${areaIdx}&find=${encodeURIComponent(findParam())}&tile=${tileParam()}&defs=${defsHave()}&tz=${tzMinutes()}${wantStats() ? '&stats=1' : ''}${isIdle() ? '&idle=1' : ''}`, opts);
   return res.json();
 }
 
@@ -2953,7 +2967,7 @@ function renderSocial() {
   for (const panel of document.querySelectorAll('#tab-social [data-soc]')) panel.hidden = socView !== 'all' && panel.dataset.soc !== socView;
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   // Everything known about each other city: its list, how many dealings of each kind, and the latest one.
-  const online = new Set((view.online || []).filter(c => c !== state.name));
+  const online = new Set((view.online || []).filter(c => c !== state.name)), idle = new Set((view.idle || []).filter(c => c !== state.name));
   const info = new Map();
   const of = name => { if (!info.has(name)) info.set(name, { name, tag: lists[name] || '', n: 0, kinds: {}, last: null, exists: false }); return info.get(name); };
   for (const c of view.cities) if (c !== state.name) of(c).exists = true;
@@ -2962,7 +2976,8 @@ function renderSocial() {
   const all = [...info.values()];
   const tagged = t => all.filter(c => c.tag === t).length, dealt = all.filter(c => c.n).length;
   setHTML($('socSummary'), stat('Allies', tagged('ally')) + stat('Enemies', tagged('enemy')) +
-    stat('Online now', online.size, online.size ? esc([...online].slice(0, 4).join(', ')) + (online.size > 4 ? '...' : '') : 'nobody else') +
+    stat('Online now', online.size, (online.size ? esc([...online].slice(0, 4).join(', ')) + (online.size > 4 ? '...' : '') : 'nobody else') +
+      (idle.size ? ` <span class="dim">&middot; ${idle.size} idle</span>` : '')) +
     stat('Cities dealt with', dealt, `of ${all.filter(c => c.exists).length} others`) + stat('Dealings noted', history.length));
 
   // ---- cities ----
@@ -2981,7 +2996,7 @@ function renderSocial() {
     cities.map(c => {
       const count = Object.entries(SOC_KINDS).filter(([k]) => c.kinds[k]).map(([k, [one, many]]) => `${c.kinds[k]} ${c.kinds[k] === 1 ? one : many}`).join(', ');
       return `<tr><td class="${c.tag === 'ally' ? 'good' : c.tag === 'enemy' ? 'bad' : 'hi'}">${esc(c.name)}` +
-        (online.has(c.name) ? ' <span class="good small">online</span>' : '') +
+        (online.has(c.name) ? ' <span class="good small">online</span>' : idle.has(c.name) ? ' <span class="dim small">idle</span>' : '') +
         (c.exists ? '' : ' <span class="dim small">(gone)</span>') + (myBanned.includes(c.name) ? ' <span class="dim small">(banned)</span>' : '') + `</td>` +
         `<td><button data-soc-tag="ally" data-city="${esc(c.name)}" class="${c.tag === 'ally' ? 'on' : ''}">Ally</button> ` +
         `<button data-soc-tag="enemy" data-city="${esc(c.name)}" class="${c.tag === 'enemy' ? 'on' : ''}">Enemy</button></td>` +
@@ -3000,12 +3015,12 @@ function renderSocial() {
   $('socMsgCount').textContent = unread ? `(${unread} new)` : mail.length ? `(${talks.size} ${talks.size === 1 ? 'city' : 'cities'})` : '';
   setHTML($('socTalks'), talks.size ? `<span class="dim small">Conversations</span>` +
     [...talks.entries()].sort((a, b) => b[1].last.t - a[1].last.t).map(([name, t]) =>
-      `<button data-talk="${esc(name)}" class="chip ${name === to ? 'on' : ''}">${online.has(name) ? '<span class="good">*</span> ' : ''}${esc(name)}` +
+      `<button data-talk="${esc(name)}" class="chip ${name === to ? 'on' : ''}">${online.has(name) ? '<span class="good">*</span> ' : idle.has(name) ? '<span class="dim">*</span> ' : ''}${esc(name)}` +
       (t.unread ? ` <span class="good">${t.unread} new</span>` : '') + `</button>`).join('') : '');
   const thread = mail.filter(m => m.city === to), box = $('socThread'), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
   const before = box._html;
   setHTML(box, !to ? `<span class="dim">${mail.length ? 'Pick a conversation above, or type a city name to start one.' : 'No messages yet. Type a city name and a message to start a conversation.'}</span>`
-    : (view.cities.includes(to) && to !== state.name ? `<div class="dim small" style="margin-bottom:4px">${esc(to)} is ${online.has(to) ? '<span class="good">online now</span>' : 'not online'}.</div>` : '') +
+    : (view.cities.includes(to) && to !== state.name ? `<div class="dim small" style="margin-bottom:4px">${esc(to)} is ${online.has(to) ? '<span class="good">online now</span>' : idle.has(to) ? 'idle (the game is open, but not in use)' : 'not online'}.</div>` : '') +
       (thread.length ? thread.map(m => `<div class="opt small"><span class="dim">[${clock(m.t)}]</span> ` +
         `<span class="${m.mine ? 'dim' : 'hi'}">${m.mine ? 'You' : esc(m.city)}:</span> <span style="white-space:normal;overflow-wrap:anywhere">${esc(m.text)}</span></div>`).join('')
         : `<span class="dim">No messages with ${esc(to)} yet.</span>`));
@@ -3649,7 +3664,7 @@ function renderBoard() {
   const banned = c => myBanned.includes(c.name);
   const words = $('boardSearch').value.trim().toLowerCase();
   // Which cities: everyone, or only those on your Social lists, online now, or banned.
-  const lists = ((view.state.social || {}).lists) || {}, online = new Set(view.online || []);
+  const lists = ((view.state.social || {}).lists) || {}, online = new Set(view.online || []), idle = new Set(view.idle || []);
   const who = { all: ['Everyone', () => true], ally: ['Allies', c => lists[c.name] === 'ally'], enemy: ['Enemies', c => lists[c.name] === 'enemy'],
                 online: ['Online now', c => online.has(c.name) && c.name !== city], banned: ['Banned by you', banned] };
   if (!who[boardWho]) boardWho = 'all';
@@ -3685,7 +3700,7 @@ function renderBoard() {
     cols.map(([k, label]) => `<th class="n sortable${k === boardSort ? ' sorted' : ''}" data-sort="${esc(k)}">${esc(label)}${k === boardSort ? ' v' : ''}</th>`).join('') +
     (withIdeology ? `<th>Ideology</th>` : '') + `<th></th></tr>` +
     rows.map(c => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${rank.get(c.name)}</td>` +
-      `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${online.has(c.name) && c.name !== city ? ' <span class="good small">online</span>' : ''}` +
+      `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${c.name === city ? '' : online.has(c.name) ? ' <span class="good small">online</span>' : idle.has(c.name) ? ' <span class="dim small">idle</span>' : ''}` +
       `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}</td>` +
       cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
       (withIdeology ? `<td class="dim">${c.ideology ? esc(c.ideology) : '-'}</td>` : '') +
@@ -4333,6 +4348,7 @@ setInterval(tick, 1000);
 // Pick up trades and changes made by other players.
 (function poll() {
   if (!document.hidden) refresh();
+  else pingIdle();      // in the background: just "still here", once a minute
   setTimeout(poll, (Number(settings.poll) || 5) * 1000);
 })();
 

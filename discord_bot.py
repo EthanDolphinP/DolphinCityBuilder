@@ -277,14 +277,14 @@ def _city(server, now, name):
     c = game.summary(state)
     cities = _cities(server, now)
     rank = 1 + sum(1 for o in cities if (o["tech"], o["population"]) > (c["tech"], c["population"]))
-    online = now - server.ONLINE.get(c["name"], 0) <= server.ONLINE_SECONDS
+    online = server.presence(c["name"], now)
     stores = sorted(c["resources"].items(), key=lambda kv: -kv[1])
-    return _embed(f"{c['name']}" + (" \U0001F7E2" if online else ""),
+    return _embed(f"{c['name']}" + {"online": " \U0001F7E2", "idle": " \U0001F319"}.get(online, ""),
                   f"A **{c['tech_name']}**" + (f" following **{c['ideology']}**" if c["ideology"] else "") + f". Rank #{rank} of {len(cities)}.",
                   [("Population", short(c["population"]), True), ("Buildings", short(c["buildings"]), True),
                    ("Research done", short(c["research"]), True), ("Areas", short(c["areas"]), True),
                    ("Best beast", f"level {c['beast']}" if c["beast"] else "none yet", True),
-                   ("Online", "yes" if online else "no", True),
+                   ("Online", {"online": "yes", "idle": "idle (game open, not in use)"}.get(online, "no"), True),
                    ("Biggest stores", ", ".join(f"{short(v)} {game.RESOURCES[k]}" for k, v in stores[:4] if v) or "nothing yet", False)])
 
 
@@ -301,9 +301,11 @@ def _market(server, material=None):
 
 
 def _online(server, now):
-    names = sorted(n for n, seen in server.ONLINE.items() if now - seen <= server.ONLINE_SECONDS)
-    return _embed("Online now", "\n".join(f"\U0001F7E2 {n}" for n in names) or "Nobody has the game open right now.",
-                  footer=f"{len(names)} online")
+    online = sorted(n for n in server.ONLINE if server.presence(n, now) == "online")
+    idle = sorted(n for n in server.ONLINE if server.presence(n, now) == "idle")
+    lines = [f"\U0001F7E2 {n}" for n in online] + [f"\U0001F319 {n} *(idle)*" for n in idle]
+    return _embed("Online now", "\n".join(lines) or "Nobody has the game open right now.",
+                  footer=f"{len(online)} online, {len(idle)} idle")
 
 
 def _game(server, now):
@@ -311,7 +313,7 @@ def _game(server, now):
     if not cities:
         return _embed("Dolphin City Builder", "No cities yet.")
     lead = _ranked(cities, "tech")[0]
-    online = sum(1 for seen in server.ONLINE.values() if now - seen <= server.ONLINE_SECONDS)
+    online = sum(1 for n in server.ONLINE if server.presence(n, now) == "online")
     return _embed("Dolphin City Builder", f"In the lead: **{lead['name']}**, a {lead['tech_name']} of {short(lead['population'])} people.",
                   [("Cities", short(len(cities)), True), ("People", short(sum(c["population"] for c in cities)), True),
                    ("Buildings", short(sum(c["buildings"] for c in cities)), True), ("Online now", short(online), True),
