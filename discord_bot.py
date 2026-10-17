@@ -36,6 +36,7 @@ import os
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -43,6 +44,7 @@ API = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/EthanDolphinP/DolphinCityBuilder, 1.0)"
 TOP = 10                     # cities in a leaderboard, offers in a market list
 COLOUR = 0xE6C35C            # the game's gold, down the side of every embed
+ADMINISTRATOR = 0x8           # Discord's permission bit for server administrators
 ROLE_NAME = "Land Owner"     # the role /claim gives (made if the server has none by that name)
 
 
@@ -187,6 +189,19 @@ COMMANDS = [
                       ("gold", "Gold"), ("electronics", "Electronics"), ("livestock", "Livestock"))]}]},
     {"name": "online", "description": "Which cities have the game open right now"},
     {"name": "game", "description": "The whole game at a glance"},
+    # Admin only: hidden from everyone without the Administrator permission ("default_member_permissions"),
+    # and checked again in handle() (is_admin), in case a server changes who may see them.
+    {"name": "present", "description": "Admin: send a present to a city, or to every city", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "to", "description": "A city's name, or all", "required": True},
+                 {"type": 3, "name": "message", "description": "Shown when the present is opened", "required": True},
+                 {"type": 3, "name": "gifts", "description": "e.g. wood=500 gold=200 egg=rare people=5", "required": False}]},
+    {"name": "announce", "description": "Admin: post a message to the announcements channel", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "message", "description": "What to say", "required": True}]},
+    {"name": "resetpassword", "description": "Admin: let the next person to sign in to a city choose its password", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "city", "description": "The city's name", "required": True}]},
     {"name": "claim", "description": f"Get the {ROLE_NAME} role for your city", "dm_permission": False,
      "options": [{"type": 3, "name": "city", "description": "Your city's name", "required": True},
                  {"type": 3, "name": "code", "description": "The Discord code on your city's Settings tab in the game", "required": True}]},
@@ -337,7 +352,52 @@ def handle(body, headers, now):
         return 200, _reply(_game(server, now))
     if name == "claim":
         return 200, _claim(server, now, request, str(options.get("city") or "")[:24], str(options.get("code") or ""))
+    if name in ("present", "announce", "resetpassword"):
+        if not is_admin(request, settings):
+            return 200, _reply(_embed("Not for you", "Only the game's admins can use that."), private=True)
+        return 200, _reply(_admin(server, now, name, options), private=True)
     return 200, _reply(_embed("Unknown command", "Try /leaderboard, /city, /market, /online or /game."), private=True)
+
+
+# ------------------------------------------------------------ admin only --
+
+def is_admin(request, settings):
+    """True for a server administrator, or a Discord user listed in admin_ids (python discord_bot.py setup)."""
+    member = request.get("member") or {}
+    user = (member.get("user") or request.get("user") or {}).get("id")
+    if user and user in [str(x) for x in settings.get("admin_ids", [])]:
+        return True
+    try:
+        return bool(int(member.get("permissions") or 0) & ADMINISTRATOR)
+    except ValueError:
+        return False
+
+
+def _admin(server, now, name, options):
+    """The admin commands. Each answers only the admin who used it."""
+    if name == "present":
+        words = [str(options.get("to") or "").strip(), str(options.get("message") or "")] + str(options.get("gifts") or "").split()
+        # the same checks and wording as `python server.py --present`; it is handed out on the game's next request
+        return _embed("Present", server.send_present(words))
+    if name == "announce":
+        message = str(options.get("message") or "").strip()
+        if not message:
+            return _embed("Nothing to say", "Write a message.")
+        announce(message)
+        return _embed("Announced", message[:1000])
+    if name == "resetpassword":
+        city = str(options.get("city") or "")[:24]
+        names = server.all_city_names()
+        match = city if city in names else next((n for n in names if n.lower() == city.lower()), None)
+        state = server.get_city(match, now) if match else None
+        if not state:
+            return _embed("No such city", f"There is no city called **{city}**.")
+        for key in server.PRIVATE:          # its password and every browser signed in to it
+            state.pop(key, None)
+        server.DIRTY.add(match)
+        server.flush()
+        return _embed("Password reset", f"Whoever signs in to **{match}** next chooses its new password. Tell its player to do it soon.")
+    return _embed("Unknown command", "")
 
 
 # ---------------------------------------------------------------- /claim --
@@ -393,12 +453,40 @@ def _give_role(settings, guild, member, city, app, token):
 
 # ------------------------------------------------------- announcements --
 
+class DiscordRefused(Exception):
+    """Discord said no; the message says why, in words a person can act on."""
+
+
+RETRIES = 3          # tries at most, when Discord says to slow down
+MAX_WAIT = 30        # seconds: a longer wait than this is given up on
+
+
 def _post(url, payload, token=None, method="POST"):
-    request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method=method,
-                                     headers={"Content-Type": "application/json", "User-Agent": USER_AGENT,
-                                              **({"Authorization": f"Bot {token}"} if token else {})})
-    with urllib.request.urlopen(request, timeout=10) as response:
-        return response.status, response.read()
+    """Send to Discord. When it says "too many requests" (429), wait as long as it asks and try again."""
+    data = json.dumps(payload).encode("utf-8")
+    for attempt in range(RETRIES):
+        request = urllib.request.Request(url, data=data, method=method,
+                                         headers={"Content-Type": "application/json", "User-Agent": USER_AGENT,
+                                                  **({"Authorization": f"Bot {token}"} if token else {})})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", "replace")
+            if error.code != 429:
+                raise DiscordRefused(f"Discord refused it (HTTP {error.code}): {body[:300]}") from None
+            try:
+                wait = float(json.loads(body).get("retry_after", 0))
+            except ValueError:      # not Discord's own answer: its firewall blocking this server's address for a while
+                raise DiscordRefused(
+                    "Discord's firewall is turning this server away for now (HTTP 429). On PythonAnywhere many accounts share "
+                    "one address, so this happens from time to time. Wait a few minutes and try again, or run the same command "
+                    "on your own computer (python discord_bot.py setup there first).") from None
+            wait = max(wait, float(error.headers.get("Retry-After") or 0))
+            if wait > MAX_WAIT or attempt == RETRIES - 1:
+                raise DiscordRefused(f"Discord asked to wait {wait:.0f} seconds before sending again. Try again in a minute.") from None
+            print(f"Discord asked to wait {wait:.1f} seconds; waiting...", file=sys.stderr)
+            time.sleep(wait + 0.5)
 
 
 def announce(text):
@@ -409,7 +497,7 @@ def announce(text):
     def send():
         try:
             _post(hook, {"content": text[:1900], "allowed_mentions": {"parse": []}})
-        except Exception as error:      # Discord unreachable: the game carries on
+        except Exception as error:      # Discord unreachable, or refusing: the game carries on
             print(f"Discord announcement failed: {error}", file=sys.stderr)
     threading.Thread(target=send, daemon=True).start()
 
@@ -423,13 +511,14 @@ def _setup():
     print("  An announcements webhook comes from a channel's settings: Integrations, Webhooks, New Webhook, Copy URL.")
     print("Press Enter to keep a value already set.\n")
     asks = [("application_id", "Application ID"), ("public_key", "Public Key"), ("bot_token", "Bot token"),
-            ("webhook", "Announcements webhook URL (optional)"), ("game_url", "The game's address, e.g. https://you.pythonanywhere.com")]
+            ("webhook", "Announcements webhook URL (optional)"), ("game_url", "The game's address, e.g. https://you.pythonanywhere.com"),
+            ("admin_ids", "Discord user IDs allowed the admin commands besides server admins, separated by spaces (optional)")]
     out = dict(old)
     for key, label in asks:
-        shown = ("(set)" if key == "bot_token" else old.get(key)) if old.get(key) else ""
+        shown = ("(set)" if key == "bot_token" else " ".join(old[key]) if key == "admin_ids" else old.get(key)) if old.get(key) else ""
         value = input(f"{label} {('[' + shown + ']') if shown else ''}: ").strip()
         if value:
-            out[key] = value
+            out[key] = value.split() if key == "admin_ids" else value
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     _save(out)
     print(f"\nSaved to {CONFIG_FILE}.")
@@ -497,8 +586,7 @@ def _daily():
     print(f"Posted today's leaderboard (HTTP {status}).")
 
 
-if __name__ == "__main__":
-    command = sys.argv[1] if len(sys.argv) > 1 else ""
+def _main(command):
     if command == "setup":
         _setup()
     elif command == "register":
@@ -513,3 +601,13 @@ if __name__ == "__main__":
         print("Sent a test message to the announcements webhook (if one is set).")
     else:
         print(__doc__)
+
+
+if __name__ == "__main__":
+    try:
+        _main(sys.argv[1] if len(sys.argv) > 1 else "")
+    except DiscordRefused as why:
+        sys.exit(str(why))
+    except urllib.error.URLError as why:
+        sys.exit(f"Could not reach Discord: {why.reason}. If this is PythonAnywhere's free plan, discord.com may be off its list "
+                 f"of allowed sites; try the same command on your own computer.")

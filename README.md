@@ -280,6 +280,21 @@ It posts the changes since the last announcement (the commit messages), with
 your note on top, then press **Reload** as usual. With nothing new and no note
 it posts nothing.
 
+**Admin commands**, for you only: `/present to: message: gifts:` (gifts as in
+`--present`, e.g. `wood=500 gold=200 egg=rare people=5`; `to` can be `all`),
+`/announce message:` (posts to the announcements channel) and
+`/resetpassword city:`. Discord hides them from everyone without the
+Administrator permission in your server, and the game checks again; to let
+someone else use them without making them a server admin, add their Discord
+user ID in `python discord_bot.py setup`. Run `python discord_bot.py register`
+once more so Discord learns about them.
+
+**"Too Many Requests" (429).** Discord sometimes turns away PythonAnywhere,
+whose accounts share one internet address. The bot waits when Discord says how
+long and tries again; if Discord is blocking the address for a while it says
+so: wait a few minutes, or run the same command on your own computer (run
+`python discord_bot.py setup` there once, with just the webhook).
+
 **The Land Owner role.** `/claim city: code:` gives a member the **Land
 Owner** role (the bot makes it if there is none). The code is on each city's
 **Settings** tab in the game, under Discord, and only that city's player sees
