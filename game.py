@@ -287,7 +287,9 @@ EXPEDITION_TIME = 20 * MIN  # travel time per step of distance from home
 EXPEDITION_LOOT = [("food", 15, 40), ("wood", 15, 40), ("stone", 10, 30), ("gold", 5, 15),
                    ("livestock", 1, 3), ("knowledge", 3, 8)]
 EXPEDITION_LOOT_CHANCE = 0.7
-MAX_EXPLORE_SPEED = 1.0     # most that buildings can add to expedition speed (1.0 = twice as fast)
+FULL_EXPLORE_SPEED = 1.0    # buildings' expedition speed counts in full up to this (1.0 = twice as fast)...
+EXPLORE_SPEED_STEP = 0.3    # ...and past it this much more for every doubling: see explore_speed()
+EXPLORE_COST_WEIGHT = 1.5   # how hard the ideology's explore_cost cuts supplies: see explore_discount()
 LIVESTOCK_FOR_FULL_SPEED = 10   # herd size at which "livestock_speed" buildings run at normal speed
 WILDLIFE_TIME = 45 * MIN    # how often a new animal wanders into each area
 MAX_WILDLIFE = 4            # wild animals an area holds at once
@@ -3652,17 +3654,30 @@ def destinations(state):
     return sorted(out, key=lambda p: (abs(p[0]) + abs(p[1]), p[1], p[0]))
 
 
+def explore_speed(state):
+    """What buildings add to expedition speed: in full up to FULL_EXPLORE_SPEED, then a step per doubling."""
+    x = city_stat(state, "explore_speed")
+    return x if x <= FULL_EXPLORE_SPEED else FULL_EXPLORE_SPEED + EXPLORE_SPEED_STEP * math.log2(x / FULL_EXPLORE_SPEED)
+
+
+def explore_discount(state):
+    """The share of an expedition's supplies still needed: research's discount, then the ideology's, which
+    comes ever closer to free but never reaches it (0.15 of explore_cost is 18% off, 0.6 is 47% off, 1.0 is 60% off)."""
+    cut = max(0, ideology.value(state, "explore_cost"))
+    return min(_researched(state, "explore_discount"), default=1) / (1 + EXPLORE_COST_WEIGHT * cut)
+
+
 def expedition_cost(state, rx, ry):
     """Supplies for the team: depends on the land it is heading into and how far it is."""
     distance = abs(rx) + abs(ry)
-    discount = min(_researched(state, "explore_discount"), default=1) * (1 - min(0.6, ideology.value(state, "explore_cost")))
+    discount = explore_discount(state)
     base = ENVIRONMENTS[region_env(state, rx, ry)]["cost"]
     return {k: math.ceil(v * distance * discount) for k, v in base.items()}
 
 
 def expedition_time(state, rx, ry):
     """Seconds the journey takes. Stables and the like shorten it."""
-    speed = 1 + min(MAX_EXPLORE_SPEED, city_stat(state, "explore_speed")) + beasts.bonus(state, "explore_speed")
+    speed = 1 + explore_speed(state) + beasts.bonus(state, "explore_speed")
     return round(EXPEDITION_TIME * (abs(rx) + abs(ry)) / speed)
 
 
@@ -4321,8 +4336,8 @@ def _city_stats(state, now, rates):
         return out
     night, weather_cover = weather.shelter(state)
     section("bonuses", "Bonuses", {"rows": [
-        ["Expedition speed", pct(1 + min(MAX_EXPLORE_SPEED, city_stat(state, "explore_speed")) + beasts.bonus(state, "explore_speed")), "of normal"],
-        ["Expedition supplies", pct(min(_researched(state, "explore_discount"), default=1) * (1 - min(0.6, ideology.value(state, "explore_cost")))), "of the full cost"],
+        ["Expedition speed", pct(1 + explore_speed(state) + beasts.bonus(state, "explore_speed")), "of normal"],
+        ["Expedition supplies", pct(explore_discount(state)), "of the full cost"],
         ["Expedition range", (lambda r: "any distance" if r >= 99 else f"{r} areas" if r else "none yet")(max(_researched(state, "explore_range"), default=0)), ""],
         ["Wildlife appears", pct(1 + city_stat(state, "wildlife_speed") + beasts.bonus(state, "wildlife_speed")), "of normal"],
         ["Generators give", pct(1 + beasts.bonus(state, "power") + ideology.value(state, "power")), "of normal"],
@@ -4359,7 +4374,7 @@ def _city_stats(state, now, rates):
         ["Hatched beasts", len(hatched), ""],
         ["Eggs", len(state["beasts"]) - len(hatched), ""],
         ["Species owned", len({b["species"] for b in hatched}), f"of {len(beasts.SPECIES)} in the game"],
-        ["Active beast", f"{beasts.title(act)}, level {act['level']} of {beasts.max_level(act)}" if act and act["stage"] != "egg" else "none yet", ""],
+        ["Active beast", f"{beasts.title(act)}, level {act['level']} (fully grown at {beasts.max_level(act)})" if act and act["stage"] != "egg" else "none yet", ""],
         ["Highest level", max((b["level"] for b in hatched), default=0), ""],
         ["Levels in all", sum(b["level"] for b in hatched), ""],
         ["Strongest (stats added up)", max((sum(b["stats"].values()) for b in hatched), default=0), ""],

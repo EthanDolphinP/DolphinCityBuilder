@@ -22,8 +22,8 @@ Rituals: each ideology has five, opened one by one by the ritual research
 (game.RESEARCH entries with "ritual": rank, one per tech level from Village
 up). A ritual is started by donating gold to the ideology and gives its
 effects for a while. The gold asked for depends on the city's tech level
-(RITUAL_GOLD); giving up to RITUAL_MAX_GIFT times that makes the ritual
-stronger and longer (see ritual_scale). Each rank of research also makes
+(RITUAL_GOLD); giving more makes the ritual stronger and longer, with no
+top, but each doubling of the gift adds the same step (see ritual_terms). Each rank of research also makes
 every ritual stronger and longer. Different rituals can run at once; starting
 one that is running starts it again with the new gift.
     beast_xp / beast_power / hatch_speed / egg_chance / mission_speed   as in beasts.py
@@ -32,13 +32,14 @@ one that is running starts it again with the new gift.
 touch `game` at import time: only inside functions.
 """
 
+import math
+
 import game
 
 HOUR = 3600
 RITUAL_GOLD = [0, 200, 800, 3000, 10000, 25000]   # least gold a ritual takes, by the city's tech level
-RITUAL_MAX_GIFT = 5          # a gift can be up to this many times the least...
-RITUAL_GIFT_STRENGTH = 0.25  # ...each extra share makes the ritual this much stronger (2x at 5x the gold)
-RITUAL_GIFT_TIME = 0.5       # ...and this much longer (3x at 5x the gold)
+RITUAL_GIFT_STRENGTH = 0.3   # every doubling of the gift over the least makes the ritual this much stronger...
+RITUAL_GIFT_TIME = 0.6       # ...and this much longer (no top: 5x the gold gives 1.7x and 2.4x, 32x gives 2.5x and 4x)
 RITUAL_RANK_STRENGTH = 0.25  # each rank of research past the first: this much stronger...
 RITUAL_TIME = 2 * HOUR       # ...a ritual at rank 1 with the least gold lasts this long...
 RITUAL_RANK_TIME = HOUR // 2 # ...and each rank past the first adds this
@@ -477,11 +478,11 @@ def ritual_terms(state, gold):
     """(strength, seconds) a gift of `gold` buys at the city's rank and tech level, or None if it is out of range."""
     least = RITUAL_GOLD[state["tech"]]
     rank = ritual_rank(state)
-    if not least or not rank or not least <= gold <= least * RITUAL_MAX_GIFT:
+    if not least or not rank or gold < least:
         return None
-    share = gold / least - 1
-    strength = (1 + RITUAL_RANK_STRENGTH * (rank - 1)) * (1 + RITUAL_GIFT_STRENGTH * share)
-    seconds = (RITUAL_TIME + RITUAL_RANK_TIME * (rank - 1)) * (1 + RITUAL_GIFT_TIME * share)
+    doublings = math.log2(gold / least)
+    strength = (1 + RITUAL_RANK_STRENGTH * (rank - 1)) * (1 + RITUAL_GIFT_STRENGTH * doublings)
+    seconds = (RITUAL_TIME + RITUAL_RANK_TIME * (rank - 1)) * (1 + RITUAL_GIFT_TIME * doublings)
     return round(strength, 3), round(seconds)
 
 
@@ -500,7 +501,7 @@ def start_ritual(state, now, ritual_id, gold):
     least = RITUAL_GOLD[state["tech"]]
     terms = ritual_terms(state, gold)
     if not terms:
-        return f"Give between {least} and {least * RITUAL_MAX_GIFT} Gold."
+        return f"Give at least {least:,} Gold."
     if state["resources"]["gold"] < gold:
         return f"You don't have {gold} Gold."
     state["resources"]["gold"] -= gold
@@ -606,7 +607,7 @@ def defs():
 
 def view(state):
     ideo, rank, least = chosen(state), ritual_rank(state), RITUAL_GOLD[state["tech"]]
-    rituals = {"rank": rank, "least": least, "most": least * RITUAL_MAX_GIFT,
+    rituals = {"rank": rank, "least": least,
                "gift_strength": RITUAL_GIFT_STRENGTH, "gift_time": RITUAL_GIFT_TIME,
                "base_strength": 1 + RITUAL_RANK_STRENGTH * (rank - 1) if rank else 0,
                "base_time": RITUAL_TIME + RITUAL_RANK_TIME * (rank - 1) if rank else 0,

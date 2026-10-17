@@ -1440,9 +1440,9 @@ const HOWTO = [
   ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
-  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow to higher levels (common to 10, legendary to 20), and their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
+  ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow further before they are fully grown (common at 10, legendary at 20); past that a beast still levels up, but each level takes 30% more experience than the last and adds less. Their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
-  ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving up to five times that makes it up to twice as strong and three times as long. Different rituals can run at once.'],
+  ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Stats', 'The Stats tab has everything about your city in numbers: people, every resource and what makes it, buildings, power, land, research, bonuses, time and weather, beasts, the market and your rank among other cities, and all-time counts of what the city has made, built and done since stats began. Pick a section along the top or search for any stat.'],
@@ -2576,9 +2576,10 @@ function renderBeast() {
   setHTML($('beastActive'), mine
     ? `<div class="head"><span class="big" style="color:${esc(mine.color)}">${esc(mine.name)}</span><span class="dim small">${esc(mine.rarity)}</span></div>` +
       `<pre class="beastArt" style="color:${esc(mine.color)}">${esc(mine.art)}</pre><div class="desc">${esc(mine.desc)}</div>` +
-      kv([['Nature', esc(mine.nature)], ['Sex', sexMark(mine.sex, true)], ['Level', `<span class="hi">${mine.level}</span> of ${mine.cap} <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts grow to ${mine.cap})</span>`]]) +
-      (mine.max_level ? `<div class="good small">Fully grown.</div>`
-        : `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
+      kv([['Nature', esc(mine.nature)], ['Sex', sexMark(mine.sex, true)], ['Level', `<span class="hi">${mine.level}</span> <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts are fully grown at ${mine.cap}; ` +
+        `past that each level takes 30% more experience and adds less)</span>`]]) +
+      (mine.max_level ? `<div class="good small">As far as a beast can go.</div>`
+        : (mine.grown ? `<div class="good small">Fully grown, and still growing slowly.</div>` : '') + `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
       `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats, mine.species)}</div>` +
       `<div class="opt dim small">Grades show how good each stat is for a ${esc(mine.name)}: F is the lowest it can roll, A near the top, S the best possible.</div>` +
       `<div class="opt dim small">Likes ${esc(R[mine.likes])}: bet it on this beast in the Arena below to make it fight harder.</div>` +
@@ -2621,7 +2622,7 @@ function renderBeast() {
     (bv.nest_at ? `<div class="opt">Nesting Ground: next egg in <span class="hi" data-timer="nest"></span>` +
       `</div>` : '') +
     `<details class="fold" data-fold="egg:rarity" ${isOpen('egg:rarity', false) ? 'open' : ''}><summary>What each rarity takes</summary><div class="scroll">` +
-      `<table><tr><th>Rarity</th><th>Kept warm</th><th class="n">Egg missions</th><th class="n">Grows to level</th><th>Missions ask for</th><th class="n">Experience per mission, before bonuses</th></tr>` +
+      `<table><tr><th>Rarity</th><th>Kept warm</th><th class="n">Egg missions</th><th class="n">Fully grown at level</th><th>Missions ask for</th><th class="n">Experience per mission, before bonuses</th></tr>` +
       Object.values(bv.rarities).map(r => `<tr><td style="color:${esc(r.color)}">${esc(r.name)}</td><td>${duration(r.hatch * 3600 / (1 + bv.hatch_speed))}</td>` +
         `<td class="n">${r.egg_tasks}</td><td class="n">${r.max_level}</td><td>${r.pay === 1 ? 'the usual amount' : 'x' + r.pay + ' goods, x' + r.events + ' tasks'}</td>` +
         `<td class="n">${Math.round(10 * r.xp)}</td></tr>`).join('') + `</table>` +
@@ -2663,7 +2664,7 @@ function renderBeast() {
         ...(g.list[0].home && g.list[0].home.length ? [['Home', esc(g.list[0].home.join(', ')) + ' <span class="dim small">(its eggs are likelier there)</span>']] : []),
         ['You have', g.list.length]])}</div></div>` +
       `<div class="scroll"><table><tr>${th('level', 'Level')}<th>Experience</th>${Object.entries(S).map(([k, name]) => th(k, esc(name))).join('')}${th('grade', 'Grade')}<th>Gives the city</th><th></th></tr>` +
-      g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level} ${sexMark(b.sex)}</td><td class="dim">${b.max_level ? 'fully grown' : b.xp + ' of ' + b.xp_needed} <span class="small">(max ${b.cap})</span></td>` +
+      g.list.map(b => `<tr class="${b.active ? 'me' : ''}"><td>${b.level} ${sexMark(b.sex)}</td><td class="dim">${b.xp + ' of ' + b.xp_needed} <span class="small">(${b.grown ? 'fully grown' : 'full at ' + b.cap})</span></td>` +
         Object.keys(S).map(k => `<td>${b.stats[k]}${gradeTag(b.species, k, b.stats[k])}</td>`).join('') + `<td>${gradeTag(b.species, null, b.stats)}</td>` + `<td class="dim small" style="white-space:normal;min-width:160px">${esc(b.bonus.join('; '))}</td><td>` +
         (b.active ? `<span class="good">active</span>` : !own ? ''
           : `<button data-beast-active="${b.id}">Make active</button> ` +
@@ -2707,7 +2708,7 @@ const duelRes = new Map();    // challenge id -> the material they chose to bet
 // What a bet multiplies a beast's stats by in a duel (the same sum the server does).
 function duelBoost(likes, res, qty) {
   const d = view.beast.duel, amount = res === likes ? qty : qty * d.other;
-  return amount > 0 ? Math.round(Math.min(d.max, 1 + d.step * Math.log2(1 + amount / d.per)) * 100) / 100 : 1;
+  return amount > 0 ? Math.round((1 + d.step * Math.log2(1 + amount / d.per)) * 100) / 100 : 1;
 }
 const boostText = b => `+${Math.round((b - 1) * 100)}%`;
 // The line under the challenge form, and the line under each challenge's answer.
@@ -3127,13 +3128,16 @@ const scaleEffects = (eff, s) => Object.fromEntries(Object.entries(eff).map(([k,
   [k, k === 'speed' ? Object.fromEntries(Object.entries(v).map(([c, x]) => [c, x * s])) : v * s]));
 // What a gift buys at the city's rank: [strength, seconds], as ideology.ritual_terms() works it out.
 function ritualTerms(r, gold) {
-  const share = gold / r.least - 1;
-  return [r.base_strength * (1 + r.gift_strength * share), r.base_time * (1 + r.gift_time * share)];
+  const doublings = Math.log2(gold / r.least);
+  return [r.base_strength * (1 + r.gift_strength * doublings), r.base_time * (1 + r.gift_time * doublings)];
 }
+// The gift slider runs from the least to 1,024x it, each notch a little more than the last: 10 notches per doubling.
+const giftFromSlider = (r, v) => Math.round(r.least * 2 ** (v / 10));
+const sliderFromGift = (r, g) => Math.max(0, Math.min(100, Math.round(10 * Math.log2(g / r.least))));
 function ritualLine(gift, strength, seconds) {
   const r = view.ideology.rituals;
   return `A gift of <span class="hi">${num(gift)} Gold</span> makes it <span class="hi">${strength.toFixed(2)}x</span> as strong and last ` +
-    `<span class="hi">${duration(seconds)}</span>. <span class="dim">(Least ${num(r.least)}, most ${num(r.most)}; you have ${num(Math.floor(view.state.resources.gold))}.)</span>`;
+    `<span class="hi">${duration(seconds)}</span>. <span class="dim">(At least ${num(r.least)}; every doubling of the gift adds the same again. You have ${num(Math.floor(view.state.resources.gold))}.)</span>`;
 }
 function ritualPanel(i, iv, own) {
   const r = iv.rituals, R = view.defs.research, gold = Math.floor(view.state.resources.gold);
@@ -3141,16 +3145,17 @@ function ritualPanel(i, iv, own) {
   const next = ranks[r.rank];
   let html = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.ritual_plural)}</h2>` +
     `<p class="dim small" style="margin-top:0">Give Gold to ${esc(i.name)} to hold a ${esc(i.ritual_word.toLowerCase())}: a bonus for a while. ` +
-    `Giving more, up to ${r.least ? 5 : ''}x the least, makes it stronger and last longer. Different ones can run at once; holding one that is running starts it again.</p>` +
+    `Giving more makes it stronger and last longer, with no top, but each doubling of the gift adds the same step. Different ones can run at once; holding one that is running starts it again.</p>` +
     `<div class="opt">Ritual research: <span class="hi">rank ${r.rank} of ${ranks.length}</span>` +
     (next ? ` <span class="dim">- next: ${esc(next[1].name)} (${esc(view.defs.tech[next[1].tech].name)}), which opens another and makes them all stronger and longer</span>` : ' <span class="good">- all done</span>') + `</div>`;
   if (!r.rank) return html + `<p class="dim">Research ${esc(ranks[0][1].name)} on the Research tab to hold your first ${esc(i.ritual_word.toLowerCase())}.</p></div>`;
-  if (ritualGift === null || ritualGift < r.least || ritualGift > r.most) ritualGift = r.least;
+  if (ritualGift === null || ritualGift < r.least) ritualGift = r.least;
   const [strength, seconds] = ritualTerms(r, ritualGift);
   if (own) html += `<div class="cat">Your gift</div><div class="bar">` +
-    `<input type="range" data-ritual-gift data-k="ritual-range" min="${r.least}" max="${r.most}" step="${Math.max(1, Math.round(r.least / 20))}" value="${ritualGift}" style="flex:1 1 200px">` +
-    `<input type="number" data-ritual-gift data-k="ritual-num" min="${r.least}" max="${r.most}" step="1" value="${ritualGift}" style="width:110px"> Gold` +
-    `<button data-ritual-preset="${r.least}">Least</button><button data-ritual-preset="${r.most}">Most</button></div>` +
+    `<input type="range" data-ritual-gift="slider" data-k="ritual-range" min="0" max="100" step="1" value="${sliderFromGift(r, ritualGift)}" style="flex:1 1 200px">` +
+    `<input type="text" inputmode="decimal" autocomplete="off" data-ritual-gift="box" data-k="ritual-num" value="${ritualGift}" style="width:110px"> Gold` +
+    `<button data-ritual-preset="${r.least}">Least</button>` +
+    `<button data-ritual-preset="${Math.max(r.least, Math.floor(view.state.resources.gold))}" title="All the Gold you have">All I have</button></div>` +
     `<div class="opt small" id="ritualLine">${ritualLine(ritualGift, strength, seconds)}</div>`;
   html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(i.rituals).map(([id, x], n) => {
     const open = n < r.rank, running = r.active[id];
@@ -3721,10 +3726,12 @@ document.addEventListener('click', e => {
 // While the gift is being dragged or typed only its line changes; the cards follow once it is let go of.
 $('ideologyBody').addEventListener('input', e => {
   if (!('ritualGift' in e.target.dataset)) return;
-  const v = Math.floor(+e.target.value), r = view.ideology.rituals;
-  if (!(v >= r.least && v <= r.most)) return;
+  const r = view.ideology.rituals, slider = e.target.dataset.ritualGift === 'slider';
+  const v = slider ? giftFromSlider(r, +e.target.value) : amount(e.target.value);
+  if (!(v >= r.least)) return;
   ritualGift = v;
-  for (const box of $('ideologyBody').querySelectorAll('[data-ritual-gift]')) if (box !== e.target) box.value = v;
+  for (const box of $('ideologyBody').querySelectorAll('[data-ritual-gift]'))
+    if (box !== e.target) box.value = box.dataset.ritualGift === 'slider' ? sliderFromGift(r, v) : v;
   const [strength, seconds] = ritualTerms(r, v);
   $('ritualLine').innerHTML = ritualLine(v, strength, seconds);
 });

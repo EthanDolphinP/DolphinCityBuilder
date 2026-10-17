@@ -45,8 +45,10 @@ import game
 
 HOUR = 3600
 MISSION_TIME = 24 * HOUR    # a new mission this often
-MAX_LEVEL = 20              # the highest level any beast can reach (see each rarity's max_level)
-FULL_LEVELS = 10            # levels past this add half as much to a beast's bonus
+MAX_LEVEL = 1000            # only a sanity limit (beast trades ask for a level up to this)
+FULL_LEVELS = 10            # levels past this add half as much to a beast's bonus...
+LATE_LEVEL_SHARE = 0.25     # ...and past its rarity's max_level ("full growth") a quarter...
+LATE_XP_GROWTH = 1.3        # ...and each level past full growth needs 30% more experience than the one before
 MISSION_XP = 10             # experience for a completed mission, before bonuses (times the rarity's xp)
 TECH_PAY = [1, 2, 4, 8, 15, 25]   # "bring me" missions ask for this many times more at each tech level
 INCOME_HOURS = 1.5          # ...and at least this many hours of what the city makes of it (more for rarer and higher beasts)
@@ -72,7 +74,8 @@ WEATHER_EGG_CHANCE = 0.004  # chance, at each meal, that rare weather in an area
 # weight     how often an egg found by an expedition is of this rarity
 # hatch      hours an egg must be kept warm
 # egg_tasks  missions an egg needs done, one after another, before it hatches
-# max_level  the highest level the beast can reach
+# max_level  full growth: past this a beast still levels, but each level needs 30% more experience
+#            than the last and adds a quarter of a level's bonus (see xp_needed, bonus_level)
 # pay        "bring me" missions ask for this many times more
 # events     "do something" missions ask for this many times more
 # xp         a completed mission gives this many times MISSION_XP
@@ -481,7 +484,6 @@ DUEL = {
     "per": 50,       # every doubling past this much of the liked material...
     "step": 0.25,    # ...adds this much to all four stats (0.25 = 25%)
     "other": 0.2,    # a material it does not care for counts for this share of the amount
-    "max": 3.0,      # the most a bet can multiply the stats by
 }
 DUEL_ROUNDS = 40
 DUEL_RESULTS_KEPT = 6
@@ -491,7 +493,7 @@ DUEL_XP = 3                 # experience the winning beast gains (a mission give
 def duel_boost(species, res, qty):
     """What a bet of `qty` of `res` multiplies this species' stats by in a duel."""
     amount = qty if res == LIKES[species] else qty * DUEL["other"]
-    return round(min(DUEL["max"], 1 + DUEL["step"] * math.log2(1 + amount / DUEL["per"])), 2)
+    return round(1 + DUEL["step"] * math.log2(1 + amount / DUEL["per"]), 2)     # no top: each doubling adds a step
 
 
 def fight(one, two, rng):
@@ -518,7 +520,9 @@ def fight(one, two, rng):
 #              or, if more, INCOME_HOURS x (1 + 0.15 x level) x the square root of the
 #              rarity's pay hours' worth of what the city makes of it (see _income)
 #   event      something the city does (see note()): it asks for
-#              (base + per_level x level) x the rarity's events, at most cap; with
+#              (base + per_level x level) x the rarity's events, at most cap until the beast
+#              is past full growth, then half a cap more per doubling of its level ("hard":
+#              never more than cap, for things time limits); with
 #              "scales" also x (1 + TECH_EVENTS x tech level), as bigger cities do more
 #   min_level  the beast's level before it asks for this (eggs are level 0)
 #   min_tech   the city's tech level before it is asked for
@@ -538,9 +542,9 @@ MISSIONS = {
     "addition":  {"text": "Attach {n} addition{s} to your buildings", "event": "addition", "base": 1, "per_level": 0.3, "cap": 12, "scales": True, "min_level": 1},
     "grow":      {"text": "Welcome {n} new arrival{s} to the city", "event": "arrival", "base": 2, "per_level": 0.6, "cap": 40, "scales": True, "min_level": 1},
     "tame":      {"text": "Tame {n} wild animal{s} for it to meet", "event": "tame", "base": 1, "per_level": 0.4, "cap": 12, "scales": True, "min_level": 1},
-    "research":  {"text": "Research {n} new thing{s} to show it", "event": "research", "base": 1, "per_level": 0.15, "cap": 6, "min_level": 2},
-    "explore":   {"text": "Complete {n} expedition{s} and tell it what you saw", "event": "explore", "base": 1, "per_level": 0.1, "cap": 4, "min_level": 3},
-    "weather":   {"text": "Watch {n} spell{s} of rare weather with it (any area, at a meal)", "event": "weather", "base": 1, "per_level": 0.15, "cap": 5, "min_level": 4},
+    "research":  {"text": "Research {n} new thing{s} to show it", "event": "research", "base": 1, "per_level": 0.15, "cap": 6, "hard": True, "min_level": 2},
+    "explore":   {"text": "Complete {n} expedition{s} and tell it what you saw", "event": "explore", "base": 1, "per_level": 0.1, "cap": 4, "hard": True, "min_level": 3},
+    "weather":   {"text": "Watch {n} spell{s} of rare weather with it (any area, at a meal)", "event": "weather", "base": 1, "per_level": 0.15, "cap": 5, "hard": True, "min_level": 4},
 }
 
 
@@ -579,7 +583,13 @@ def _make_mission(state, kind, level, rarity):
         need = max(1, int(round(need, -1) if need >= 100 else round(need)))
     else:
         scale = 1 + TECH_EVENTS * state["tech"] if m.get("scales") else 1
-        need = max(1, min(m["cap"], round((m["base"] + m["per_level"] * level) * r["events"] * scale)))
+        raw = (m["base"] + m["per_level"] * level) * r["events"] * scale
+        if raw > m["cap"]:
+            # At most the cap, until the beast is past full growth: then half a cap more for every doubling of
+            # its level (where time limits what can be done, never more than the cap).
+            grown = r["max_level"]
+            raw = m["cap"] if m.get("hard") or level <= grown else m["cap"] * (1 + 0.5 * math.log2(level / grown))
+        need = max(1, round(raw))
         left = _possible(state, kind)
         if left:
             need = min(need, left)
@@ -669,7 +679,7 @@ def rarity_of(species):
 
 
 def max_level(beast):
-    """The highest level this beast can reach."""
+    """The level at which this beast is fully grown (it can go on past it, ever more slowly)."""
     return rarity_of(beast["species"])["max_level"]
 
 
@@ -761,14 +771,20 @@ def title(beast):
     return SPECIES[beast["species"]]["name"]
 
 
-def xp_needed(level):
-    """Experience to go from `level` to the next."""
-    return 10 + 5 * level
+def xp_needed(level, grown=None):
+    """Experience to go from `level` to the next. Past full growth (`grown`) each level needs LATE_XP_GROWTH times the last."""
+    base = 10 + 5 * level
+    return round(base * LATE_XP_GROWTH ** max(0, level - grown)) if grown is not None else base
 
 
-def bonus_level(level):
-    """How many levels' worth of bonus a beast of this level gives: levels past FULL_LEVELS count half."""
-    return min(level, FULL_LEVELS) + max(0, level - FULL_LEVELS) / 2
+def bonus_level(level, grown=None):
+    """How many levels' worth of bonus a beast of this level gives: levels past FULL_LEVELS count half,
+    and levels past full growth (`grown`) a quarter."""
+    grown = MAX_LEVEL if grown is None else grown
+    early = min(level, FULL_LEVELS, grown)
+    middle = max(0, min(level, grown) - FULL_LEVELS) / 2
+    late = max(0, level - max(grown, FULL_LEVELS)) * LATE_LEVEL_SHARE
+    return early + middle + late
 
 
 def _power(state):
@@ -780,7 +796,7 @@ def bonus(state, key):
     beast = active(state)
     if not beast or beast["stage"] == "egg":
         return 0
-    return SPECIES[beast["species"]]["bonus"].get(key, 0) * bonus_level(beast["level"]) * _power(state)
+    return SPECIES[beast["species"]]["bonus"].get(key, 0) * bonus_level(beast["level"], max_level(beast)) * _power(state)
 
 
 def speed_bonus(state, category):
@@ -789,7 +805,7 @@ def speed_bonus(state, category):
     if not beast or beast["stage"] == "egg":
         return None
     per = SPECIES[beast["species"]]["bonus"].get("speed", {})
-    extra = (per.get(category, 0) + per.get("all", 0)) * bonus_level(beast["level"]) * _power(state)
+    extra = (per.get(category, 0) + per.get("all", 0)) * bonus_level(beast["level"], max_level(beast)) * _power(state)
     return (1 + extra, title(beast)) if extra else None
 
 
@@ -808,8 +824,8 @@ def mission_period(state):
 
 def give_xp(state, now, beast, amount):
     beast["xp"] += amount
-    while beast["level"] < max_level(beast) and beast["xp"] >= xp_needed(beast["level"]):
-        beast["xp"] -= xp_needed(beast["level"])
+    while beast["level"] < MAX_LEVEL and beast["xp"] >= xp_needed(beast["level"], max_level(beast)):
+        beast["xp"] -= xp_needed(beast["level"], max_level(beast))
         beast["level"] += 1
         game.tally(state, "beast_levels")
         game.log(state, now, f"*** {title(beast)} has grown to level {beast['level']}. ***")
@@ -818,7 +834,7 @@ def give_xp(state, now, beast, amount):
             rarity = names[min(len(names) - 1, names.index(SPECIES[beast["species"]]["rarity"]) + EGG_LEVELS[beast["level"]])]
             new_egg(state, now, random_species(random.Random(), rarity=rarity))
             game.log(state, now, f"{title(beast)} has brought home a {RARITIES[rarity]['name'].lower()} egg.")
-    if beast["level"] >= max_level(beast):
+    if beast["level"] >= MAX_LEVEL:
         beast["xp"] = 0
 
 
@@ -1173,10 +1189,11 @@ def view(state, now):
                          species=b["species"], stats=b["stats"], art="\n".join(ART[b["species"]]),
                          likes=LIKES[b["species"]], duel=bool(b.get("duel")),
                          home=[game.ENVIRONMENTS[e]["name"] for e in species.get("home", [])],
-                         xp=b["xp"], xp_needed=xp_needed(b["level"]), max_level=b["level"] >= max_level(b),
+                         xp=b["xp"], xp_needed=xp_needed(b["level"], max_level(b)), max_level=b["level"] >= MAX_LEVEL,
+                         grown=b["level"] >= max_level(b),
                          cap=max_level(b), xp_per_mission=mission_xp(state, b),
-                         bonus=_describe(species["bonus"], bonus_level(b["level"]), power),
-                         next_bonus=_describe(species["bonus"], bonus_level(min(max_level(b), b["level"] + 1)), power))
+                         bonus=_describe(species["bonus"], bonus_level(b["level"], max_level(b)), power),
+                         next_bonus=_describe(species["bonus"], bonus_level(b["level"] + 1, max_level(b)), power))
         beasts.append(entry)
     return {
         "beasts": beasts,
