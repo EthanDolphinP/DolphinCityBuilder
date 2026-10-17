@@ -1443,6 +1443,7 @@ const HOWTO = [
   ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow further before they are fully grown (common at 10, legendary at 20); past that a beast still levels up, but each level takes 30% more experience than the last and adds less. Their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
+  ['Curses', 'An ideology can also curse: each has five curses, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can curse cities from one tech level below yours to two above, and each of your curses can be on one city at a time; curses from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Curses on your city are shown on the Ideology tab and wear off by themselves.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Stats', 'The Stats tab has everything about your city in numbers: people, every resource and what makes it, buildings, power, land, research, bonuses, time and weather, beasts, the market and your rank among other cities, and all-time counts of what the city has made, built and done since stats began. Pick a section along the top or search for any stat.'],
@@ -1817,9 +1818,11 @@ function render() {
   setHTML(document.querySelector('[data-tab=city]'), (gfx() ? icon('house') : '') + 'City' +
     (ready ? (gfx() ? ' <span class="nav-badge">Ready</span>' : ' <span class="good">(ready)</span>') : ''));
   const iv = view.ideology, ideoTodo = !visiting && state.tech >= 1 && (!iv.id || iv.points > 0);
+  const cursedNow = !visiting && iv.curses && iv.curses.on_me.length;
   setHTML(document.querySelector('[data-tab=ideology]'), (gfx() ? icon('shaman') : '') + 'Ideology' +
     (!ideoTodo ? '' : gfx() ? ` <span class="nav-badge">${iv.id ? iv.points : 'Choose'}</span>`
-      : ` <span class="good">(${iv.id ? iv.points + (iv.points === 1 ? ' point' : ' points') : 'choose'})</span>`));
+      : ` <span class="good">(${iv.id ? iv.points + (iv.points === 1 ? ' point' : ' points') : 'choose'})</span>`) +
+    (cursedNow ? ` <span class="bad">(cursed)</span>` : ''));
   // The browser tab's title: the city, and how many things are waiting, so it shows from another tab.
   const waitingCount = visiting ? 0 : (state.messages || []).filter(m => !m.read).length + (state.sales || []).length +
     (view.market.duels || []).filter(d => d.to === state.name).length + (ready ? 1 : 0) + (ideoTodo ? 1 : 0) + (todo ? 1 : 0);
@@ -3069,7 +3072,7 @@ function renderIdeology() {
         ? `A city chooses its ideology when it becomes a Village. These are the choices.`
         : visiting ? `This city has not chosen an ideology yet.`
         : `Your city has not chosen an ideology yet. Choose one below; you will have ${iv.points} ${iv.points === 1 ? 'point' : 'points'} to spend on its perks.`) +
-      `</p>${ideologyCards(own && state.tech >= 1)}</div>`);
+      `</p>${ideologyCards(own && state.tech >= 1)}</div>` + cursedPanel(iv));
     return;
   }
   const i = I[iv.id];
@@ -3079,6 +3082,8 @@ function renderIdeology() {
                      later: ['Not open yet', ([, p]) => p.tier > state.tech] };
   if (!pfilters[perkFilter]) perkFilter = 'all';
   const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && iv.points ? `<span class="good">${iv.points} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
+                  curses: ['Curses', iv.curses.on_me.length ? `<span class="bad">${iv.curses.on_me.length} on you</span>`
+                                    : Object.keys(iv.curses.cursing).length ? `${Object.keys(iv.curses.cursing).length} laid` : ''],
                   rituals: [i.ritual_plural, Object.keys(iv.rituals.active).length ? `<span class="good">${Object.keys(iv.rituals.active).length} running</span>`
                                               : iv.rituals.rank ? `${iv.rituals.rank} of 5 open` : 'need research'],
                   compare: ['Compare all six', ''], all: ['Everything', ''] };
@@ -3125,6 +3130,7 @@ function renderIdeology() {
     ideologyCards(false) + `</div>`;
 
   setHTMLKeep(box, header + (show('mine') ? mine : '') + (show('rituals') ? ritualPanel(i, iv, own) : '') +
+    (show('curses') ? cursedPanel(iv) + cursePanel(i, iv, own) : (iv.curses.on_me.length && show('mine') ? cursedPanel(iv) : '')) +
     (show('perks') ? perkPanel : '') + (show('compare') ? compare : ''));
 }
 // ---- rituals: gold given to the ideology buys a bonus for a while ----
@@ -3187,6 +3193,53 @@ function ritualPanel(i, iv, own) {
               (own ? `<button data-ritual-start="${id}" ${gold >= ritualGift ? '' : 'disabled'}>${running ? 'Hold again' : 'Hold'} for ${num(ritualGift)} Gold</button>` : '')
             : `<div class="small dim">${effectWords(x.effects).map(esc).join('<br>')} (at rank 1, least gift)</div>` +
               `<span class="dim small">Opens with ${esc(opens ? opens.name : 'more research')}</span>`) + `</div>`;
+  }).join('') + `</div></div>`;
+  return html;
+}
+// ---- curses: laid on another city for a while, paid for in Gold (and more, for the later ones) ----
+let curseTarget = '';      // the city picked to curse
+function cursedPanel(iv) {
+  const c = iv.curses;
+  if (!c || !c.on_me.length) return '';
+  const load = Object.entries(c.load).filter(([, x]) => x > 0);
+  const names = { power: 'Power', explore: 'Expeditions', wildlife: 'Wildlife', hatch: 'Hatching', missions: 'Beast missions', ...view.defs.categories };
+  return `<div class="panel" style="border-color:var(--bad)"><h2>Curses on your city</h2>` +
+    c.on_me.map(x => `<div class="opt"><span class="bad">${esc(x.name)}</span> from <span class="hi">${esc(x.from)}</span> ` +
+      `<span class="dim small">- ${esc(x.text.join(', '))}; ends about ${esc(clock(x.until))}</span></div>`).join('') +
+    (load.length ? `<div class="small" style="margin-top:6px"><span class="dim">All together:</span> ` +
+      load.map(([k, x]) => `${esc(names[k] || k)} <span class="bad">${Math.round(x * 100)}% slower</span>`).join(', ') + `</div>` : '') +
+    `<p class="dim small" style="margin-bottom:0">Curses wear off by themselves. Each one more on the same city has less effect than the last.</p></div>`;
+}
+function cursePanel(i, iv, own) {
+  const c = iv.curses, R = view.defs.research, state = view.state, T = view.defs.tech;
+  const ranks = Object.entries(R).filter(([, x]) => x.ritual).sort((a, b) => a[1].ritual - b[1].ritual);
+  let html = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.name)}: curses</h2>` +
+    `<p class="dim small" style="margin-top:0">Lay a ${esc(i.curse_word.toLowerCase())} on another city to slow it for ${duration(c.time)}. ` +
+    `You can curse cities from ${esc(T[Math.max(0, state.tech - c.below)].name)} to ${esc(T[Math.min(T.length - 1, state.tech + c.above)].name)}. ` +
+    `Each of your curses can be on one city at a time; curses from different cities pile up on the same city. ` +
+    `The same research that opens rituals opens curses, and makes them stronger and longer.</p>`;
+  if (!c.rank) return html + `<p class="dim">Research ${esc(ranks[0][1].name)} to lay your first curse.</p></div>`;
+  if (own) {
+    if (!board) { loadBoard(); html += `<p class="dim">Finding cities to curse...</p>`; }
+    else {
+      const ok = board.filter(x => x.name !== state.name && x.tech >= state.tech - c.below && x.tech <= state.tech + c.above)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (!ok.some(x => x.name === curseTarget)) curseTarget = ok.length ? ok[0].name : '';
+      html += `<div class="bar"><label class="dim">Curse <select data-curse-target>` + (ok.length
+        ? ok.map(x => `<option value="${esc(x.name)}" ${x.name === curseTarget ? 'selected' : ''}>${esc(x.name)} (${esc(x.tech_name)})</option>`).join('')
+        : `<option value="">No city is in reach</option>`) + `</select></label></div>`;
+    }
+  }
+  html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(i.curses).map(([id, x], n) => {
+    const open = n < c.rank, laid = c.cursing[id], cost = c.costs[id];
+    const afford = Object.entries(cost).every(([k, v]) => state.resources[k] >= v);
+    return `<div class="ideoCard ${laid ? 'on' : open ? '' : 'locked'}"><span class="name">${esc(x.name)}</span>` +
+      `<span class="dim small">${esc(x.desc)}</span>` +
+      `<div class="small bad">${(open ? c.texts[id] : x.text).map(esc).join('<br>')}</div>` +
+      (open ? `<div class="small">Costs ${goods(cost)}</div>` : `<span class="dim small">Opens with ${esc(ranks[n] ? ranks[n][1].name : 'more research')}</span>`) +
+      (laid ? `<div class="small good">On ${esc(laid.target)} until about ${esc(clock(laid.until))}</div>` : '') +
+      (own && open && !laid ? `<button data-curse-cast="${id}" ${afford && curseTarget ? '' : 'disabled'} ` +
+        `title="${afford ? '' : 'You cannot afford it'}">Lay it on ${esc(curseTarget || '...')}</button>` : '') + `</div>`;
   }).join('') + `</div></div>`;
   return html;
 }
@@ -3566,6 +3619,7 @@ function renderMarket() {
 async function loadBoard() {
   try { board = (await (await fetch('/api/leaderboard')).json()).cities; } catch { return; }
   renderBoard();
+  if (tab === 'ideology' && view) renderIdeology();
 }
 
 function renderBoard() {
@@ -3729,7 +3783,7 @@ $('reportOk').onclick = () => { $('report').hidden = true; act('report_seen'); }
 $('tutorial').onclick = e => { if ('tutorialHide' in e.target.dataset) { settings.tutorial = false; saveSettings(); render(); } };
 // Choosing an ideology (in the window or on the tab), taking perks, and putting the choice off.
 document.addEventListener('click', e => {
-  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-ritual-preset]');
+  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-ritual-preset], [data-curse-cast]');
   if (!d || visiting || !view) return;
   if ('ideologyLater' in d.dataset) { settings.ideologyLater = new Date().toDateString(); saveSettings(); render(); }
   else if (d.dataset.ideologyChoose) {
@@ -3742,6 +3796,10 @@ document.addEventListener('click', e => {
     if (confirm(`Give ${ritualGift} Gold to hold ${name}?`)) act('ritual_start', { ritual: d.dataset.ritualStart, gold: ritualGift });
   }
   else if (d.dataset.ritualPreset) { ritualGift = +d.dataset.ritualPreset; renderIdeology(); }
+  else if (d.dataset.curseCast) {
+    const name = view.defs.ideologies[view.ideology.id].curses[d.dataset.curseCast].name;
+    if (curseTarget && confirm(`Lay ${name} on ${curseTarget}?`)) act('curse_cast', { curse: d.dataset.curseCast, target: curseTarget });
+  }
 });
 // While the gift is being dragged or typed only its line changes; the cards follow once it is let go of.
 $('ideologyBody').addEventListener('input', e => {
@@ -3755,7 +3813,10 @@ $('ideologyBody').addEventListener('input', e => {
   const [strength, seconds] = ritualTerms(r, v);
   $('ritualLine').innerHTML = ritualLine(v, strength, seconds);
 });
-$('ideologyBody').addEventListener('change', e => { if ('ritualGift' in e.target.dataset) renderIdeology(); });
+$('ideologyBody').addEventListener('change', e => {
+  if ('ritualGift' in e.target.dataset) renderIdeology();
+  if ('curseTarget' in e.target.dataset) { curseTarget = e.target.value; renderIdeology(); }
+});
 $('ideologyBody').addEventListener('click', e => {
   const v = e.target.closest('[data-ideo-view]'), f = e.target.closest('[data-perk-filter]');
   if (v) { ideoView = settings.ideoView = v.dataset.ideoView; saveSettings(); renderIdeology(); }

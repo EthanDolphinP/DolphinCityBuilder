@@ -811,7 +811,7 @@ def speed_bonus(state, category):
 
 def hatch_time(state, beast):
     """Seconds of warmth this egg needs: longer for rarer eggs."""
-    return rarity_of(beast["species"])["hatch"] * HOUR / (1 + game.city_stat(state, "hatch_speed"))
+    return rarity_of(beast["species"])["hatch"] * HOUR / (1 + game.city_stat(state, "hatch_speed")) / game.ideology.curse_factor(state, "hatch")
 
 
 def mission_xp(state, beast):
@@ -819,7 +819,7 @@ def mission_xp(state, beast):
 
 
 def mission_period(state):
-    return MISSION_TIME / (1 + game.city_stat(state, "mission_speed"))
+    return MISSION_TIME / (1 + game.city_stat(state, "mission_speed")) / game.ideology.curse_factor(state, "missions")
 
 
 def give_xp(state, now, beast, amount):

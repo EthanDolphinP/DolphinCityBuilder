@@ -3033,6 +3033,10 @@ def tile_cycle(state, area, x, y, bid):
     belief = ideology.speed_bonus(state, b.get("category"))
     if belief:
         factors.append(belief)
+    # Curses other cities have laid on this one.
+    hexed = ideology.curse_speed(state, b.get("category"))
+    if hexed:
+        factors.append(hexed)
     # Researched techniques.
     for rid in state["research"]:
         if bid in RESEARCH[rid].get("boost", {}):
@@ -3116,7 +3120,7 @@ def _work_plan(state):
     free = state["population"]
     housing = BASE_HOUSING + int(beasts.bonus(state, "housing")) + int(ideology.value(state, "housing"))
     needed, herd_room, jobs = 0, 0, []
-    beast_power = 1 + beasts.bonus(state, "power") + ideology.value(state, "power")     # generators give more
+    beast_power = (1 + beasts.bonus(state, "power") + ideology.value(state, "power")) * ideology.curse_factor(state, "power")     # generators give more (or less, cursed)
     for ai, area in enumerate(state["areas"]):
         for y, row in enumerate(area["tiles"]):
             for x, tile in enumerate(row):
@@ -3288,7 +3292,7 @@ def advance_time(state, now):
     state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
     # Caught up in stretches that end where a ritual ends, so each counts for exactly as long as it ran.
-    ends = sorted({r["until"] for r in state.get("rituals", {}).values() if start < r["until"] < now})
+    ends = sorted({r["until"] for r in list(state.get("rituals", {}).values()) + state.get("curses", []) if start < r["until"] < now})
     for end in ends + [now]:
         state["ritual_now"] = start
         with _stats_cached():     # buildings and ideology don't change within a stretch
@@ -3348,7 +3352,7 @@ def _advance(state, now, remaining):
                 tally(state, "rare_weather", len(rare))
                 beasts.note(state, when, "weather")
                 beasts.weather_egg(state, when, rare, rng)
-        state["wild"] += dt * (1 + wildlife_speed)
+        state["wild"] += dt * (1 + wildlife_speed) * ideology.curse_factor(state, "wildlife")
         while state["wild"] >= WILDLIFE_TIME:
             state["wild"] -= WILDLIFE_TIME
             night = weather.is_night(state, now - remaining)
@@ -3727,7 +3731,7 @@ def expedition_cost(state, rx, ry):
 
 def expedition_time(state, rx, ry):
     """Seconds the journey takes. Stables and the like shorten it."""
-    speed = 1 + explore_speed(state) + beasts.bonus(state, "explore_speed")
+    speed = (1 + explore_speed(state) + beasts.bonus(state, "explore_speed")) * ideology.curse_factor(state, "explore")
     return round(EXPEDITION_TIME * (abs(rx) + abs(ry)) / speed)
 
 
@@ -4241,7 +4245,7 @@ TALLIES = [
     ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
-    ("rituals", "Rituals held"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+    ("rituals", "Rituals held"), ("curses_cast", "Curses laid on other cities"), ("curses_taken", "Curses laid on your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
 ]
 
 

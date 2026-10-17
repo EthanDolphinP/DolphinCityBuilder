@@ -26,6 +26,13 @@ effects for a while. The gold asked for depends on the city's tech level
 top, but each doubling of the gift adds the same step (see ritual_terms). Each rank of research also makes
 every ritual stronger and longer. Different rituals can run at once; starting
 one that is running starts it again with the new gift.
+
+Curses: each ideology also has five, opened by the same research ranks, cast on
+another city for a while. A curse only slows things (its "penalty"), far less
+than a ritual helps. A city may curse cities from one tech level below it to two
+above it, and has each of its curses on at most one city at a time; curses from
+different cities pile up on the same city, each with less effect than the last
+(see curse_factor). They cost Gold, and the later ones Livestock and more too.
     beast_xp / beast_power / hatch_speed / egg_chance / mission_speed   as in beasts.py
 
 `game` imports this module and this module uses `game`, so nothing here may
@@ -44,6 +51,15 @@ RITUAL_RANK_STRENGTH = 0.25  # each rank of research past the first: this much s
 RITUAL_TIME = 2 * HOUR       # ...a ritual at rank 1 with the least gold lasts this long...
 RITUAL_RANK_TIME = HOUR // 2 # ...and each rank past the first adds this
 
+CURSE_GOLD = [0, 150, 600, 2500, 8000, 20000]   # Gold for the first curse, by the caster's tech level; curse n takes n times it
+CURSE_GOODS = [{}, {"livestock": 3}, {"livestock": 4, "food": 100}, {"livestock": 5, "tools": 30},
+               {"livestock": 6, "electronics": 10, "knowledge": 100}]    # more for the later curses, times CURSE_SCALE
+CURSE_SCALE = [0, 1, 3, 8, 20, 50]                # ...by the caster's tech level
+CURSE_TIME = 3 * HOUR        # how long a curse lasts at rank 1...
+CURSE_RANK_TIME = HOUR // 2  # ...and each rank past the first adds this
+CURSE_RANK_STRENGTH = 0.15   # each rank past the first makes the caster's curses this much stronger
+CURSE_BELOW, CURSE_ABOVE = 1, 2   # a city may curse cities this many tech levels below it, and this many above
+
 IDEOLOGIES = {
     "faith": {
         "name": "The Old Faith", "perk_word": "Blessing", "perk_plural": "Blessings of the gods",
@@ -61,6 +77,19 @@ IDEOLOGIES = {
                             "desc": "Chanted on the temple steps until the sky gives in."},
             "holy_day": {"name": "High Holy Day", "effects": {"speed": {"all": 0.1}, "attracts": 1},
                         "desc": "The whole city stops to give thanks, then works twice as hard."},
+        },
+        "curse_word": "Hex",
+        "curses": {
+            "withering_fields": {"name": "Hex of the Withering Fields", "penalty": {"speed": {"food": 0.08}},
+                                "desc": "The crops sulk and the cows go dry."},
+            "crumbling_stone": {"name": "Hex of Crumbling Stone", "penalty": {"speed": {"materials": 0.08}},
+                               "desc": "Every pick finds the soft seam."},
+            "empty_purses": {"name": "Hex of Empty Purses", "penalty": {"speed": {"trade": 0.08}},
+                            "desc": "Coins slip through every finger."},
+            "restless_nights": {"name": "Hex of Restless Nights", "penalty": {"speed": {"knowledge": 0.08}, "missions": 0.15},
+                               "desc": "No scholar sleeps, and none can think."},
+            "old_gods_wrath": {"name": "Wrath of the Old Gods", "penalty": {"speed": {"all": 0.04}},
+                              "desc": "The whole city feels watched, and nothing goes quite right."},
         },
         "perks": {
             "storm_father":   {"name": "Blessing of the Storm Father", "tier": 3, "effects": {"weather_shelter": 0.4, "speed": {"food": 0.05}},
@@ -104,6 +133,19 @@ IDEOLOGIES = {
             "worlds_fair": {"name": "World's Fair", "effects": {"speed": {"all": 0.1}, "attracts": 1},
                            "desc": "The marvels of the age, all in one city."},
         },
+        "curse_word": "Sabotage",
+        "curses": {
+            "misinformation": {"name": "Misinformation", "penalty": {"speed": {"knowledge": 0.08}},
+                              "desc": "Forged papers in every journal."},
+            "sabotage": {"name": "Industrial Sabotage", "penalty": {"speed": {"materials": 0.08}},
+                        "desc": "A spanner in every works."},
+            "power_surge": {"name": "Power Surge", "penalty": {"power": 0.12},
+                           "desc": "The grid hums, flickers and fails."},
+            "broken_chains": {"name": "Broken Supply Chains", "penalty": {"speed": {"trade": 0.06}, "explore": 0.2},
+                             "desc": "Every shipment late, every map wrong."},
+            "systems_crash": {"name": "Systems Crash", "penalty": {"speed": {"all": 0.04}},
+                             "desc": "Nothing works, and nobody knows why."},
+        },
         "perks": {
             "gaslight":    {"name": "Gas Lighting", "tier": 2, "effects": {"night_shelter": 0.5},
                             "desc": "Every street lit and every workshop open after dark."},
@@ -146,6 +188,19 @@ IDEOLOGIES = {
             "grand_exposition": {"name": "Grand Exposition", "effects": {"speed": {"all": 0.1, "trade": 0.15}},
                                 "desc": "Every merchant in the world wants a stall."},
         },
+        "curse_word": "Embargo",
+        "curses": {
+            "embargo": {"name": "Trade Embargo", "penalty": {"speed": {"trade": 0.08}},
+                       "desc": "No merchant will sell to them."},
+            "price_gouging": {"name": "Price Gouging", "penalty": {"speed": {"food": 0.08}},
+                             "desc": "Bread costs a week's wages."},
+            "strike": {"name": "Strike Action", "penalty": {"speed": {"materials": 0.08}},
+                      "desc": "Paid agitators at every mine gate."},
+            "debt_collectors": {"name": "Debt Collectors", "penalty": {"speed": {"knowledge": 0.06}, "power": 0.06},
+                               "desc": "Bailiffs at the laboratory door."},
+            "market_crash": {"name": "Market Crash", "penalty": {"speed": {"all": 0.04}},
+                            "desc": "Panic in every counting house."},
+        },
         "perks": {
             "insurance": {"name": "Insurance Charter", "tier": 3, "effects": {"weather_shelter": 0.4, "speed": {"trade": 0.05}},
                           "desc": "Bad weather is somebody else's problem, for a small fee."},
@@ -187,6 +242,19 @@ IDEOLOGIES = {
                            "desc": "Danced in the rain until the rain grows bored."},
             "great_hunt": {"name": "The Great Hunt", "effects": {"speed": {"all": 0.08}, "beast_xp": 0.5},
                           "desc": "The whole city follows the great beasts across the land."},
+        },
+        "curse_word": "Blight",
+        "curses": {
+            "locusts": {"name": "Plague of Locusts", "penalty": {"speed": {"food": 0.08}},
+                       "desc": "A dark cloud over the fields."},
+            "scattering": {"name": "Scattering of the Herds", "penalty": {"wildlife": 0.3, "hatch": 0.2},
+                          "desc": "The wild animals flee, and the eggs go cold."},
+            "rot": {"name": "Rot in the Timbers", "penalty": {"speed": {"materials": 0.08}},
+                   "desc": "Beetles in every beam."},
+            "night_terrors": {"name": "Night Terrors", "penalty": {"missions": 0.2, "speed": {"knowledge": 0.05}},
+                             "desc": "Howling in the dark; the beasts will not settle."},
+            "wild_hunt": {"name": "The Wild Hunt", "penalty": {"speed": {"all": 0.04}},
+                         "desc": "Something runs through the city every night."},
         },
         "perks": {
             "moon_pact": {"name": "Pact of the Moon", "tier": 2, "effects": {"night_shelter": 0.4, "wildlife_speed": 0.25},
@@ -231,6 +299,19 @@ IDEOLOGIES = {
             "voyage_of_legends": {"name": "Voyage of Legends", "effects": {"speed": {"all": 0.1}, "egg_chance": 0.1},
                                  "desc": "The old stories retold, and the young set out to make new ones."},
         },
+        "curse_word": "Misfortune",
+        "curses": {
+            "lost_maps": {"name": "Lost Maps", "penalty": {"explore": 0.25},
+                         "desc": "Every map they own is suddenly wrong."},
+            "ill_winds": {"name": "Ill Winds", "penalty": {"speed": {"food": 0.08}},
+                         "desc": "Bad weather follows them home."},
+            "misdirection": {"name": "Misdirection", "penalty": {"speed": {"trade": 0.08}},
+                            "desc": "Caravans take every wrong turn."},
+            "faded_stars": {"name": "Faded Stars", "penalty": {"speed": {"knowledge": 0.08}},
+                           "desc": "The sky goes dim over their observatories."},
+            "endless_road": {"name": "Curse of the Endless Road", "penalty": {"speed": {"all": 0.03}, "explore": 0.15},
+                            "desc": "Every road is longer than it was."},
+        },
         "perks": {
             "sky_reading":   {"name": "Reading the Skies", "tier": 2, "effects": {"weather_shelter": 0.3, "explore_speed": 0.1},
                               "desc": "Sailors' lore: always know what tomorrow's sky will do."},
@@ -272,6 +353,19 @@ IDEOLOGIES = {
                             "desc": "Everyone has their say, and some of it is even useful."},
             "midsummer": {"name": "Midsummer Festival", "effects": {"speed": {"all": 0.1}, "attracts": 2},
                          "desc": "The longest day, the biggest party, and the city's name on every tongue."},
+        },
+        "curse_word": "Feud",
+        "curses": {
+            "gossip": {"name": "Malicious Gossip", "penalty": {"speed": {"trade": 0.08}},
+                      "desc": "Nobody trusts anybody at the market."},
+            "feud": {"name": "Family Feud", "penalty": {"speed": {"materials": 0.08}},
+                    "desc": "Half the workshop won't speak to the other half."},
+            "sloth": {"name": "Spreading Sloth", "penalty": {"speed": {"food": 0.08}},
+                     "desc": "Everyone would rather stay in bed."},
+            "grudge": {"name": "Bitter Grudge", "penalty": {"speed": {"knowledge": 0.06}, "missions": 0.15},
+                      "desc": "The council argues and nothing is decided."},
+            "discord": {"name": "Seeds of Discord", "penalty": {"speed": {"all": 0.04}},
+                       "desc": "The whole city quarrels."},
         },
         "perks": {
             "night_watch": {"name": "The Night Watch", "tier": 2, "effects": {"night_shelter": 0.4, "housing": 10},
@@ -514,9 +608,128 @@ def start_ritual(state, now, ritual_id, gold):
 
 
 def tidy_rituals(state):
-    """Forget rituals that have finished."""
+    """Forget rituals and curses that have finished."""
     for rid in [rid for rid, r in state.get("rituals", {}).items() if r["until"] <= state["updated"]]:
         del state["rituals"][rid]
+    state["curses"] = [c for c in state.get("curses", []) if c["until"] > state["updated"]]
+    for cid in [cid for cid, c in state.get("cursing", {}).items() if c["until"] <= state["updated"]]:
+        del state["cursing"][cid]
+
+
+# ---- curses ----
+
+def curse_cost(state, n):
+    """What curse number n (0 to 4) of the caster's ideology takes, at the caster's tech level."""
+    tech = state["tech"]
+    cost = {"gold": CURSE_GOLD[tech] * (n + 1)}
+    for k, v in CURSE_GOODS[n].items():
+        cost[k] = cost.get(k, 0) + v * CURSE_SCALE[tech]
+    return cost
+
+
+def curse_terms(state):
+    """(strength, seconds) the caster's curses have, from its ritual research."""
+    rank = ritual_rank(state)
+    return 1 + CURSE_RANK_STRENGTH * (rank - 1), CURSE_TIME + CURSE_RANK_TIME * (rank - 1)
+
+
+def can_curse(caster, target):
+    """Why `caster` can't curse `target` at all (whichever curse), or None."""
+    if not chosen(caster):
+        return "Choose an ideology first."
+    if not ritual_rank(caster):
+        return "Research Sacred Calendar to lay curses."
+    if not target or target is caster or target["name"] == caster["name"]:
+        return "Pick another city to curse."
+    low, high = caster["tech"] - CURSE_BELOW, caster["tech"] + CURSE_ABOVE
+    if not low <= target["tech"] <= high:
+        return (f"{target['name']} is a {game.TECH_LEVELS[target['tech']]['name']}: you can only curse cities from "
+                f"{game.TECH_LEVELS[max(0, low)]['name']} to {game.TECH_LEVELS[min(len(game.TECH_LEVELS) - 1, high)]['name']}.")
+    return None
+
+
+def cast_curse(caster, target, now, curse_id):
+    """Lay one of the caster's ideology's curses on another city. Returns an error or None."""
+    problem = can_curse(caster, target)
+    if problem:
+        return problem
+    ideo = chosen(caster)
+    order = list(ideo["curses"])
+    if curse_id not in ideo["curses"]:
+        return f"That is not one of your ideology's curses."
+    n = order.index(curse_id)
+    if n >= ritual_rank(caster):
+        return "That curse needs more ritual research first."
+    mine = caster.setdefault("cursing", {}).get(curse_id)
+    if mine and mine["until"] > now:
+        return f"Your {ideo['curses'][curse_id]['name']} is still on {mine['target']}; each curse can be on one city at a time."
+    cost = curse_cost(caster, n)
+    missing = game._missing(caster, cost)
+    if missing:
+        return f"Not enough for that curse (need {game.fmt_goods(missing)})."
+    game._pay(caster, cost)
+    strength, seconds = curse_terms(caster)
+    curse = ideo["curses"][curse_id]
+    caster["cursing"][curse_id] = {"target": target["name"], "until": now + seconds}
+    target.setdefault("curses", []).append({"from": caster["name"], "ideology": caster["ideology"], "curse": curse_id,
+                                            "start": now, "until": now + seconds, "scale": round(strength, 3)})
+    words = ", ".join(describe_penalty(_scaled(curse["penalty"], strength)))
+    hours = f"{seconds // 3600}h {seconds % 3600 // 60:02d}m"
+    game.tally(caster, "curses_cast")
+    game.tally(target, "curses_taken")
+    game.log(caster, now, f"You laid {curse['name']} on {target['name']} for {hours}: {words}. It cost {game.fmt_goods(cost)}.")
+    game.log(target, now, f"*** {caster['name']} has laid {curse['name']} on your city for {hours}: {words}. ***")
+    return None
+
+
+def active_curses(state):
+    """(curse definition, curse on this city) for every curse on it at the moment being worked out."""
+    t = state.get("ritual_now", state["updated"])
+    out = []
+    for c in state.get("curses", []):
+        d = IDEOLOGIES.get(c["ideology"], {}).get("curses", {}).get(c["curse"])
+        if d and c["start"] <= t < c["until"]:
+            out.append((d, c))
+    return out
+
+
+def curse_load(state, key, category=None):
+    """How much curses slow this down, added up: the city then runs at 1 / (1 + load)."""
+    total = 0.0
+    for d, c in active_curses(state):
+        pen = d["penalty"]
+        if key == "speed":
+            total += (pen.get("speed", {}).get(category, 0) + pen.get("speed", {}).get("all", 0)) * c["scale"]
+        else:
+            total += pen.get(key, 0) * c["scale"]
+    return total
+
+
+def curse_factor(state, key, category=None):
+    """What curses multiply this by: 1 with none; each one more has less effect than the last, and it never reaches 0."""
+    return 1 / (1 + curse_load(state, key, category))
+
+
+def curse_speed(state, category):
+    """(multiplier, label) curses put on a building of this category, or None."""
+    f = curse_factor(state, "speed", category)
+    return (f, "Cursed") if f < 1 else None
+
+
+PENALTY_WORDS = {"power": "Generators give {} less power", "explore": "Expeditions {} slower", "wildlife": "Wild animals appear {} less often",
+                 "hatch": "Eggs hatch {} slower", "missions": "Beast missions come {} less often"}
+
+
+def describe_penalty(pen):
+    """A curse's penalty in words: ["Food buildings 8% slower", ...] (each alone, before others pile on)."""
+    pct = lambda x: f"{round(x / (1 + x) * 100):g}%"
+    out = []
+    for cat, x in pen.get("speed", {}).items():
+        out.append(("All buildings" if cat == "all" else f"{game.CATEGORIES[cat]} buildings") + f" {pct(x)} slower")
+    for key, words in PENALTY_WORDS.items():
+        if pen.get(key):
+            out.append(words.format(pct(pen[key])))
+    return out
 
 
 def value(state, key):
@@ -599,6 +812,9 @@ def defs():
                   "ritual_word": i["ritual_word"], "ritual_plural": i["ritual_plural"],
                   "rituals": {rid: {"name": r["name"], "desc": r["desc"], "effects": r["effects"], "text": describe(r["effects"])}
                               for rid, r in i["rituals"].items()},
+                  "curse_word": i["curse_word"],
+                  "curses": {cid: {"name": c["name"], "desc": c["desc"], "text": describe_penalty(c["penalty"])}
+                             for cid, c in i["curses"].items()},
                   "perks": {pid: {"name": p["name"], "tier": p["tier"], "desc": p["desc"], "text": describe(p["effects"]),
                                   "art": "\n".join(PERK_ART[pid])}
                             for pid, p in i["perks"].items()}}
@@ -614,5 +830,14 @@ def view(state):
                "active": {rid: {"until": r["until"], "scale": r["scale"], "gold": r["gold"],
                                 "text": describe(_scaled(ideo["rituals"][rid]["effects"], r["scale"]))}
                           for rid, r in active_rituals(state)} if ideo else {}}
-    return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state), "rituals": rituals,
+    strength, seconds = curse_terms(state)
+    curses = {"rank": rank, "strength": round(strength, 3), "time": seconds, "below": CURSE_BELOW, "above": CURSE_ABOVE,
+              "costs": {cid: curse_cost(state, n) for n, cid in enumerate(ideo["curses"])} if ideo else {},
+              "texts": {cid: describe_penalty(_scaled(c["penalty"], strength)) for cid, c in ideo["curses"].items()} if ideo else {},
+              "cursing": {cid: c for cid, c in state.get("cursing", {}).items() if c["until"] > state["updated"]},
+              "on_me": [{"from": c["from"], "name": d["name"], "until": c["until"],
+                         "text": describe_penalty(_scaled(d["penalty"], c["scale"]))} for d, c in active_curses(state)],
+              "load": {**{cat: round(1 - curse_factor(state, "speed", cat), 3) for cat in game.CATEGORIES},
+                       **{k: round(1 - curse_factor(state, k), 3) for k in PENALTY_WORDS}}}
+    return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state), "rituals": rituals, "curses": curses,
             "total": describe(effects(state)) if chosen(state) else []}

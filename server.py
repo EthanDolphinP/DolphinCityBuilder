@@ -377,7 +377,7 @@ def handle_get(path, query, token, now):
 # would look a list or an object up in its tables. Anything else there is dropped, and the action then
 # says what is missing. "bet" (and a beast trade's "want") may be small objects, whose own name fields are checked too.
 NAME_FIELDS = {"action", "building", "addition", "research", "ideology", "perk", "ritual", "give", "want", "to", "text",
-               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city"}
+               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse"}
 
 
 def _clean(data, inner=False):
@@ -453,6 +453,14 @@ def handle_post(path, data, token, now):
     elif action == "message_send":
         error = market.send_message(state, now, data.get("to"), data.get("text"),
                                     lambda other: find_city(other, now))
+    elif action == "curse_cast":
+        target = find_city(data.get("target"), now)
+        error = game.ideology.cast_curse(state, target, now, data.get("curse"))
+        if not error:
+            curse = game.ideology.chosen(state)["curses"][data["curse"]]
+            market.social(state, now, target["name"], "curse", f"You laid {curse['name']} on them.")
+            market.social(target, now, name, "curse", f"They laid {curse['name']} on you.")
+            discord_bot.announce(f"\U0001F56F\uFE0F **{name}** has laid **{curse['name']}** on **{target['name']}**.")
     elif action == "messages_read":
         error = market.read_messages(state, data.get("other"))
     elif action == "duel_post":
