@@ -19,7 +19,9 @@ def application(environ, start_response):
     body = environ["wsgi.input"].read(min(length, server.MAX_BODY)) if length > 0 else b""
     status, payload, content_type = server.respond(
         environ["REQUEST_METHOD"], environ.get("PATH_INFO") or "/",
-        environ.get("QUERY_STRING", ""), environ.get("HTTP_X_TOKEN"), body)
+        environ.get("QUERY_STRING", ""), environ.get("HTTP_X_TOKEN"), body,
+        {"X-Signature-Ed25519": environ.get("HTTP_X_SIGNATURE_ED25519"),
+         "X-Signature-Timestamp": environ.get("HTTP_X_SIGNATURE_TIMESTAMP")})
     payload, extra = server.compress(payload, environ.get("HTTP_ACCEPT_ENCODING"))
     start_response(f"{status} {HTTPStatus(status).phrase}", extra + [
         ("Content-Type", content_type),

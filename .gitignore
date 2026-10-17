@@ -4,6 +4,7 @@ old_saves/
 market.json
 presents.json
 presents.taken
+discord.json      # the Discord bot's token and keys (see discord_bot.py)
 *.tmp
 
 __pycache__/

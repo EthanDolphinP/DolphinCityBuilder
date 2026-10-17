@@ -7,6 +7,7 @@ browser. It is plain Python (standard library only) plus one HTML page.
 |---|---|
 | `game.py` | All the rules and content: terrain, buildings, research, additions, wildlife, exploring, power. New content is normally one entry in a table at the top. |
 | `market.py` | Trades, beast trades and bills between cities. |
+| `discord_bot.py` | The game on Discord: slash commands answered by the game server, and announcements. |
 | `ideology.py` | Ideologies chosen at Village, and the perks each tech level's point buys. |
 | `weather.py` | Day and night (from the player's own clock) and each area's weather, changing every meal, what they do to buildings, shelter from them, and forecasts. |
 | `beasts.py` | Beasts: eggs, missions, levelling, stats, pictures and the bonuses they give. |
@@ -234,6 +235,39 @@ The message goes in quotes, then as many `material=amount` gifts as you like:
 `knowledge`. `egg=` adds a beast egg: `common`, `uncommon`, `rare`, `epic` or
 `legendary`. `people=` adds new arrivals, who move in even if every bed is taken.
 Use `all` instead of a city name to send it to everyone.
+
+### Discord
+
+The game can answer slash commands in your Discord server (`/leaderboard`,
+`/city`, `/market`, `/online`, `/game`) and post announcements to a channel (a
+new city, a city reaching a new tech level, an ideology chosen, and a daily
+leaderboard). Nothing extra has to keep running: Discord sends each command to
+the game's own address, and the game answers it from the live cities.
+
+1. At https://discord.com/developers/applications press **New Application** and
+   name it. On **General Information** copy the **Application ID** and the
+   **Public Key**. On **Bot**, press **Reset Token** and copy the token (it is
+   only shown once; keep it secret).
+2. Invite it: **OAuth2**, **URL Generator**, tick `applications.commands` (and
+   `bot`), open the link at the bottom and pick your server.
+3. For announcements, in your Discord server open the channel's settings,
+   **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL**.
+4. In a Bash console on PythonAnywhere:
+   ```
+   cd ~/DolphinCityBuilder
+   python discord_bot.py setup
+   python discord_bot.py register
+   ```
+   `setup` asks for the values above and the game's address, and keeps them in
+   `discord.json` next to the saves (never in the code). `register` tells
+   Discord about the slash commands; run it again if they ever change.
+5. **Reload** the web app, then back on the application's **General
+   Information** page set **Interactions Endpoint URL** to
+   `https://mangoclaw119.pythonanywhere.com/api/discord` and save. Discord
+   checks the address at once; if it is refused, check the Public Key.
+6. `python discord_bot.py test` posts a test message to the announcements
+   channel. For a daily leaderboard, add a scheduled task on the **Tasks**
+   tab: `cd ~/DolphinCityBuilder && python discord_bot.py daily`.
 
 ### A forgotten password
 

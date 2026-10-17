@@ -39,6 +39,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import beasts
+import discord_bot
 import game
 import market
 import weather
@@ -53,7 +54,7 @@ PRESENTS_FILE = DATA / "presents.json"   # presents sent from the console, waiti
 CITY_NAME = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 BAD_NAME = "City names are 1-24 letters, digits, - or _."
 AUTOSAVE_SECONDS = 60
-MAX_BODY = 10_000                # bytes of request body read
+MAX_BODY = 64_000                # bytes of request body read (Discord's commands can be a few kB)
 
 PRIVATE = ("auth", "sessions")   # parts of a save that never leave the server
 MIN_PASSWORD, MAX_PASSWORD = 4, 100
@@ -131,6 +132,7 @@ def login(name, password, now):
         state = get_city(name, now, create=True)
         set_password(state, password)
         reply["created"] = True
+        discord_bot.announce(f"\U0001F3D5\uFE0F A new city has been founded: **{name}**.")
     elif "auth" not in state:       # a city from before passwords: first to sign in claims it
         set_password(state, password)
         reply["claimed"] = True
@@ -485,7 +487,12 @@ def handle_post(path, data, token, now):
             if action == "ban" and not error:
                 market.drop_proposals(MARKET, target, name)
     else:
+        tech, belief = state["tech"], state.get("ideology")
         error = game.apply_action(state, now, action, data)
+        if not error and state["tech"] > tech:
+            discord_bot.announce(f"\U0001F389 **{name}** is now a **{game.TECH_LEVELS[state['tech']]['name']}**!")
+        if not error and state.get("ideology") and not belief:
+            discord_bot.announce(f"\U0001F54A\uFE0F **{name}** has taken up **{game.ideology.IDEOLOGIES[state['ideology']]['name']}**.")
     flush()
     out = city_view(state, now, 0 if action == "restart" else data.get("area", 0), data.get("find"),
                     data.get("tile"), data.get("defs"), data.get("stats") is True)
@@ -493,7 +500,7 @@ def handle_post(path, data, token, now):
     return 200, out
 
 
-def respond(method, path, query="", token=None, body=b""):
+def respond(method, path, query="", token=None, body=b"", headers=None):
     """Answer one HTTP request, however it arrived.
 
     Returns (status code, body bytes, content type).
@@ -501,6 +508,14 @@ def respond(method, path, query="", token=None, body=b""):
     now = time.time()
     if method == "GET" and path == "/":
         return 200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8"
+    if method == "POST" and path == "/api/discord":     # a slash command from Discord (see discord_bot.py)
+        with LOCK:
+            try:
+                status, reply = discord_bot.handle(body, headers or {}, now)
+            except Exception:
+                traceback.print_exc()
+                status, reply = 500, {"error": "Something went wrong."}
+        return status, json.dumps(reply, separators=(",", ":")).encode("utf-8"), "application/json"
     data = None
     if method == "POST":
         try:
@@ -558,7 +573,8 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             length = 0
         body = self.rfile.read(min(length, MAX_BODY))
-        self._reply(*respond("POST", urlparse(self.path).path, "", self.headers.get("X-Token"), body))
+        self._reply(*respond("POST", urlparse(self.path).path, "", self.headers.get("X-Token"), body,
+                             {k: self.headers.get(k) for k in ("X-Signature-Ed25519", "X-Signature-Timestamp")}))
 
     def log_message(self, *args):
         pass  # keep the console quiet
