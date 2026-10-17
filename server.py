@@ -349,6 +349,7 @@ def handle_get(path, query, token, now):
         out = city_view(state, now, _area(query.get("area", ["0"])[0]), query.get("find", [""])[0],
                         query.get("tile", [""])[0], query.get("defs", [""])[0], query.get("stats", [""])[0] == "1")
         out["away"] = game.check_in(state, now)
+        out["discord_code"] = discord_bot.link_code(name)      # for /claim; only this city's player sees it
         return 200, out
 
     if path == "/api/visit":   # read-only look at someone else's city

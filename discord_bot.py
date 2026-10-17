@@ -8,7 +8,14 @@ be posted by a scheduled task (`python discord_bot.py daily`).
 
 Setup, once (see README.md, "Discord"):
     python discord_bot.py setup       asks for the bot's keys and writes DATA/discord.json
-    python discord_bot.py register    tells Discord about the slash commands
+    python discord_bot.py register    tells Discord about the slash commands (again whenever they change)
+After each update of the game:
+    python discord_bot.py update ["a message"]   posts what changed (the git commits since the last time)
+
+/claim gives a player the "Land Owner" role (ROLE_NAME) for a city they own. To show it
+is theirs they also type the city's link code, which only its own player sees, on the
+game's Settings tab (link_code). The bot needs the Manage Roles permission, and its own
+role must be above Land Owner in the server's role list.
 then set the bot's Interactions Endpoint URL to https://<your game>/api/discord.
 
 The keys live in DATA/discord.json, next to the saves and never in the code, so
@@ -19,8 +26,12 @@ against the bot's public key and refuses anything else. PyNaCl is used for that
 when it is installed; otherwise the pure-Python check below (RFC 8032) does it.
 """
 
+import base64
 import hashlib
+import hmac
 import json
+import secrets
+import subprocess
 import os
 import sys
 import threading
@@ -32,6 +43,7 @@ API = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/EthanDolphinP/DolphinCityBuilder, 1.0)"
 TOP = 10                     # cities in a leaderboard, offers in a market list
 COLOUR = 0xE6C35C            # the game's gold, down the side of every embed
+ROLE_NAME = "Land Owner"     # the role /claim gives (made if the server has none by that name)
 
 
 def _data_dir():
@@ -47,6 +59,26 @@ def config():
         return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def _save(settings):
+    CONFIG_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    try:
+        os.chmod(CONFIG_FILE, 0o600)    # only you can read the token
+    except OSError:
+        pass
+
+
+def link_code(city):
+    """The code that shows a Discord member owns `city`: only its own player sees it, in the game. None if Discord is not set up."""
+    settings = config()
+    if not settings.get("public_key"):
+        return None
+    if not settings.get("link_secret"):          # made once; changing it would change every city's code
+        settings["link_secret"] = secrets.token_hex(16)
+        _save(settings)
+    digest = hmac.new(settings["link_secret"].encode(), city.lower().encode(), hashlib.sha256).digest()
+    return base64.b32encode(digest)[:6].decode()
 
 
 # ---------------------------------------------------------- signatures --
@@ -155,6 +187,9 @@ COMMANDS = [
                       ("gold", "Gold"), ("electronics", "Electronics"), ("livestock", "Livestock"))]}]},
     {"name": "online", "description": "Which cities have the game open right now"},
     {"name": "game", "description": "The whole game at a glance"},
+    {"name": "claim", "description": f"Get the {ROLE_NAME} role for your city", "dm_permission": False,
+     "options": [{"type": 3, "name": "city", "description": "Your city's name", "required": True},
+                 {"type": 3, "name": "code", "description": "The Discord code on your city's Settings tab in the game", "required": True}]},
 ]
 
 
@@ -300,7 +335,60 @@ def handle(body, headers, now):
         return 200, _reply(_online(server, now))
     if name == "game":
         return 200, _reply(_game(server, now))
+    if name == "claim":
+        return 200, _claim(server, now, request, str(options.get("city") or "")[:24], str(options.get("code") or ""))
     return 200, _reply(_embed("Unknown command", "Try /leaderboard, /city, /market, /online or /game."), private=True)
+
+
+# ---------------------------------------------------------------- /claim --
+
+def _claim(server, now, request, name, code):
+    """Check the city and its code, then give the member the role. The role is given in the background (it
+    takes calls to Discord), so the answer is "thinking..." at once, and becomes the result when done."""
+    settings = config()
+    names = server.all_city_names()
+    match = name if name in names else next((n for n in names if n.lower() == name.lower()), None)
+    if not match:
+        return _reply(_embed("No such city", f"There is no city called **{name}**."), private=True)
+    if not hmac.compare_digest(code.strip().upper(), link_code(match) or "-"):
+        return _reply(_embed("That code is not right", f"Your city's code is on its **Settings** tab in the game, "
+                                                       f"under Discord. Only the player of {match} can see it."), private=True)
+    guild, member = request.get("guild_id"), (request.get("member") or {}).get("user", {}).get("id")
+    if not (guild and member):
+        return _reply(_embed("Use this in the server", "Run /claim in a channel of the Discord server."), private=True)
+    if not settings.get("bot_token"):
+        return _reply(_embed("Not set up", "The bot has no token: run python discord_bot.py setup."), private=True)
+    state = server.get_city(match, now)
+    state["discord_user"] = member                 # remembered, for whoever looks after the game
+    token, app = request.get("token"), request.get("application_id") or settings.get("application_id")
+    threading.Thread(target=_give_role, args=(settings, guild, member, match, app, token), daemon=True).start()
+    return {"type": 5, "data": {"flags": 64}}      # "thinking...", seen only by the member
+
+
+def _give_role(settings, guild, member, city, app, token):
+    """Find (or make) the Land Owner role and give it to the member; then say how it went."""
+    def call(method, url, payload=None):
+        request = urllib.request.Request(f"{API}{url}", data=None if payload is None else json.dumps(payload).encode("utf-8"),
+                                         method=method, headers={"Authorization": f"Bot {settings['bot_token']}",
+                                                                 "Content-Type": "application/json", "User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            body = response.read()
+            return json.loads(body) if body else None
+    role_name = settings.get("role_name") or ROLE_NAME
+    try:
+        role = next((r for r in call("GET", f"/guilds/{guild}/roles") if r["name"].lower() == role_name.lower()), None)
+        if not role:
+            role = call("POST", f"/guilds/{guild}/roles", {"name": role_name, "color": COLOUR, "mentionable": True})
+        call("PUT", f"/guilds/{guild}/members/{member}/roles/{role['id']}")
+        result = _embed(f"Welcome, land owner of {city}", f"You now have the **{role_name}** role.")
+    except Exception as error:
+        print(f"Discord /claim failed: {error}", file=sys.stderr)
+        result = _embed("Could not give the role", f"The bot needs the **Manage Roles** permission, and its own role must be "
+                                                   f"above **{role_name}** in the server's role list. ({error})")
+    try:
+        _post(f"{API}/webhooks/{app}/{token}/messages/@original", {"embeds": [result]}, method="PATCH")
+    except Exception as error:
+        print(f"Discord /claim reply failed: {error}", file=sys.stderr)
 
 
 # ------------------------------------------------------- announcements --
@@ -343,11 +431,7 @@ def _setup():
         if value:
             out[key] = value
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_FILE.write_text(json.dumps(out, indent=2), encoding="utf-8")
-    try:
-        os.chmod(CONFIG_FILE, 0o600)    # only you can read the token
-    except OSError:
-        pass
+    _save(out)
     print(f"\nSaved to {CONFIG_FILE}.")
     print("Next: python discord_bot.py register, then put this in the bot's Interactions Endpoint URL:")
     print(f"  {out.get('game_url', 'https://<your game>').rstrip('/')}/api/discord")
@@ -360,6 +444,31 @@ def _register():
     status, body = _post(f"{API}/applications/{c['application_id']}/commands", COMMANDS, token=c["bot_token"], method="PUT")
     print(f"Registered {len(json.loads(body))} slash commands (HTTP {status}): " + ", ".join("/" + x["name"] for x in COMMANDS))
     print("They can take a minute to appear in Discord.")
+
+
+def _update(message):
+    """Announce an update: the message given, and the commits since the last announcement (or the last five)."""
+    settings = config()
+    hook = settings.get("webhook")
+    if not hook:
+        sys.exit("No announcements webhook set: run python discord_bot.py setup.")
+    here = Path(__file__).resolve().parent
+    def git(*args):
+        return subprocess.run(["git", "-C", str(here), *args], capture_output=True, text=True).stdout.strip()
+    head = git("rev-parse", "HEAD")
+    since = settings.get("last_update")
+    span = [f"{since}..HEAD"] if since and git("cat-file", "-t", since) == "commit" else ["-5"]
+    changes = [line for line in git("log", "--no-merges", "--format=%s", *span).splitlines() if line.strip()]
+    if not changes and not message:
+        print("Nothing new since the last announcement. Give a message to announce anyway.")
+        return
+    lines = "\n".join(f"\u2022 {c}" for c in changes[:15]) + (f"\n...and {len(changes) - 15} more" if len(changes) > 15 else "")
+    embed = _embed("\U0001F6E0\uFE0F The game has been updated", (message + "\n\n" if message else "") + (lines or ""),
+                   footer=settings.get("game_url") or None)
+    status, _ = _post(hook, {"embeds": [embed], "allowed_mentions": {"parse": []}})
+    settings["last_update"] = head
+    _save(settings)
+    print(f"Announced the update (HTTP {status}): {len(changes)} change{'s' if len(changes) != 1 else ''}.")
 
 
 def _daily():
@@ -396,6 +505,8 @@ if __name__ == "__main__":
         _register()
     elif command == "daily":
         _daily()
+    elif command == "update":
+        _update(" ".join(sys.argv[2:]).strip())
     elif command == "test":
         announce("Test message from Dolphin City Builder.")
         time.sleep(5)

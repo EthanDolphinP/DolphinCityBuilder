@@ -248,8 +248,9 @@ the game's own address, and the game answers it from the live cities.
    name it. On **General Information** copy the **Application ID** and the
    **Public Key**. On **Bot**, press **Reset Token** and copy the token (it is
    only shown once; keep it secret).
-2. Invite it: **OAuth2**, **URL Generator**, tick `applications.commands` (and
-   `bot`), open the link at the bottom and pick your server.
+2. Invite it: **OAuth2**, **URL Generator**, tick `applications.commands` and
+   `bot`, and under Bot Permissions tick **Manage Roles** (for `/claim`); open the
+   link at the bottom and pick your server.
 3. For announcements, in your Discord server open the channel's settings,
    **Integrations**, **Webhooks**, **New Webhook**, **Copy Webhook URL**.
 4. In a Bash console on PythonAnywhere:
@@ -268,6 +269,27 @@ the game's own address, and the game answers it from the live cities.
 6. `python discord_bot.py test` posts a test message to the announcements
    channel. For a daily leaderboard, add a scheduled task on the **Tasks**
    tab: `cd ~/DolphinCityBuilder && python discord_bot.py daily`.
+
+**After every update of the game**, announce it in the same console:
+
+```
+cd ~/DolphinCityBuilder && git pull && python discord_bot.py update "A short note, if you like"
+```
+
+It posts the changes since the last announcement (the commit messages), with
+your note on top, then press **Reload** as usual. With nothing new and no note
+it posts nothing.
+
+**The Land Owner role.** `/claim city: code:` gives a member the **Land
+Owner** role (the bot makes it if there is none). The code is on each city's
+**Settings** tab in the game, under Discord, and only that city's player sees
+it, so nobody can claim someone else's city. For this the bot needs the
+**Manage Roles** permission (in the invite link, or in the server's Roles
+settings), and the bot's own role must be **above** Land Owner in the role
+list. Discord doesn't tell this kind of bot when someone joins, so point new
+members at `/claim` in your welcome channel or in Onboarding. After this
+update, run `python discord_bot.py register` once more so Discord learns
+about `/claim`.
 
 ### A forgotten password
 

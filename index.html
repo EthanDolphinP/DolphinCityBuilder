@@ -946,6 +946,12 @@
           <span class="dim small">Other browsers signed in to this city will have to sign in again.</span>
         </form>
       </div>
+      <div class="panel own" data-set="account" id="discordPanel" hidden>
+        <h2>Discord</h2>
+        <p class="small" style="margin-top:0">In the game's Discord server, type <span class="hi">/claim</span> with your city's name and
+          this code to get the <span class="hi">Land Owner</span> role. Keep it to yourself: it shows the city is yours.</p>
+        <div class="bar" style="margin-top:0"><code id="discordCode" class="big hi"></code><button id="copyDiscord" type="button">Copy</button></div>
+      </div>
       <div class="panel own" data-set="account">
         <h2>Privacy</h2>
         <p class="dim small" style="margin-top:0">A banned city cannot view yours or propose bills to you.</p>
@@ -1620,6 +1626,7 @@ async function api(action, extra) {
 }
 
 function acceptStats(data) {
+  if ('discord_code' in data && !data.visiting) discordCode = data.discord_code;
   if (data.stats) { stats = data.stats; statsAt = performance.now(); statsAsk = false; }
 }
 function accept(data) {
@@ -3270,8 +3277,11 @@ function renderSetViews() {
     (words.length && k !== 'all' ? ` <span class="dim small">${counts[k] || 0}</span>` : '') + `</button>`).join('') +
     (words.length && !Object.values(counts).some(Boolean) ? `<span class="dim small">No setting matches.</span>` : ''));
 }
+let discordCode = null;      // this city's code for /claim, while the game has a Discord bot
 function renderSettings() {
   renderSetViews();
+  $('discordPanel').hidden = !discordCode || !!visiting;
+  if (discordCode) $('discordCode').textContent = `/claim city:${view.state.name} code:${discordCode}`;
   // Fill the menus once, then show the current choices.
   const fill = (key, options) => {
     const el = document.querySelector(`[data-setting=${key}]`);
@@ -3830,6 +3840,10 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-tame-all]');
   if (b && !visiting) act('tame_all', { area: b.dataset.tameAll === 'all' ? 'all' : +b.dataset.tameAll });
 });
+$('copyDiscord').onclick = async () => {
+  try { await navigator.clipboard.writeText($('discordCode').textContent); say('Copied. Paste it into Discord.', true); }
+  catch { say('Select the text and copy it yourself.'); }
+};
 $('statsViews').onclick = e => {
   const b = e.target.closest('[data-stats-view]');
   if (b) { statsView = settings.statsView = b.dataset.statsView; saveSettings(); renderStats(); }
