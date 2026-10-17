@@ -1436,7 +1436,7 @@ const HOWTO = [
   ['Additions', 'Click a finished building to attach additions to it. Each one improves that building: faster, more output, more beds. A building can hold two.'],
   ['Research', 'Knowledge buys research on the Research tab. Research unlocks buildings and additions, speeds buildings up, and lets you use difficult land. Each tech level\'s research needs its research building standing in your city: Shaman Hut, School, University, Laboratory, Research Institute.'],
   ['Tech levels', 'Tribe, Village, Town, City, Metropolis, Megacity. The list at the top of the City tab shows what the next one asks for: people, materials, research and areas. Advancing spends the materials, unlocks new buildings and research, and makes your home area bigger.'],
-  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It costs more the further from home, and takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. Each kind of land has its own terrain, wildlife, likely weather and things an expedition may bring back: caves and crystal caverns in Cave Country, reefs and kelp in the Reef Shallows, tundra in the Icefields, heath on the Moorland, scrub in the Outback, and more. Each beast has home lands where its eggs are likelier to be found. You can rename areas to keep track of them.'],
+  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It costs more the further from home, and takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. Each kind of land has its own terrain, wildlife, likely weather and things an expedition may bring back: caves and crystal caverns in Cave Country, reefs and kelp in the Reef Shallows, tundra in the Icefields, heath on the Moorland, scrub in the Outback, and more. Each beast has home lands where its eggs are likelier to be found. You can rename areas to keep track of them. With Expedition Planning (and later Supply Lines, The Grand Survey, an Expedition Camp and an Explorers\' Guild) up to five more expeditions can wait in a queue, supplies paid, each setting off the moment the one before is back, even while you are away; a queued team can head past land still being mapped, and calling one off gives its supplies back.'],
   ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, which a Pasture keeps and farms, a Butcher turns into food, and several later buildings use. A Salt Lick brings animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
@@ -2246,7 +2246,8 @@ function renderExplore() {
   const attention = view.areas.filter(a => a.problems).length;
 
   // ---- the two parts of the tab ----
-  const parts = { send: ['Send an expedition', trip ? 'one on its way' : `${sendable} you can afford`],
+  const queue = explore.queue || [];
+  const parts = { send: ['Send an expedition', trip ? 'one on its way' + (queue.length ? `, ${queue.length} waiting` : '') : `${sendable} you can afford`],
                   areas: ['Your areas', `${view.areas.length}` + (attention ? `, <span class="bad">${attention} need attention</span>` : '')],
                   all: ['Both', ''] };
   setHTML($('expViews'), Object.entries(parts).map(([k, [label, note]]) =>
@@ -2299,7 +2300,19 @@ function renderExplore() {
     `<div class="expedition-info"><div class="expedition-label">Expedition underway</div>` +
     `<div class="expedition-destination">${esc(E[trip.env].name)}</div><div>${esc(trip.where)} of home</div></div>` +
     `<div class="expedition-arrival"><span class="small dim">Arrives in</span><strong data-timer="trip"></strong></div>` +
-    `<div class="expedition-route">Home<span aria-hidden="true"></span>Mapping new land ${gfxIcon('pin')}</div></section>` : '');
+    `<div class="expedition-route">Home<span aria-hidden="true"></span>Mapping new land ${gfxIcon('pin')}</div></section>` +
+    // ---- the queue: teams packed and waiting to set off when the one before is back ----
+    `<div class="panel" style="margin-top:12px"><div class="head"><h2 style="margin:0">Waiting to set off</h2>` +
+    `<span class="dim small">${explore.queue_room ? `${queue.length} of ${explore.queue_room} places` : 'no queue yet'}</span></div>` +
+    (queue.length ? queue.map((q, i) => `<div class="opt"><span class="hi">${i + 1}. ${esc(E[q.env].name)}</span> ${esc(q.where)} of home ` +
+      `<span class="dim small">- sets off about ${esc(clock(q.leaves))}, back about ${esc(clock(q.arrive))}; supplies paid: ${goods(q.cost)}</span> ` +
+      `<button data-exp-cancel="${i}" title="Call it off: its supplies come back">Cancel</button></div>`).join('') : '') +
+    `<p class="dim small" style="margin-bottom:0">` + (!explore.queue_room
+      ? `Research <span class="hi">Expedition Planning</span> (Village) to have another expedition wait and set off the moment this one is back.`
+      : queue.length >= explore.queue_room
+        ? (queueMore().length ? `The queue is full. More places: ${esc(queueMore().join(', '))}.` : 'The queue is full.')
+        : `${explore.queue_room - queue.length} more can wait: pick a destination below and press Queue it. A queued team can head past land still being mapped.`) +
+    `</p></div>` : '');
   fillKinds($('destKind'), explore.destinations.map(d => d.env), 'Any land');
   const dkind = $('destKind').value;
   const dests = explore.destinations.filter(d => !dkind || d.env === dkind);
@@ -2315,10 +2328,17 @@ function renderExplore() {
       list.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}${landHint(E[d.env])}</td>` +
         `<td class="n">${d.distance}</td><td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>` +
         (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
-          : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>Send expedition</button>`) +
+          : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>${trip ? 'Queue it' : 'Send expedition'}</button>`) +
         `</td></tr>`).join('') + `</table>`);
 }
 
+// The research and buildings that would add a place in the expedition queue, that this city does not have yet.
+function queueMore() {
+  const { defs, state } = view, done = new Set(view.research.filter(r => r.done).map(r => r.id));
+  const built = new Set(state.areas.flatMap(a => a.tiles.flat().map(t => t.building)).filter(Boolean));
+  return [...Object.entries(defs.research).filter(([id, r]) => r.exp_queue && !done.has(id)).map(([, r]) => `research ${r.name}`),
+          ...Object.entries(defs.buildings).filter(([id, b]) => b.exp_queue && !built.has(id)).map(([, b]) => `build an ${b.name}`)];
+}
 // What a kind of land is mostly made of, and what an expedition there may bring back besides.
 function landHint(env) {
   const T = view.defs.terrains, R = view.defs.resources;
@@ -4066,6 +4086,10 @@ $('areaSearch').oninput = () => { if (view) renderExplore(); };
 for (const id of ['areaKind', 'areaSort', 'destKind', 'destSort']) $(id).onchange = () => { if (view) renderExplore(); };
 $('areaLook').onchange = () => { settings.areaLook = $('areaLook').value; saveSettings(); if (view) renderExplore(); };
 $('areaLook').value = settings.areaLook || 'cards';
+$('trip').onclick = e => {
+  const b = e.target.closest('[data-exp-cancel]');
+  if (b) act('explore_cancel', { index: +b.dataset.expCancel });
+};
 $('explore').onclick = e => {
   if (!e.target.dataset.send) return;
   const [rx, ry] = e.target.dataset.send.split(',').map(Number);

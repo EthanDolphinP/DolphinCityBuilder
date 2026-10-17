@@ -283,6 +283,8 @@ LONG_STEP = 300             # ...or this, while more than LONG_CATCH_UP is still
 LONG_CATCH_UP = 6 * 3600
 
 EXPEDITION_TIME = 20 * MIN  # travel time per step of distance from home
+MAX_EXPEDITION_QUEUE = 5    # most expeditions that can wait for the one under way to come back
+# Room in the queue comes from research and buildings with "exp_queue" (each adds that many places).
 # What an expedition may bring back besides its map: (resource, least, most), per step of distance.
 EXPEDITION_LOOT = [("food", 15, 40), ("wood", 15, 40), ("stone", 10, 30), ("gold", 5, 15),
                    ("livestock", 1, 3), ("knowledge", 3, 8)]
@@ -1188,6 +1190,19 @@ BUILDINGS = {
         "produces": {"knowledge": 260}, "modifiers": ["cooling"],
         "desc": "Machines that think in many directions at once. Runs best on a cold tile.",
     },
+    # ---- the expedition queue ----
+    "expedition_camp": {
+        "name": "Expedition Camp", "glyph": "⚐", "tech": 1, "category": "support", "research": "expedition_planning", "unique": True,
+        "terrain": ["plains", "forest", "desert", "hill"],
+        "cost": {"wood": 120, "stone": 60, "food": 50}, "exp_queue": 1, "explore_speed": 0.05,
+        "desc": "Tents, mules and stores for the next team: one more expedition can wait in the queue, and expeditions are 5% faster. A city can have one.",
+    },
+    "explorers_guild": {
+        "name": "Explorers' Guild", "glyph": "⚑", "tech": 3, "category": "support", "research": "grand_survey", "unique": True,
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 400, "tools": 80, "gold": 300}, "exp_queue": 1, "explore_speed": 0.1,
+        "desc": "A hall of maps and veteran guides: one more expedition can wait in the queue, and expeditions are 10% faster. A city can have one.",
+    },
 }
 
 # Research is bought with Knowledge. Fields:
@@ -1613,6 +1628,22 @@ RESEARCH = {
         "name": "Eternal Rituals", "tech": 5, "building": "research_institute", "cost": {"knowledge": 20000, "gold": 60000},
         "ritual": 5, "effect": "opens your ideology's ritual number 5, and every ritual is stronger and lasts longer",
         "desc": "Ceremony perfected over a thousand years, and then improved.",
+    },
+    # ---- expedition queue: each adds a place for a trip waiting behind the one under way ----
+    "expedition_planning": {
+        "name": "Expedition Planning", "tech": 1, "building": "school", "cost": {"knowledge": 60},
+        "exp_queue": 1, "effect": "one expedition can wait for the one under way, and sets off when it comes back",
+        "desc": "Maps, lists and a second team packed and ready.",
+    },
+    "supply_lines": {
+        "name": "Supply Lines", "tech": 2, "building": "university", "cost": {"knowledge": 180},
+        "exp_queue": 1, "effect": "one more expedition can wait in the queue",
+        "desc": "Depots along the roads, so the next team never waits for food.",
+    },
+    "grand_survey": {
+        "name": "The Grand Survey", "tech": 3, "building": "university", "cost": {"knowledge": 500},
+        "exp_queue": 1, "effect": "one more expedition can wait in the queue",
+        "desc": "A plan to map everything, one team after another.",
     },
 }
 
@@ -2770,6 +2801,7 @@ def new_game(name, now, seed=None):
         "tech": 0,
         "areas": [home],
         "expedition": None,  # {"rx", "ry", "arrive"} while a team is travelling
+        "exp_queue": [],     # [{"rx", "ry", "cost", "queued"}]: teams waiting to set off, supplies already paid
         "resources": {k: START_RESOURCES.get(k, 0) for k in RESOURCES},
         "population": START_POPULATION,
         "research": [],
@@ -2804,6 +2836,7 @@ def migrate(state, now):
     state.setdefault("research", [])
     state.setdefault("wild", 0)
     state.setdefault("expedition", None)
+    state.setdefault("exp_queue", [])
     state.setdefault("banned", [])
     if "seen" not in state:
         _remember_seen(state, state["updated"])
@@ -3264,8 +3297,13 @@ def advance_time(state, now):
     state.pop("ritual_now", None)
     ideology.tidy_rituals(state)
     trip = state["expedition"]
-    if trip and now >= trip["arrive"]:
+    while trip and now >= trip["arrive"]:
         _arrive(state, trip)
+        if state.get("exp_queue"):          # the next team was waiting: it leaves the moment this one is back
+            nxt = state["exp_queue"].pop(0)
+            _depart(state, trip["arrive"], nxt["rx"], nxt["ry"])
+            log(state, trip["arrive"], f"The next expedition set out {where(nxt['rx'], nxt['ry'])} of home.")
+        trip = state["expedition"]
     beasts.tick(state, now)
 
 
@@ -3643,9 +3681,21 @@ def region_env(state, rx, ry):
     return rng.choices(names, weights=[ENVIRONMENTS[e]["weight"] for e in names])[0]
 
 
+def planned(state):
+    """Positions an expedition is heading for or waiting to head for."""
+    trip = state.get("expedition")
+    return ([(trip["rx"], trip["ry"])] if trip else []) + [(q["rx"], q["ry"]) for q in state.get("exp_queue", [])]
+
+
+def queue_room(state):
+    """How many expeditions can wait behind the one under way: from research and buildings, at most MAX_EXPEDITION_QUEUE."""
+    return min(MAX_EXPEDITION_QUEUE, int(sum(_researched(state, "exp_queue")) + city_stat(state, "exp_queue")))
+
+
 def destinations(state):
-    """Undiscovered positions next to a discovered area."""
-    known = {(a["rx"], a["ry"]) for a in state["areas"]}
+    """Undiscovered positions next to a discovered area, or next to one an expedition is heading for
+    (so a queue can push outwards), leaving out those already planned."""
+    known = {(a["rx"], a["ry"]) for a in state["areas"]} | set(planned(state))
     out = set()
     for rx, ry in known:
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
@@ -3686,10 +3736,15 @@ def expedition_problem(state, rx, ry):
     problem = _need_research(state, "explore_range", "Exploring")
     if problem:
         return problem
-    if state["expedition"]:
-        return "an expedition is already under way"
+    if (rx, ry) in planned(state):
+        return "an expedition is already heading there"
+    if state["expedition"] and len(state.get("exp_queue", [])) >= queue_room(state):
+        if not queue_room(state):
+            better = next((r["name"] for r in RESEARCH.values() if r.get("exp_queue")), None)
+            return "an expedition is already under way" + (f" (research {better} to queue more)" if better else "")
+        return f"the queue is full ({queue_room(state)} waiting)"
     if (rx, ry) not in destinations(state):
-        return "you can only explore next to land you already know"
+        return "you can only explore next to land you already know, or are already exploring"
     if abs(rx) + abs(ry) > max(_researched(state, "explore_range")):
         better = [r["name"] for r in RESEARCH.values()
                   if r.get("explore_range", 0) >= abs(rx) + abs(ry)]
@@ -3710,9 +3765,41 @@ def send_expedition(state, now, rx, ry):
     _pay(state, cost)
     for k, v in cost.items():
         tally(state, "supplies:" + k, v)
-    state["expedition"] = {"rx": rx, "ry": ry, "left": now, "arrive": now + expedition_time(state, rx, ry)}
+    if state["expedition"]:      # one is under way: this one waits its turn, its supplies set aside
+        state["exp_queue"].append({"rx": rx, "ry": ry, "cost": cost, "queued": now})
+        log(state, now, f"An expedition {where(rx, ry)} of home is packed and waiting its turn ({len(state['exp_queue'])} in the queue), "
+                        f"with {fmt_goods(cost)}.")
+        return None
+    _depart(state, now, rx, ry)
     log(state, now, f"An expedition set out {where(rx, ry)} of home with {fmt_goods(cost)}.")
     return None
+
+
+def _depart(state, when, rx, ry):
+    state["expedition"] = {"rx": rx, "ry": ry, "left": when, "arrive": when + expedition_time(state, rx, ry)}
+
+
+def cancel_queued(state, now, index):
+    """Call off a waiting expedition (not the one under way): its supplies come back."""
+    queue = state.get("exp_queue", [])
+    if not (isinstance(index, int) and not isinstance(index, bool) and 0 <= index < len(queue)):
+        return "There is no such expedition waiting."
+    if any(_depends(state, q, queue[index]) for q in queue[index + 1:]):
+        return "A later expedition in the queue can only get there through that land. Call that one off first."
+    trip = queue.pop(index)
+    for k, v in trip["cost"].items():
+        state["resources"][k] += v
+    log(state, now, f"Called off the expedition waiting to go {where(trip['rx'], trip['ry'])} of home; "
+                    f"its {fmt_goods(trip['cost'])} went back into store.")
+    return None
+
+
+def _depends(state, later, earlier):
+    """True if the land `later` is heading for can only be reached through the land `earlier` will map."""
+    step = lambda a, b: abs(a[0] - b[0]) + abs(a[1] - b[1]) == 1
+    goal, via = (later["rx"], later["ry"]), (earlier["rx"], earlier["ry"])
+    others = {(a["rx"], a["ry"]) for a in state["areas"]} | (set(planned(state)) - {goal, via})
+    return step(goal, via) and not any(step(goal, o) for o in others)
 
 
 def _arrive(state, trip):
@@ -3802,6 +3889,8 @@ def apply_action(state, now, action, data):
         return research(state, now, data.get("research"))
     if action == "explore":
         return send_expedition(state, now, data.get("rx"), data.get("ry"))
+    if action == "explore_cancel":
+        return cancel_queued(state, now, data.get("index"))
     if action == "rename_area":
         target = data.get("target")
         if not (isinstance(target, int) and 0 <= target < len(state["areas"])):
@@ -3873,6 +3962,17 @@ def defs():
             "weather": weather.defs(),
         }
     return DEFS
+
+
+def _queue_view(state):
+    """The waiting expeditions, each with when it should set off and be back (if nothing changes)."""
+    out, t = [], (state["expedition"] or {}).get("arrive", state["updated"])
+    for q in state.get("exp_queue", []):
+        took = expedition_time(state, q["rx"], q["ry"])
+        out.append({"rx": q["rx"], "ry": q["ry"], "where": where(q["rx"], q["ry"]), "env": region_env(state, q["rx"], q["ry"]),
+                    "cost": q["cost"], "leaves": t, "arrive": t + took})
+        t += took
+    return out
 
 
 def _view(state, ai, detail):
@@ -4009,6 +4109,7 @@ def _view(state, ai, detail):
             "destinations": explore,
             "expedition": trip and {**trip, "where": where(trip["rx"], trip["ry"]),
                                     "env": region_env(state, trip["rx"], trip["ry"])},
+            "queue": _queue_view(state), "queue_room": queue_room(state), "queue_max": MAX_EXPEDITION_QUEUE,
         },
         "defs": defs(),
     }
