@@ -87,7 +87,9 @@
   .tile.hl { background: var(--hl); box-shadow: inset 0 0 0 1px var(--accent); }
   .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
   #areaPick { flex: 1 1 160px; min-width: 0; max-width: 340px; }
-  .areaChips { margin: 8px 0 0; gap: 6px; align-items: center; max-height: 96px; overflow-y: auto; }
+  .areaChips { margin: 8px 0 0; gap: 6px; align-items: center; }
+  .areaChips:not(.all) > .chip.extra { display: none; }
+  .areaChips > .more { font-size: 13px; padding: 2px 8px; }
   .chip { padding: 2px 8px; font-size: 13px; }
   #weatherBar { margin: 0 0 10px; line-height: 1.5; }
   #weatherBar .sky { white-space: pre; font-weight: bold; }
@@ -139,7 +141,7 @@
   #msg:not(:empty) { margin-top: 12px; }
   html:not(.mobile) main:has(> #game:not([hidden])) { max-width: calc(var(--page) + 512px); }
   html:not(.mobile) #advancePanel { flex: 0 0 240px; position: sticky; top: calc(var(--topbar-h, 54px) + 12px);
-    max-height: calc(100vh - var(--topbar-h, 54px) - 24px); overflow-y: auto; scrollbar-width: thin; }
+    max-height: calc(100vh - var(--topbar-h, 54px) - 24px); overflow-y: auto; }
   html:not(.mobile) #advancePanel > .head { flex-direction: column; align-items: stretch; gap: 8px; }
   html:not(.mobile) #advancePanel .checks > span { display: block; margin: 4px 0 0; }
   html.gfx:not(.mobile) #advancePanel .requirement-grid { grid-template-columns: 1fr; gap: 4px; }
@@ -155,7 +157,7 @@
   html:not(.mobile) #game:not([hidden]) { display: flex; align-items: flex-start; gap: 16px; }
   html:not(.mobile) #gameMain { flex: 1 1 auto; min-width: 0; }
   html:not(.mobile) #resourcePanel { flex: 0 0 240px; position: sticky; top: calc(var(--topbar-h, 54px) + 12px);
-    max-height: calc(100vh - var(--topbar-h, 54px) - 24px); overflow-y: auto; scrollbar-width: thin; }
+    max-height: calc(100vh - var(--topbar-h, 54px) - 24px); overflow-y: auto; }
   html:not(.mobile) #resourcePanel .stats { grid-template-columns: 1fr; gap: 4px; }
   html:not(.mobile) #tab-city { container-type: inline-size; }
   @container (min-width: 692px) {
@@ -167,12 +169,20 @@
   html:not(.mobile) #resourcePanel .stat .r { grid-column: 1 / -1; }
   #topbar.stacked #titleBlock { flex-direction: column; align-items: flex-start; }
   #topbar.stacked #titleBlock > * { max-width: 100%; }
-  #topbar .tabs { flex: 0 1 auto; min-width: 0; margin: 0; gap: 2px 0; scrollbar-width: none; }
-  #topbar .tabs::-webkit-scrollbar { display: none; }
+  #topbar .tabs { flex: 0 1 auto; min-width: 0; margin: 0; gap: 2px 0; flex-wrap: wrap; }   /* too many to fit: a second row */
   #topbar .tabs button { flex: none; white-space: nowrap; padding: 8px 6px; font-size: 14px; }
   button.on { border-color: var(--accent); color: var(--accent); }
   .tile em, .animal { font-style: normal; color: #e58fd0; }
   .scroll { overflow-x: auto; }
+  /* Scroll bars, where any are left, are thin and drawn in the theme's colours. Chrome, Edge and Safari
+     use the ::-webkit rules; Firefox, which has none of them, the two standard properties. */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--dim); }
+  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
+  /* Text never scrolls sideways: long words wrap. */
+  #log, #socTalks, #socThread, #findOut, #salesBody .list { overflow-x: hidden; overflow-wrap: anywhere; }
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: left; padding: 5px 12px 5px 0; border-top: 1px solid var(--line); white-space: nowrap; }
   th { color: var(--dim); font-weight: normal; border-top: 0; }
@@ -227,8 +237,12 @@
   .mobile .tile { min-height: 0; padding: 0; font-size: calc(var(--tw, 44px) * 0.39); }
   .mobile #topbar { flex-wrap: wrap; padding: 6px 8px; gap: 4px; }
   .mobile #topbar h1 { max-width: 100%; font-size: 15px; }
-  .mobile #topbar .tabs { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; }
-  .mobile #topbar .tabs button { font-size: 16px; }
+  #tabMenu { display: none; }
+  .mobile #tabMenu { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 15px; }
+  .mobile #tabMenu .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .mobile #topbar .tabs { display: none; flex: 1 1 100%; }
+  .mobile #topbar.menuOpen .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+  .mobile #topbar .tabs button { font-size: 15px; white-space: normal; padding: 9px 4px; }
   .mobile .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   .mobile .stat { padding: 4px 6px; }
   .mobile .stat .k { font-size: 10px; letter-spacing: 0; }
@@ -241,12 +255,13 @@
   .mobile #findOut { max-height: 40vh; }
   .mobile .kv { gap: 2px 8px; }
   /* Tables become lists on a phone: one block per row, each value on its own line beside its column's name. */
-  .mobile table, .mobile tbody { display: block; }
-  .mobile tr { display: block; padding: 7px 0; border-top: 1px solid var(--line); }
-  .mobile tr:first-child { display: none; }                  /* the heading row; its names are shown beside each value */
-  .mobile td { display: block; padding: 2px 0; border: 0; white-space: normal; text-align: left; }
-  .mobile td[data-th]:not([data-th=""])::before { content: attr(data-th); display: inline-block; width: 32%; min-width: 92px; color: var(--dim); font-size: 13px; }
-  .mobile td:empty { display: none; }
+  .mobile table, .mobile tbody, table.stacked, table.stacked tbody { display: block; }
+  .mobile tr, table.stacked tr { display: block; padding: 7px 0; border-top: 1px solid var(--line); }
+  .mobile tr:first-child, table.stacked tr:first-child { display: none; }   /* the heading row; its names are shown beside each value */
+  .mobile td, table.stacked td { display: block; padding: 2px 0; border: 0; white-space: normal; text-align: left; }
+  .mobile td[data-th]:not([data-th=""])::before, table.stacked td[data-th]:not([data-th=""])::before {
+    content: attr(data-th); display: inline-block; width: 32%; min-width: 92px; color: var(--dim); font-size: 13px; }
+  .mobile td:empty, table.stacked td:empty { display: none; }
   .mobile .areaCards { grid-template-columns: 1fr; }
   .mobile .setGrid { grid-template-columns: 1fr; }
   .mobile .bar { gap: 6px; }
@@ -513,7 +528,8 @@
     <h1 id="title"></h1>
     <div id="status" class="dim"></div>
   </div>
-  <nav class="bar tabs">
+  <button id="tabMenu" type="button" aria-expanded="false" aria-controls="tabNav">Menu</button>
+  <nav class="bar tabs" id="tabNav">
     <button data-tab="city">City</button>
     <button data-tab="people">People</button>
     <button data-tab="beast">Beast</button>
@@ -1182,7 +1198,9 @@ function fitMap() {
   const scale = { small: 0.8, medium: 1, large: 1.25, huge: 1.5 }[settings.tile] || 1;
   const wanted = (gfx() ? (size > 9 ? 44 : 80) : (size > 9 ? 40 : 44)) * scale;      // picture tiles are bigger
   const fits = Math.floor((room - (gfx() ? 12 : 0) - 2 * (size - 1)) / size);      // 2px gaps between tiles
-  map.style.setProperty('--tw', Math.max(isMobile ? 30 : 14, Math.min(wanted, fits)) + 'px');
+  // Tiles shrink to fit rather than make the map scroll sideways: down to 22px on a phone (a Megacity's home area
+  // fits a 375px screen), 14px elsewhere.
+  map.style.setProperty('--tw', Math.max(isMobile ? 22 : 14, Math.min(wanted, fits)) + 'px');
 }
 window.addEventListener('resize', () => { applyLayout(); fitMap(); });
 
@@ -1275,10 +1293,45 @@ function setHTML(el, html) {
   if (el._html === html) return;
   el.innerHTML = html;
   el._html = html;
-  if (html.includes('<table')) labelTables(el);
+  if (html.includes('<table')) { labelTables(el); fitTables(el); }
+  if (html.includes('chip')) foldChips(el);
+}
+// A row of chips longer than CHIPS_SHOWN shows that many and a "+N more" button (which is remembered per row).
+const CHIPS_SHOWN = 12, chipsOpen = new Set();
+function foldChips(el) {
+  for (const row of [el, ...el.querySelectorAll('.areaChips')]) {
+    if (!row.classList || !row.classList.contains('areaChips')) continue;
+    const chips = [...row.querySelectorAll(':scope > .chip')], key = row.id || row.dataset.chipsKey || '';
+    if (chips.length <= CHIPS_SHOWN + 2) continue;
+    const keep = chips.filter(c => c.classList.contains('on')).slice(0, 1);    // the chosen one always shows
+    chips.forEach((c, i) => c.classList.toggle('extra', i >= CHIPS_SHOWN && !keep.includes(c)));
+    row.classList.toggle('all', chipsOpen.has(key));
+    const more = document.createElement('button');
+    more.type = 'button'; more.className = 'more';
+    const hidden = chips.filter(c => c.classList.contains('extra')).length;
+    const label = () => { more.textContent = row.classList.contains('all') ? 'Show fewer' : `+${hidden} more`; };
+    label();
+    more.onclick = e => {
+      e.stopPropagation();
+      const open = row.classList.toggle('all');
+      open ? chipsOpen.add(key) : chipsOpen.delete(key);
+      label();
+    };
+    row.appendChild(more);
+  }
 }
 // Give every table cell the name of its column, so the phone layout can show a table as a list
 // of labelled lines (see ".mobile td" in the styles) instead of making it scroll sideways.
+// After drawing: a table wider than the space it has is shown as a list (the "stacked" class), the way a phone
+// shows every table, rather than making the panel scroll sideways. Checked again when the window changes size.
+function fitTables(root = document) {
+  for (const table of root.querySelectorAll('table')) {
+    if (!table.offsetParent) continue;
+    const box = table.parentElement;
+    table.classList.remove('stacked');
+    if (table.scrollWidth > box.clientWidth + 2) table.classList.add('stacked');
+  }
+}
 function labelTables(el) {
   for (const table of el.querySelectorAll('table')) {
     if (!table.rows.length) continue;
@@ -1767,6 +1820,7 @@ function render() {
     (view.market.duels || []).filter(d => d.to === state.name).length + (ready ? 1 : 0) + (ideoTodo ? 1 : 0) + (todo ? 1 : 0);
   document.title = (waitingCount ? `(${waitingCount}) ` : '') + (visiting ? `${state.name} (visiting)` : state.name) + ' - Dolphin City Builder';
   fitTopbar();
+  renderTabMenu();
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
@@ -1864,6 +1918,7 @@ function render() {
   if ($('log').textContent !== text) $('log').textContent = text;
 
   tick();
+  fitTables($('tab-' + tab));
 }
 
 // Sections the player has opened in the tile panel; kept so a refresh doesn't close them.
@@ -3838,9 +3893,22 @@ $('restart').onclick = () => {
   if (confirm('Wipe this city and start over on a new map? Its market offers are removed too.')) { sel = null; areaIdx = 0; act('restart'); }
 };
 
+// The phone's menu button: says which tab is open, and has a dot when another tab has something waiting.
+function renderTabMenu() {
+  const open = document.querySelector(`.tabs [data-tab="${tab}"]`);
+  const waiting = [...document.querySelectorAll('.tabs [data-tab]')].some(b => b !== open && b.offsetParent !== null &&
+    b.querySelector('.good, .hi, .bad, .nav-badge'));
+  setHTML($('tabMenu'), `&#9776; ${esc(open ? open.textContent.replace(/\(.*\)/, '').trim() : 'Menu')}` + (waiting ? '<span class="dot" title="Something is waiting on another tab"></span>' : ''));
+}
+$('tabMenu').onclick = () => {
+  const open = $('topbar').classList.toggle('menuOpen');
+  $('tabMenu').setAttribute('aria-expanded', String(open));
+};
 document.querySelector('.tabs').onclick = e => {
   const button = e.target.closest('[data-tab]');   // the click may land on a badge inside the button
   if (!button) return;
+  $('topbar').classList.remove('menuOpen');
+  $('tabMenu').setAttribute('aria-expanded', 'false');
   tab = button.dataset.tab;
   say('');
   if (tab === 'settings' && !settings.visitedSettings) { settings.visitedSettings = true; saveSettings(); }   // ticks off "Make it yours"
@@ -3877,6 +3945,8 @@ new ResizeObserver(() => {
   document.documentElement.style.setProperty('--topbar-h', bar.offsetHeight + 'px');
 }).observe($('topbar'));
 new ResizeObserver(() => document.documentElement.style.setProperty('--map-h', $('mapPanel').offsetHeight + 'px')).observe($('mapPanel'));
+let fitWidth = 0;
+new ResizeObserver(() => { if (view && innerWidth !== fitWidth) { fitWidth = innerWidth; fitTables($('tab-' + tab)); } }).observe(document.body);
 function fitTopbar() {
   const bar = $('topbar'), tabs = bar.querySelector('.tabs'), block = $('titleBlock');
   bar.classList.add('stacked');
