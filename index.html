@@ -178,9 +178,9 @@
      use the ::-webkit rules; Firefox, which has none of them, the two standard properties. */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--dim) 55%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
   ::-webkit-scrollbar-thumb:hover { background-color: var(--dim); }
-  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
+  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--dim) 55%, transparent) transparent; } }
   /* Text never scrolls sideways: long words wrap. */
   #log, #socTalks, #socThread, #findOut, #salesBody .list { overflow-x: hidden; overflow-wrap: anywhere; }
   table { border-collapse: collapse; width: 100%; }
@@ -256,6 +256,11 @@
   .mobile .kv { gap: 2px 8px; }
   /* Tables become lists on a phone: one block per row, each value on its own line beside its column's name. */
   .mobile table, .mobile tbody, table.stacked, table.stacked tbody { display: block; }
+  /* the Leaderboard stays a table even on a phone, and scrolls sideways (with the thin scroll bar) when it is wide */
+  .mobile [data-keep-table] table { display: table; } .mobile [data-keep-table] tbody { display: table-row-group; }
+  .mobile [data-keep-table] tr { display: table-row; padding: 0; } .mobile [data-keep-table] tr:first-child { display: table-row; }
+  .mobile [data-keep-table] td { display: table-cell; padding: 4px 8px; white-space: nowrap; }
+  .mobile [data-keep-table] td::before { display: none !important; }
   .mobile tr, table.stacked tr { display: block; padding: 7px 0; border-top: 1px solid var(--line); }
   .mobile tr:first-child, table.stacked tr:first-child { display: none; }   /* the heading row; its names are shown beside each value */
   .mobile td, table.stacked td { display: block; padding: 2px 0; border: 0; white-space: normal; text-align: left; }
@@ -1068,7 +1073,7 @@
         </div>
         <div id="boardViews" class="bar"></div>
         <div id="boardWho" class="bar"></div>
-        <div id="board" class="scroll" style="margin-top:10px"><span class="dim">Loading...</span></div>
+        <div id="board" class="scroll" data-keep-table style="margin-top:10px"><span class="dim">Loading...</span></div>
         <p class="dim small">Click a column heading, or use the menu, to rank by it. View opens another city
           read-only, and Message writes to it. Ban stops a city from viewing yours, writing to you and proposing
           bills to you. Allies and enemies come from your lists on the Social tab.</p>
@@ -1326,7 +1331,7 @@ function foldChips(el) {
 // shows every table, rather than making the panel scroll sideways. Checked again when the window changes size.
 function fitTables(root = document) {
   for (const table of root.querySelectorAll('table')) {
-    if (!table.offsetParent) continue;
+    if (!table.offsetParent || table.closest('[data-keep-table]')) continue;   // e.g. the Leaderboard: kept a table, scrolling sideways
     const box = table.parentElement;
     table.classList.remove('stacked');
     if (table.scrollWidth > box.clientWidth + 2) table.classList.add('stacked');
