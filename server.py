@@ -485,7 +485,7 @@ def handle_post(path, data, token, now):
                                     lambda other: find_city(other, now))
     elif action == "curse_cast":
         target = find_city(data.get("target"), now)
-        error = game.ideology.cast_curse(state, target, now, data.get("curse"))
+        error = game.ideology.cast_curse(state, target, now, data.get("curse"), data.get("gold"))
         if not error:
             curse = game.ideology.chosen(state)["curses"][data["curse"]]
             market.social(state, now, target["name"], "curse", f"You laid {curse['name']} on them.")

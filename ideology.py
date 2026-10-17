@@ -51,13 +51,15 @@ RITUAL_RANK_STRENGTH = 0.25  # each rank of research past the first: this much s
 RITUAL_TIME = 2 * HOUR       # ...a ritual at rank 1 with the least gold lasts this long...
 RITUAL_RANK_TIME = HOUR // 2 # ...and each rank past the first adds this
 
-CURSE_GOLD = [0, 150, 600, 2500, 8000, 20000]   # Gold for the first curse, by the caster's tech level; curse n takes n times it
+CURSE_GOLD = [0, 150, 600, 2500, 8000, 20000]   # the least Gold for the first curse, by the caster's tech level; curse n takes n times it
 CURSE_GOODS = [{}, {"livestock": 3}, {"livestock": 4, "food": 100}, {"livestock": 5, "tools": 30},
                {"livestock": 6, "electronics": 10, "knowledge": 100}]    # more for the later curses, times CURSE_SCALE
 CURSE_SCALE = [0, 1, 3, 8, 20, 50]                # ...by the caster's tech level
 CURSE_TIME = 3 * HOUR        # how long a curse lasts at rank 1...
 CURSE_RANK_TIME = HOUR // 2  # ...and each rank past the first adds this
 CURSE_RANK_STRENGTH = 0.15   # each rank past the first makes the caster's curses this much stronger
+CURSE_GIFT_STRENGTH = 0.2    # like a ritual's gift: every doubling of the Gold over the least makes a curse this much stronger...
+CURSE_GIFT_TIME = 0.5        # ...and this much longer (no top; smaller steps than a ritual's: curses stay mild)
 CURSE_BELOW, CURSE_ABOVE = 1, 2   # a city may curse cities this many tech levels below it, and this many above
 
 IDEOLOGIES = {
@@ -627,10 +629,11 @@ def curse_cost(state, n):
     return cost
 
 
-def curse_terms(state):
-    """(strength, seconds) the caster's curses have, from its ritual research."""
-    rank = ritual_rank(state)
-    return 1 + CURSE_RANK_STRENGTH * (rank - 1), CURSE_TIME + CURSE_RANK_TIME * (rank - 1)
+def curse_terms(state, gift=1.0):
+    """(strength, seconds) of the caster's curses, from its ritual research, for a gift `gift` times the least Gold."""
+    rank, doublings = ritual_rank(state), math.log2(max(1.0, gift))
+    return ((1 + CURSE_RANK_STRENGTH * (rank - 1)) * (1 + CURSE_GIFT_STRENGTH * doublings),
+            (CURSE_TIME + CURSE_RANK_TIME * (rank - 1)) * (1 + CURSE_GIFT_TIME * doublings))
 
 
 def can_curse(caster, target):
@@ -648,8 +651,9 @@ def can_curse(caster, target):
     return None
 
 
-def cast_curse(caster, target, now, curse_id):
-    """Lay one of the caster's ideology's curses on another city. Returns an error or None."""
+def cast_curse(caster, target, now, curse_id, gold=None):
+    """Lay one of the caster's ideology's curses on another city, giving `gold` (at least the curse's least; more makes it
+    stronger and longer, as a ritual's gift does). Returns an error or None."""
     problem = can_curse(caster, target)
     if problem:
         return problem
@@ -664,11 +668,18 @@ def cast_curse(caster, target, now, curse_id):
     if mine and mine["until"] > now:
         return f"Your {ideo['curses'][curse_id]['name']} is still on {mine['target']}; each curse can be on one city at a time."
     cost = curse_cost(caster, n)
+    least = cost["gold"]
+    if gold is None:
+        gold = least
+    if not (isinstance(gold, (int, float)) and not isinstance(gold, bool)) or gold < least:
+        return f"That curse takes at least {least:,} Gold."
+    cost["gold"] = int(gold)
     missing = game._missing(caster, cost)
     if missing:
         return f"Not enough for that curse (need {game.fmt_goods(missing)})."
     game._pay(caster, cost)
-    strength, seconds = curse_terms(caster)
+    strength, seconds = curse_terms(caster, gold / least)
+    seconds = round(seconds)
     curse = ideo["curses"][curse_id]
     caster["cursing"][curse_id] = {"target": target["name"], "until": now + seconds}
     target.setdefault("curses", []).append({"from": caster["name"], "ideology": caster["ideology"], "curse": curse_id,
@@ -833,6 +844,9 @@ def view(state):
     strength, seconds = curse_terms(state)
     curses = {"rank": rank, "strength": round(strength, 3), "time": seconds, "below": CURSE_BELOW, "above": CURSE_ABOVE,
               "costs": {cid: curse_cost(state, n) for n, cid in enumerate(ideo["curses"])} if ideo else {},
+              "gift_strength": CURSE_GIFT_STRENGTH, "gift_time": CURSE_GIFT_TIME,
+              "penalties": {cid: c["penalty"] for cid, c in ideo["curses"].items()} if ideo else {},
+              "on_me_ids": [{"from": c["from"], "ideology": c["ideology"], "curse": c["curse"]} for d, c in active_curses(state)],
               "texts": {cid: describe_penalty(_scaled(c["penalty"], strength)) for cid, c in ideo["curses"].items()} if ideo else {},
               "cursing": {cid: c for cid, c in state.get("cursing", {}).items() if c["until"] > state["updated"]},
               "on_me": [{"from": c["from"], "name": d["name"], "until": c["until"],

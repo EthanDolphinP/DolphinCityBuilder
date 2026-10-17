@@ -302,6 +302,11 @@
   .mobile .breedRow { grid-template-columns: 1fr; justify-items: center; }
   .mobile .breedSlot { width: 100%; }
   .stat.go { cursor: pointer; } .stat.go:hover { border-color: var(--accent); }
+  #effectsBar { margin: 10px 0 0; gap: 6px; }
+  #effectsBar .fx { border: 1px solid var(--line); border-radius: 12px; padding: 2px 9px; cursor: pointer; background: var(--panel); }
+  #effectsBar .fx.good { border-color: color-mix(in srgb, var(--good) 60%, var(--line)); }
+  #effectsBar .fx.bad { border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
+  #effectsBar .fx .dim { margin-left: 4px; }
   .pin { background: none; border: none; padding: 0 4px; color: var(--dim); cursor: pointer; font: inherit; }
   .pin.on { color: var(--hi); }
   .statTable th[data-stat-sort] { cursor: pointer; }
@@ -574,6 +579,7 @@
       <button id="leave">Back to my city</button>
     </div>
     <div id="msg" class="bad"></div>
+    <div id="effectsBar" class="bar small" hidden></div>
 
     <!-- City -->
     <div id="tab-city">
@@ -1771,6 +1777,9 @@ function render() {
   if (bv.nest_at) timers.nest = { cycle: bv.nest_time, progress: bv.nest_time - (bv.nest_at - view.now), speed: 1, waiting: [] };
   for (const [id, x] of Object.entries((view.ideology.rituals || {}).active || {}))
     timers['ritual:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
+  ((view.ideology.curses || {}).on_me || []).forEach((x, n) => { timers['cursed:' + n] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] }; });
+  for (const [id, x] of Object.entries((view.ideology.curses || {}).cursing || {}))
+    timers['cursing:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
   timers.mission = { cycle: bv.mission_period, progress: bv.mission_period - (bv.mission_at - view.now), speed: 1, waiting: [] };
   for (const b of bv.beasts) {
     if (b.egg && b.warm < b.warm_needed) timers['hatch' + b.id] = { cycle: b.warm_needed, progress: b.warm, speed: 1, waiting: [] };
@@ -1850,6 +1859,7 @@ function render() {
   document.title = (waitingCount ? `(${waitingCount}) ` : '') + (visiting ? `${state.name} (visiting)` : state.name) + ' - Dolphin City Builder';
   fitTopbar();
   renderTabMenu();
+  renderEffects();
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
 
   const adv = status.advance;
@@ -3120,6 +3130,8 @@ function renderIdeology() {
 
   const mine = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Everything it gives the city now</h2>` +
     iv.total.map(t => `<div class="ideology-bonus good">${gfxIcon('check')}${esc(t)}</div>`).join('') +
+    (iv.curses.on_me.length ? `<div class="cat">Taken away by curses on your city</div>` +
+      iv.curses.on_me.map(c => `<div class="ideology-bonus bad">${esc(c.text.join(', '))} <span class="dim small">- ${esc(c.name)}, from ${esc(c.from)}</span></div>`).join('') : '') +
     `<div class="cat">Your ${esc(i.perk_plural.toLowerCase())} (${iv.perks.length})</div>` +
     (iv.perks.length ? `<div class="ideoCards" style="margin-top:8px">` + iv.perks.map(id => i.perks[id]).filter(Boolean).map(p =>
       `<div class="ideoCard perk taken">${ideologyArt(iv.id, p.art, true, true)}<span class="name" style="color:${esc(i.color)}">${esc(p.name)}</span>` +
@@ -3220,6 +3232,21 @@ function ritualPanel(i, iv, own) {
 }
 // ---- curses: laid on another city for a while, paid for in Gold (and more, for the later ones) ----
 let curseTarget = '';      // the city picked to curse
+let curseGift = 1;         // how many times each curse's least Gold to give (one slider for them all)
+const CURSE_PENALTY = { power: 'Generators give {} less power', explore: 'Expeditions {} slower', wildlife: 'Wild animals appear {} less often',
+                        hatch: 'Eggs hatch {} slower', missions: 'Beast missions come {} less often' };
+// A curse's penalty in words, at a strength (as ideology.describe_penalty works it out).
+function penaltyWords(pen, s) {
+  const pct = x => `${Math.round(x * s / (1 + x * s) * 100)}%`, C = view.defs.categories, out = [];
+  for (const [cat, x] of Object.entries(pen.speed || {})) out.push(`${cat === 'all' ? 'All buildings' : C[cat] + ' buildings'} ${pct(x)} slower`);
+  for (const [k, words] of Object.entries(CURSE_PENALTY)) if (pen[k]) out.push(words.replace('{}', pct(pen[k])));
+  return out;
+}
+// What a gift of `gift` times the least buys: [strength, seconds], as ideology.curse_terms() works it out.
+function curseTerms(c, gift) {
+  const d = Math.log2(Math.max(1, gift));
+  return [c.strength * (1 + c.gift_strength * d), c.time * (1 + c.gift_time * d)];
+}
 function cursedPanel(iv) {
   const c = iv.curses;
   if (!c || !c.on_me.length) return '';
@@ -3232,6 +3259,26 @@ function cursedPanel(iv) {
       load.map(([k, x]) => `${esc(names[k] || k)} <span class="bad">${Math.round(x * 100)}% slower</span>`).join(', ') + `</div>` : '') +
     `<p class="dim small" style="margin-bottom:0">Curses wear off by themselves. Each one more on the same city has less effect than the last.</p></div>`;
 }
+// The strip on every tab: rituals running (green), curses on the city (red), curses it has laid (grey),
+// each with a countdown; hovering shows what it does, a click opens it on the Ideology tab.
+function renderEffects() {
+  const iv = view.ideology, I = view.defs.ideologies, chips = [];
+  if (!visiting && iv.id) for (const [id, r] of Object.entries(iv.rituals.active || {}))
+    chips.push(`<span class="fx good" data-fx="rituals" data-timer-label title="${esc(r.text.join('\n'))}">&#10024; ${esc(I[iv.id].rituals[id].name)}` +
+               `<span class="dim" data-timer="ritual:${id}"></span></span>`);
+  if (!visiting) (iv.curses ? iv.curses.on_me : []).forEach((c, n) =>
+    chips.push(`<span class="fx bad" data-fx="curses" title="${esc(c.text.join('\n'))}">&#9760; ${esc(c.name)} <span class="dim">from ${esc(c.from)}</span>` +
+               `<span class="dim" data-timer="cursed:${n}"></span></span>`));
+  if (!visiting && iv.id) for (const [id, c] of Object.entries((iv.curses || {}).cursing || {}))
+    chips.push(`<span class="fx" data-fx="curses" title="Your curse, laid on ${esc(c.target)}">&#128367; ${esc(I[iv.id].curses[id].name)} <span class="dim">on ${esc(c.target)}</span>` +
+               `<span class="dim" data-timer="cursing:${id}"></span></span>`);
+  $('effectsBar').hidden = !chips.length;
+  setHTML($('effectsBar'), chips.length ? `<span class="dim">Now:</span>` + chips.join('') : '');
+}
+function curseLine(strength, seconds) {
+  return `Your curses would be <span class="hi">${strength.toFixed(2)}x</span> as strong and last <span class="hi">${duration(seconds)}</span>. ` +
+    `<span class="dim">Like a ritual's gift: every doubling of the Gold adds the same step again. Other goods stay the same.</span>`;
+}
 function cursePanel(i, iv, own) {
   const c = iv.curses, R = view.defs.research, state = view.state, T = view.defs.tech;
   const ranks = Object.entries(R).filter(([, x]) => x.ritual).sort((a, b) => a[1].ritual - b[1].ritual);
@@ -3241,6 +3288,12 @@ function cursePanel(i, iv, own) {
     `Each of your curses can be on one city at a time; curses from different cities pile up on the same city. ` +
     `The same research that opens rituals opens curses, and makes them stronger and longer.</p>`;
   if (!c.rank) return html + `<p class="dim">Research ${esc(ranks[0][1].name)} to lay your first curse.</p></div>`;
+  const [strength, seconds] = curseTerms(c, curseGift);
+  if (own) html += `<div class="cat">Your gift</div><div class="bar">` +
+    `<input type="range" data-curse-gift data-k="curse-gift" min="0" max="100" step="1" value="${Math.round(10 * Math.log2(curseGift))}" style="flex:1 1 200px">` +
+    `<span class="hi">${curseGift >= 10 ? Math.round(curseGift) : +curseGift.toFixed(1)}x</span> <span class="dim">the least Gold</span>` +
+    `<button data-curse-preset="1">Least</button></div>` +
+    `<div class="opt small" id="curseLine">${curseLine(strength, seconds)}</div>`;
   if (own) {
     if (!board) { loadBoard(); html += `<p class="dim">Finding cities to curse...</p>`; }
     else {
@@ -3253,11 +3306,12 @@ function cursePanel(i, iv, own) {
     }
   }
   html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(i.curses).map(([id, x], n) => {
-    const open = n < c.rank, laid = c.cursing[id], cost = c.costs[id];
+    const open = n < c.rank, laid = c.cursing[id];
+    const cost = { ...c.costs[id], gold: Math.round(c.costs[id].gold * curseGift) };
     const afford = Object.entries(cost).every(([k, v]) => state.resources[k] >= v);
     return `<div class="ideoCard ${laid ? 'on' : open ? '' : 'locked'}"><span class="name">${esc(x.name)}</span>` +
       `<span class="dim small">${esc(x.desc)}</span>` +
-      `<div class="small bad">${(open ? c.texts[id] : x.text).map(esc).join('<br>')}</div>` +
+      `<div class="small bad">${(open ? penaltyWords(c.penalties[id], strength) : x.text).map(esc).join('<br>')}</div>` +
       (open ? `<div class="small">Costs ${goods(cost)}</div>` : `<span class="dim small">Opens with ${esc(ranks[n] ? ranks[n][1].name : 'more research')}</span>`) +
       (laid ? `<div class="small good">On ${esc(laid.target)} until about ${esc(clock(laid.until))}</div>` : '') +
       (own && open && !laid ? `<button data-curse-cast="${id}" ${afford && curseTarget ? '' : 'disabled'} ` +
@@ -3808,7 +3862,7 @@ $('reportOk').onclick = () => { $('report').hidden = true; act('report_seen'); }
 $('tutorial').onclick = e => { if ('tutorialHide' in e.target.dataset) { settings.tutorial = false; saveSettings(); render(); } };
 // Choosing an ideology (in the window or on the tab), taking perks, and putting the choice off.
 document.addEventListener('click', e => {
-  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-ritual-preset], [data-curse-cast]');
+  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-ritual-preset], [data-curse-cast], [data-curse-preset]');
   if (!d || visiting || !view) return;
   if ('ideologyLater' in d.dataset) { settings.ideologyLater = new Date().toDateString(); saveSettings(); render(); }
   else if (d.dataset.ideologyChoose) {
@@ -3821,13 +3875,22 @@ document.addEventListener('click', e => {
     if (confirm(`Give ${ritualGift} Gold to hold ${name}?`)) act('ritual_start', { ritual: d.dataset.ritualStart, gold: ritualGift });
   }
   else if (d.dataset.ritualPreset) { ritualGift = +d.dataset.ritualPreset; renderIdeology(); }
+  else if (d.dataset.cursePreset) { curseGift = 1; renderIdeology(); }
   else if (d.dataset.curseCast) {
     const name = view.defs.ideologies[view.ideology.id].curses[d.dataset.curseCast].name;
-    if (curseTarget && confirm(`Lay ${name} on ${curseTarget}?`)) act('curse_cast', { curse: d.dataset.curseCast, target: curseTarget });
+    const gold = Math.round(view.ideology.curses.costs[d.dataset.curseCast].gold * curseGift);
+    if (curseTarget && confirm(`Lay ${name} on ${curseTarget} for ${gold.toLocaleString()} Gold?`))
+      act('curse_cast', { curse: d.dataset.curseCast, target: curseTarget, gold });
   }
 });
 // While the gift is being dragged or typed only its line changes; the cards follow once it is let go of.
 $('ideologyBody').addEventListener('input', e => {
+  if ('curseGift' in e.target.dataset) {     // dragging: only the line changes; the cards follow when it is let go of
+    curseGift = 2 ** (+e.target.value / 10);
+    const [s, secs] = curseTerms(view.ideology.curses, curseGift);
+    if ($('curseLine')) $('curseLine').innerHTML = curseLine(s, secs);
+    return;
+  }
   if (!('ritualGift' in e.target.dataset)) return;
   const r = view.ideology.rituals, slider = e.target.dataset.ritualGift === 'slider';
   const v = slider ? giftFromSlider(r, +e.target.value) : amount(e.target.value);
@@ -3839,7 +3902,7 @@ $('ideologyBody').addEventListener('input', e => {
   $('ritualLine').innerHTML = ritualLine(v, strength, seconds);
 });
 $('ideologyBody').addEventListener('change', e => {
-  if ('ritualGift' in e.target.dataset) renderIdeology();
+  if ('ritualGift' in e.target.dataset || 'curseGift' in e.target.dataset) renderIdeology();
   if ('curseTarget' in e.target.dataset) { curseTarget = e.target.value; renderIdeology(); }
 });
 $('ideologyBody').addEventListener('click', e => {
@@ -3858,6 +3921,13 @@ document.addEventListener('click', e => {
 $('copyDiscord').onclick = async () => {
   try { await navigator.clipboard.writeText($('discordCode').textContent); say('Copied. Paste it into Discord.', true); }
   catch { say('Select the text and copy it yourself.'); }
+};
+$('effectsBar').onclick = e => {
+  const chip = e.target.closest('[data-fx]');
+  if (!chip) return;
+  ideoView = settings.ideoView = chip.dataset.fx; saveSettings();
+  tab = 'ideology'; render();
+  $('tab-ideology').scrollIntoView({ block: 'start' });
 };
 $('statsViews').onclick = e => {
   const b = e.target.closest('[data-stats-view]');
