@@ -297,6 +297,7 @@ def city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=Fa
     rates = out["status"]["rates"]
     for k, v in market.bill_rates(MARKET, state["name"]).items():
         rates[k] = round(rates[k] + v, 1)
+        out["status"]["unpaused_rates"][k] = round(out["status"]["unpaused_rates"][k] + v, 1)
     if stats:       # only while the Stats tab is open: it is the most work of any reply
         out["stats"] = game.city_stats(state, now, rates)
         out["stats"].insert(-1, market_stats(state, now))

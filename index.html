@@ -38,6 +38,17 @@
   .stat .k, .stat .v, .stat .r { overflow-wrap: anywhere; }
   .stat .v { color: var(--bright); font-size: 16px; line-height: 1.25; }
   .stat .r { font-size: 12px; color: var(--dim); }
+  .stat .potential-rate { float: right; font-size: 10px; color: var(--dim); margin-left: 8px; text-align: right; }
+  .stat .r:has(.potential-rate) { display: flow-root; }
+  #people .power-stat .k { font-size: 14px; }
+  #resourcePanel #people .power-stat { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; align-items: center; min-height: 44px; row-gap: 3px; }
+  #people .power-stat .v { grid-column: 2; grid-row: 1; text-align: right; }
+  #people .power-stat .r { grid-column: 1 / -1; }
+  #people .power-stat .r:empty { display: none; }
+  .power-low { color: var(--bad); }
+  .power-close { color: #e6c35c; }
+  .power-good { color: var(--good); }
+  .power-surplus { color: #51df8b; }
   button, select, input { max-width: 100%; }     /* a long menu or field shrinks to its box instead of sticking out */
   input[type=range] { margin-left: 0; margin-right: 0; }
   .bar > *, .buy > *, .fin > * { min-width: 0; }
@@ -195,7 +206,9 @@
   .meter div.warn { background: var(--bad); } .meter div.alt { background: var(--accent); }
   .meter div.empty { background: none; }
   .big { font-size: 17px; }
-  #visitBar { border-color: var(--accent); }
+  #visitBar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-left: auto; font-size: 12px; color: var(--dim); }
+  #visitBar[hidden] { display: none; }
+  #visitBar button { min-height: 0; padding: 5px 8px; font-size: 12px; }
   /* Looking at someone else's city: nothing that changes it is offered. */
   details.panel > summary.cat { margin: 0; padding: 0; border: 0; }
   details.panel[open] > summary.cat { margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
@@ -316,6 +329,12 @@
   .pageHead p { margin: 4px 0 10px; }
   #statsBody .panel > .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   #statsBody .panel > .head h2 { margin: 0; }
+  #statsBody { font-size: 16px; line-height: 1.5; }
+  #statsBody .statKv { gap: 4px 16px; }
+  #statsBody .statKv > div:nth-child(odd), #statsBody h2, #statsBody th { color: var(--text); }
+  #statsBody .dim, #statsBody .note, #statsBody .cat { color: color-mix(in srgb, var(--text) 85%, var(--dim)); }
+  #statsBody .note, #statsBody .small { font-size: 14px; }
+  #statsBody .statTable { font-size: 15px; }
   #away, #report, #present, #ideologyPick { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex;
           align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   /* The heading and buttons of a pop-up always stay on screen; only the middle scrolls. */
@@ -412,7 +431,15 @@
   .gfx #tile .card [data-build] { background: var(--accent); color: var(--bg); font-weight: 600; }
   .gfx #tile .card [data-build]:disabled { background: var(--button); color: var(--dim); }
   .gfx #tile .kv { font-variant-numeric: tabular-nums; margin: 10px 0; }
+  .gfx #tile .card.addition-card { padding: 8px 12px; margin-top: 6px; }
+  .addition-heading { display: flex; align-items: center; gap: 10px; }
+  .addition-heading .addition-summary { flex: 1; display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 10px; }
+  .addition-effect { color: var(--dim); font-size: 13px; }
+  #tile .addition-heading > button { min-height: 0; padding: 4px 10px; font-size: 14px; }
+  .addition-cost { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; font-size: 13px; }
+  .gfx .addition-cost .cost-pills { margin: 0; }
   .gfx #msg:empty { display: none; }
+  .gfx #msg:not(:empty) { position: fixed; bottom: 18px; right: 18px; z-index: 100; max-width: min(460px, calc(100vw - 36px)); margin: 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 18px #0005; }
   .gfx #inspectorClose { display: none; }
   .gfx.mobile button, .gfx.mobile select, .gfx.mobile input { min-height: 44px; }
   .gfx.mobile main { padding-bottom: 20px; }
@@ -492,6 +519,71 @@
   .gfx .tile-facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .gfx .tile-facts span { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); padding: 5px 7px; border-radius: 6px; font-size: 12px; }
   .gfx .tile-facts .ui-icon { width: 16px; height: 16px; }
+  .quantity-stepper { display: inline-flex; position: relative; align-items: stretch; flex: none; }
+  #tab-market .quantity-stepper input { padding-right: 22px; }
+  .quantity-arrows { position: absolute; right: 2px; top: 2px; bottom: 2px; display: flex; flex-direction: column; width: 17px; }
+  #tab-market .quantity-arrows button { display: flex; justify-content: center; align-items: center; flex: 1; min-height: 0; padding: 0; border: 0; border-radius: 2px; font-size: 9px; line-height: 1; background: transparent; color: var(--dim); }
+  #tab-market .quantity-arrows button:hover { color: var(--text); background: var(--button); }
+  #tab-market > .panel { padding: 12px 14px; margin-top: 10px; }
+  #tab-market .cat { margin: 0 0 8px; }
+  #tab-market .bar { gap: 6px; margin-top: 7px; }
+  #tab-market #mktSummary { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 8px; }
+  #tab-market #mktSummary .stat { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; border: 0; background: none; padding: 0; border-radius: 0; }
+  #tab-market #mktSummary .stat .k { font-size: 12px; }
+  #tab-market #mktSummary .stat .v { font-size: 15px; font-weight: 600; }
+  #tab-market #mktSummary .stat .r { display: none; }
+  #tab-market #mktViews { gap: 16px; border-bottom: 1px solid var(--line); }
+  #tab-market #mktViews button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 6px 0; min-height: 0; color: var(--dim); }
+  #tab-market #mktViews button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  #tab-market button, #tab-market input, #tab-market select { min-height: 30px; font-size: 13px; padding: 5px 8px; }
+  #tab-market .market-filters { display: grid; grid-template-columns: minmax(160px,1fr) repeat(3,minmax(100px,auto)) auto; }
+  #tab-market .market-filters > * { min-width: 0; width: 100%; }
+  #tab-market .market-help { margin-top: 8px; color: var(--dim); font-size: 12px; }
+  #tab-market .market-help summary { cursor: pointer; }
+  #tab-market .market-help p { margin: 5px 0 0; }
+  #tab-market table { font-size: 13px; }
+  #tab-market th { font-size: 11px; color: var(--dim); font-weight: 500; }
+  #tab-market td, #tab-market th { padding: 7px 8px; }
+  #tab-market .buy { display: flex; flex-wrap: wrap; gap: 4px; }
+  #tab-market .buy input { width: 80px !important; }
+  #tab-market #mktSelling:empty { display: none; }
+  #tab-market #offerForm, #tab-market #billForm { gap: 8px 12px; }
+  #tab-market .pair { gap: 5px; font-size: 13px; }
+  @media(max-width:760px) {
+    #tab-market .market-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    #tab-market .market-filters #mktSearch { grid-column: 1 / -1; }
+    #tab-market #mktViews { gap: 8px 14px; }
+    #tab-market button, #tab-market input, #tab-market select { min-height: 36px; }
+  }
+  .weather-section { margin: 8px 0; font-size: 13px; }
+  .weather-section + .weather-section { border-top: 1px solid var(--line); padding-top: 8px; }
+  .weather-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 5px; }
+  .weather-heading > strong { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }
+  .weather-heading .ui-icon { width: 16px; height: 16px; }
+  .weather-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+  .weather-effect, .weather-forecast { display: inline-flex; align-items: center; gap: 5px; }
+  .weather-row .weather-effect { background: var(--inset); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; white-space: nowrap; color: var(--text); }
+  .weather-row .weather-effect.good { color: var(--good); }
+  .weather-effect, .weather-symbol { cursor: help; }
+  .weather-effect .ui-icon { width: 16px; height: 16px; }
+  .weather-symbol { font-size: 19px; line-height: 1.2; }
+  .weather-forecast { margin-left: 4px; gap: 7px; }
+  .terrain-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .help-tip { position: relative; display: inline-flex; align-items: center; }
+  .staffing-controls { font-size: 14px; padding-right: 22px; }
+  #tile .demolish-action { margin-left: auto; min-height: 0; padding: 4px 7px; font-size: 12px; color: #fff; background: #a83232; border-color: #c94b4b; }
+  #tile .demolish-action:hover { background: #c13c3c; border-color: #e06464; }
+  .staffing-off { position: relative; display: inline-flex; }
+  .staffing-controls .help-tip { position: absolute; top: -5px; left: calc(100% + 5px); }
+  #tile .help-tip > button { border-radius: 50%; width: 16px; height: 16px; min-height: 0; padding: 0; font-size: 10px; line-height: 1; color: var(--dim); border-color: var(--line); background: transparent; }
+  .staffing-controls .help-popup { left: auto; right: 0; }
+  #tile .staffing-controls button[data-priority] { border: 0; border-radius: 0; background: transparent; box-shadow: none; min-height: 0; padding: 2px 0; color: var(--dim); font-size: 14px; }
+  #tile .staffing-controls button[data-priority]:hover { color: var(--text); text-decoration: underline; }
+  #tile .staffing-controls button[data-priority].on { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+  .help-popup { position: absolute; bottom: 100%; left: 0; width: 240px; max-width: 65vw; padding-bottom: 6px; z-index: 30; }
+  .help-popup > span { display: block; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 12px; line-height: 1.5; box-shadow: 0 4px 16px #0005; cursor: pointer; }
+  .help-popup[hidden] { display: none; }
+  .gfx .terrain-summary .tile-facts { margin: 0; }
   .gfx .tabs button { display: inline-flex; align-items: center; gap: 5px; }
   .gfx .tabs .ui-icon { width: 16px; height: 16px; }
   .gfx .tabs button { gap: 3px; }
@@ -515,10 +607,10 @@
   @media (max-width:380px) { .gfx .tile .tile-name { display: none; } }
 
 
-  .gfx .building-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; }
-  .gfx .building-fact { background: var(--panel); padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
-  .gfx .building-fact .dim { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
-  .gfx .building-fact .ui-icon { width: 16px; height: 16px; }
+  .gfx .building-facts { display: flex; flex-wrap: wrap; column-gap: 18px; row-gap: 4px; margin: 8px 0; font-size: 14px; line-height: 1.5; }
+  .gfx .building-fact { max-width: 100%; }
+  .gfx .building-fact.wide { flex-basis: 100%; }
+  .gfx .building-fact > .dim { margin-right: 5px; font-size: inherit; }
   .gfx #resources .stat.zero .v, .gfx #resources .stat.zero .k .ui-icon { color: var(--dim); }
   .gfx #tab-city:not([hidden]) { display: flex; flex-direction: column; }      /* map first, then the rest */
   .gfx #tab-city > .cols { order: 1; } .gfx #collectionPanel { order: 2; } .gfx #tutorial { order: 3; }
@@ -541,6 +633,10 @@
     <h1 id="title"></h1>
     <div id="status" class="dim"></div>
   </div>
+    <div id="visitBar" class="visit-notice" hidden>
+      <span>You are viewing <span id="visitName" class="hi"></span>. This is read-only.</span>
+      <button id="leave">Back to my city</button>
+    </div>
   <button id="tabMenu" type="button" aria-expanded="false" aria-controls="tabNav">Menu</button>
   <nav class="bar tabs" id="tabNav">
     <button data-tab="city">City</button>
@@ -577,10 +673,6 @@
       <div id="people" class="stats" style="margin-top:8px"></div>
     </aside>
     <div id="gameMain">
-    <div id="visitBar" class="panel bar" style="margin:12px 0 0" hidden>
-      <span>You are viewing <span id="visitName" class="hi"></span>. This is read-only.</span>
-      <button id="leave">Back to my city</button>
-    </div>
     <div id="msg" class="bad"></div>
     <div id="effectsBar" class="bar small" hidden></div>
 
@@ -613,7 +705,7 @@
           </div>
         </div>
         <div class="panel inspector" id="inspector">
-          <div class="head"><h2 id="tileTitle">Tile</h2><button id="toMap" title="Back up to the map">Back to the map</button><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
+          <div class="head"><h2 id="tileTitle" hidden>Tile</h2><button id="toMap" title="Back up to the map">Back to the map</button><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
           <div id="tile" class="dim">
             <div id="tileInfo"></div>
             <div id="buildTools" hidden>
@@ -815,12 +907,12 @@
 
       <details class="panel" open data-mkt="buy sell">
         <summary class="cat"><span id="offersTitle">Open offers</span> <span id="offersCount" class="count"></span></summary>
-        <div class="bar" style="margin-top:0">
+        <div class="bar market-filters" style="margin-top:0">
           <input id="mktSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
           <select id="mktGives"></select>
           <select id="mktWants"></select>
           <select id="mktSort" title="Order">
-            <option value="auto">Best price when comparing one thing for another, else newest</option>
+            <option value="auto">Auto: best price / newest</option>
             <option value="newest">Newest first</option><option value="cheapest">Cheapest for one first</option>
             <option value="biggest">Biggest first</option><option value="oldest">Oldest first</option></select>
           <button type="button" id="mktClear" title="Show every offer again">Clear</button>
@@ -839,19 +931,29 @@
           <span class="pair">and want <input id="wantQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="5" style="width:110px"> <select id="wantRes"></select></span>
           <button>Post offer</button>
         </form>
+        <div id="offerRatio" class="bar small">
+          <span class="dim">Ratio</span>
+          <input id="ratioGive" type="number" min="1" step="1" value="2" aria-label="Give ratio" style="width:64px">
+          <span id="ratioGiveName">Wood</span><span class="dim">:</span>
+          <input id="ratioWant" type="number" min="1" step="1" value="1" aria-label="Receive ratio" style="width:64px">
+          <span id="ratioWantName">Gold</span>
+          <button type="button" id="ratioApply">Apply</button>
+          <label class="check"><input id="ratioLock" type="checkbox"> Keep ratio</label>
+          <span id="ratioNote" class="dim"></span>
+        </div>
         <p id="lotPreview" class="small hi" style="margin-bottom:0"></p>
         <p id="priceHint" class="small dim" style="margin:4px 0 0"></p>
-        <p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
+        <details class="market-help"><summary>How trading works</summary><p class="dim small">Every trade is between two cities. What you offer leaves your stock and is held
           until it is sold or you cancel. The two amounts set the price, and other cities can buy any part
           of the offer at that price. To buy from an offer, type how much of it you want and the cost is
-          shown before you press Buy; Max buys all you can afford.</p>
+          shown before you press Buy; Max buys all you can afford.</p></details>
       </details>
 
       <details class="panel" id="finishedPanel" open data-mkt="sell">
         <summary class="cat">Finished orders <span id="finishedCount" class="count"></span></summary>
-        <p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Change the
+        <details class="market-help"><summary>Reposting orders</summary><p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Change the
           amounts by typing new ones or with the &times; and &divide; buttons, which change both sides and keep the
-          price. Reactivate posts the order again with the amounts shown, taking the goods from your stock again.</p>
+          price. Reactivate posts the order again with the amounts shown, taking the goods from your stock again.</p></details>
         <div id="finished" class="scroll"></div>
       </details>
 
@@ -867,10 +969,10 @@
           <button>Propose bill</button>
         </form>
         <datalist id="cityList"></datalist>
-        <p class="dim small">A bill is a repeating trade with one other city. It starts once they accept, and
+        <details class="market-help"><summary>How bills work</summary><p class="dim small">A bill is a repeating trade with one other city. It starts once they accept, and
           either of you can cancel it at any time. If either city can't pay when it comes due, nothing
           changes hands that time; three misses in a row cancel the bill. Active bills are counted in the
-          per-hour figures at the top.</p>
+          per-hour figures at the top.</p></details>
       </details>
 
       <details class="panel" data-mkt="history">
@@ -936,7 +1038,6 @@
           <label class="check"><input data-setting="collection" type="checkbox"> Show the Building collection on the City tab</label>
           <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
           <label class="check"><input data-setting="reports" type="checkbox"> Show a report when an expedition returns</label>
-          <label class="check"><input data-setting="confirmDemolish" type="checkbox"> Ask before demolishing a building</label>
           <label class="check"><input data-setting="mapKey" type="checkbox"> Show the colour key under the map</label>
         </div>
         <p class="dim small" style="margin-bottom:0">These settings are saved in this browser only, so each player and each
@@ -1169,14 +1270,14 @@ const FONTS = {
 };
 const DEFAULT_SETTINGS = { visuals: 'text', theme: 'forest', accent: '', font: 'mono', zoom: 100, tile: 'medium', width: 'normal', layout: 'auto',
                            rate: 'hour', clock: 'auto', abbreviate: false, separators: true,
-                           poll: 5, startTab: 'city', tutorial: true, collection: false, away: true, reports: true, confirmDemolish: false, mapKey: true };
+                           poll: 5, startTab: 'city', tutorial: true, collection: false, away: true, reports: true, mapKey: true };
 let settings = { ...DEFAULT_SETTINGS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
 function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} }
 // The Visuals setting: 'text' is the original interface, 'icons' adds pictures, cards and a building
 // collection. Anything the visual interface has no picture for is drawn the text way.
 const gfx = () => settings.visuals === 'icons';
-const TAB_ICONS = { city: 'house', people: 'people', explore: 'pin', research: 'knowledge', board: 'trade', stats: 'chart', guide: 'knowledge', settings: 'settings' };
+const TAB_ICONS = { city: 'house', people: 'people', explore: 'pin', research: 'knowledge', board: 'trophy', stats: 'chart', guide: 'knowledge', settings: 'settings' };
 const TAB_NAMES = { city: 'City', people: 'People', explore: 'Explore', research: 'Research', board: 'Leaderboard', stats: 'Stats', guide: 'Guide', settings: 'Settings' };
 let visualsWere = null;
 function applyVisuals() {
@@ -1228,6 +1329,15 @@ window.addEventListener('resize', () => { applyLayout(); fitMap(); });
 
 // Original, reusable vector artwork. Unknown content keeps a generic icon.
 const ICON_PATHS = {
+ storefront: 'M3 10V6l2-3h14l2 3v4M3 6h18M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 6v4M15 6v4M4 13v8h16v-8M8 21v-6h5v6M16 15h1',
+ trophy: 'M7 3h10v7a5 5 0 0 1-10 0ZM7 5H3v3a5 5 0 0 0 5 5M17 5h4v3a5 5 0 0 1-5 5M12 15v5M7 22h10M9 20h6',
+ sun: 'M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM12 1v2M12 21v2M1 12h2M21 12h2M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2',
+ moon: 'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z',
+ cloud: 'M6 19a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 0 11Z',
+ wind: 'M2 8h13q6 0 4-5M2 12h18M2 16h10q6 0 4 5',
+ star: 'm12 2 3 7 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1Z',
+ snow: 'M12 2v20M3 7l18 10M3 17 21 7M9 4l3 3 3-3M9 20l3-3 3 3',
+ shield: 'm12 2 9 4v6q0 6-9 10-9-4-9-10V6Z',
  minus: 'M5 12h14', alert: 'M12 3 2 21h20ZM12 9v5M12 17v1',
  check: 'm5 12 4 4L19 6', lock: 'M6 10h12v12H6ZM8 10V6a4 4 0 0 1 8 0v4',
  people: 'M9 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 21v-5q0-5 6-5t6 5v5M17 4a3 3 0 0 1 0 6M18 12q4 0 4 5v4',
@@ -1433,6 +1543,8 @@ function lotPreview() {
   if (!view) return;
   const R = view.defs.resources, give = amount($('giveQty').value), want = amount($('wantQty').value);
   if (!(give >= 1 && want >= 1)) { $('lotPreview').textContent = ''; return; }
+  $('ratioGiveName').textContent = R[$('giveRes').value];
+  $('ratioWantName').textContent = R[$('wantRes').value];
   const l = lotOf({ give_qty: give, want_qty: want });
   priceHint();
   $('lotPreview').textContent = l.lots > 1
@@ -1580,24 +1692,28 @@ const SKY = { clear: '\\o/', cloudy: '(~~)', rain: "(~~)''", windy: '~~>', fog: 
               hail: 'o.o.o', dust: '..::>', warm_spell: '(o)~', frost: '*_*_', tornado: '\\\\//',
               tidal_surge: '~^~^~', harvest_moon: '(O)' };
 const skyName = id => view.defs.weather.weather[id].name;
+const WEATHER_SYMBOLS = {clear: '\u{2600}', cloudy: '\u{2601}', rain: '\u{1f327}', windy: '\u{1f32c}', fog: '\u{1f32b}', heatwave: '\u{1f321}', cold_snap: '\u{2744}', snow: '\u{1f328}', storm: '\u{26c8}', blizzard: '\u{2744}', sandstorm: '\u{1f32a}', monsoon: '\u{1f327}', drought: '\u{2600}', aurora: '\u{1f30c}', rainbow: '\u{1f308}', meteors: '\u{2604}', eclipse: '\u{25d0}', hail: '\u{1f328}', dust: '\u{1f32b}', warm_spell: '\u{1f324}', frost: '\u{2744}', tornado: '\u{1f32a}', tidal_surge: '\u{1f30a}', harvest_moon: '\u{1f315}'};
+function weatherEffects(list) {
+  const kinds = {'Crops':'food', 'Livestock':'animal', 'Fishing':'dock', 'Solar power':'sun', 'Wind power':'wind', 'Water power':'water', 'Fuel power':'power', 'Materials':'materials', 'Shops and trade':'trade', 'Taverns, inns and shows':'house', 'Stargazers':'star', 'Night markets':'moon', 'Knowledge':'knowledge', 'Weather stations':'cloud', 'Ski resorts':'hill', 'Ice works':'snow', 'Everything':'chart'};
+  return list.map(text => {
+    const match = text.match(/^(.*) ([+-]\d+%|stop)$/);
+    const label = match ? match[1] : text, value = match ? (match[2] === 'stop' ? '-100%' : match[2]) : '-';
+    return `<span class="weather-effect ${value.startsWith('+') ? 'good' : 'dim'}" tabindex="0" title="${esc(text)}" aria-label="${esc(text)}">${icon(kinds[label] || 'chart')}<span>${value}</span></span>`;
+  }).join('');
+}
 function renderWeather() {
   const env = view.environment, W = view.defs.weather, here = env.areas[view.area];
   if (!here) { setHTML($('weatherBar'), ''); return; }
-  const w = W.weather[here.now], next = W.weather[here.next], dn = env.night ? W.night : W.day;
-  const effects = list => list.length ? list.map(esc).join(', ') : 'no effect';
+  const w = W.weather[here.now], dn = env.night ? W.night : W.day;
+  const sky = (id, hint) => `<span class="weather-symbol ${W.weather[id].rare ? 'rareSky' : 'hi'}" tabindex="0" title="${esc(hint + W.weather[id].name + ': ' + W.weather[id].text.join(', '))}" aria-label="${esc(hint + W.weather[id].name)}">${WEATHER_SYMBOLS[id] || '\u2601'}</span>`;
   setHTML($('weatherBar'),
-    `<div><span class="sky ${w.rare ? 'rareSky' : 'hi'}">${esc(SKY[here.now] || '')}</span> ` +
-    `<span class="${w.rare ? 'rareSky' : 'hi'}">${esc(w.name)}</span>${w.rare ? ' <span class="rareSky">(rare)</span>' : ''} ` +
-    `<span class="dim">here: ${effects(w.text)}.</span> ` +
-    `<span class="dim">Changes at the next meal, in ${duration(env.change_in)}, to</span> ${esc(next.name)}${next.rare ? ' <span class="rareSky">(rare)</span>' : ''}` +
-    (here.forecast.length > 1 ? `<span class="dim">, then</span> ` + here.forecast.slice(1).map(id =>
-      `<span class="${W.weather[id].rare ? 'rareSky' : ''}">${esc(W.weather[id].name)}</span>`).join('<span class="dim">, </span>') : '') +
-    `<span class="dim">.</span></div>` +
-    `<div><span class="hi">${dn.name}</span> <span class="dim">(${env.clock}${visiting ? ', their time' : ''}): ${effects(dn.text)}. ` +
-    `${env.night ? 'Day' : 'Night'} comes in ${duration(env.switch_in)}.</span></div>` +
-    (env.shelter[0] || env.shelter[1] ? `<div class="dim">The city is spared ` +
-      [env.shelter[0] ? `${Math.round(env.shelter[0] * 100)}% of night's slowdowns` : '', env.shelter[1] ? `${Math.round(env.shelter[1] * 100)}% of bad weather's` : '']
-        .filter(Boolean).join(' and ') + `.</div>` : ''));
+    `<div class="weather-section"><div class="weather-heading"><strong>${sky(here.now, 'Current weather: ')}${esc(w.name)}</strong>` +
+    `<span class="weather-forecast" title="Weather changes at the next meal"><span class="dim">Next in ${duration(env.change_in)}</span> ` +
+    (here.forecast.length ? here.forecast : [here.next]).map((id, i) => sky(id, `Forecast ${i + 1}: `)).join('<span class="dim">&rsaquo;</span>') + `</span></div><div class="weather-row">${weatherEffects(w.text)}</div></div>` +
+    `<div class="weather-section"><div class="weather-heading"><strong>${icon(env.night ? 'moon' : 'sun')}${esc(dn.name)} <span class="dim">${env.clock}</span></strong>` +
+    `<span class="dim">${env.night ? 'Day' : 'Night'} in ${duration(env.switch_in)}</span>` +
+    env.shelter.map((amount, i) => amount ? `<span class="weather-effect dim" tabindex="0" title="The city is spared ${Math.round(amount * 100)}% of ${i ? 'bad weather' : 'night'} slowdowns">${icon('shield')}${Math.round(amount * 100)}% ${i ? 'weather' : 'night'} protection</span>` : '').join('') +
+    `</div><div class="weather-row">${weatherEffects(dn.text)}</div></div>`);
 }
 function duration(sec) {
   sec = Math.max(0, Math.ceil(sec));
@@ -1663,9 +1779,12 @@ function accept(data) {
       view.state.areas[view.area].size !== data.state.areas[data.area].size)) sel = null;
   view = data;
   areaIdx = data.area;
+  if (sel && !data.state.areas[data.area]?.tiles[sel.y]?.[sel.x]) { sel = null; jump = null; }
+  if (jump && !data.state.areas[data.area]?.tiles[jump.y]?.[jump.x]) jump = null;
   if (jump && jump.area === data.area) { sel = { x: jump.x, y: jump.y }; jump = null; }
   fetchedAt = performance.now();
   render();
+  if (tab === 'board' && !board) loadBoard();
   if (data.away) showAway(data.away);
   if (!visiting && data.reports && data.reports.length) showReport(data.reports[0]);
 }
@@ -1708,7 +1827,7 @@ function showAway(a) {
   $('away').hidden = false;
 }
 
-function visit(name) { visiting = name; areaIdx = 0; sel = null; tab = 'city'; say(''); refresh(); }
+function visit(name) { visiting = name; areaIdx = 0; sel = null; tab = 'city'; writeTabRoute(); say(''); refresh(); }
 function leave() { visiting = null; areaIdx = 0; sel = null; refresh(); }
 
 let msgTimer = null;
@@ -1719,12 +1838,17 @@ function say(text, good) {
   clearTimeout(msgTimer);
   if (text) msgTimer = setTimeout(() => { $('msg').textContent = ''; }, good ? 6000 : 12000);
 }
+let pendingActions = 0, actionRevision = 0, refreshRevision = 0;
 async function act(action, extra) {
   if (visiting) return;
+  if (action === 'add' && pendingActions) return;
+  actionRevision++;
+  pendingActions++;
   const log = view ? view.state.log : [], last = log.length ? log[log.length - 1] : null;
   let data;
   try { data = await api(action, extra); }
   catch { say('Lost contact with the server.'); return; }
+  finally { pendingActions--; }
   if (data.auth) return signOut(data.error);
   if (data.state) accept(data);
   if (data.error) say(data.error);
@@ -1737,10 +1861,14 @@ async function act(action, extra) {
 }
 
 async function refresh() {
-  if (!city) return;
+  writeTabRoute();
+  if (!city || pendingActions) return;
+  const revision = actionRevision, request = ++refreshRevision;
   lastFetch = performance.now();
   try {
     const data = await api();
+    // A response started before an action (or a newer refresh) must not undo its UI.
+    if (revision !== actionRevision || request !== refreshRevision || pendingActions) return;
     if (data.auth) return signOut(data.error);
     if (data.state) accept(data);
     else if (visiting) { visiting = null; say(data.error || ''); refresh(); }
@@ -1765,7 +1893,14 @@ function plain(cost) {
 
 // ---------------------------------------------------------------- render --
 
+function powerCoverage(power) {
+  const percent = power.demand > 0 ? power.supply / power.demand * 100 : null;
+  const level = percent === null ? 'good' : percent < 100 ? 'low' : percent < 110 ? 'close' : percent < 125 ? 'good' : 'surplus';
+  const label = percent === null ? 'No demand' : `${Math.floor(percent)}%`;
+  return `<span class="power-${level}" title="${num(power.supply)} power supplied / ${num(power.demand)} consumed">${label}</span>`;
+}
 function render() {
+  writeTabRoute();
   const { state, status, defs } = view;
   renderTutorial();
   renderPresent();
@@ -1804,13 +1939,14 @@ function render() {
   $('status').textContent = `Tech level ${state.tech + 1} of ${defs.tech.length}  |  ` +
     (view.ideology.id ? `${defs.ideologies[view.ideology.id].name}  |` : '') + `  ${state.areas.length} ${state.areas.length === 1 ? 'area' : 'areas'}  |  ` +
     `${view.environment.night ? 'Night' : 'Day'}, ${view.environment.clock}${visiting ? ' their time' : ''}  |  Founded ${clock(state.founded)}`;
-  const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
+  const stat = (k, v, r) => `<div class="stat${k === 'Power' ? ' power-stat' : ''}"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || (k === 'Power' ? '' : '&nbsp;')}</div></div>`;
   setHTML($('resources'), Object.entries(defs.resources).map(([k, label]) => {
     const d = status.rates[k];
     return stat((gfx() ? icon(RESOURCE_ICONS[k]) : '') + esc(label), num(state.resources[k]),
       (d ? `<span class="${d > 0 ? 'good' : 'bad'}">${rateText(d)}</span>` : gfx() ? (state.resources[k] > 0 ? 'In storage' : 'None owned') : '') +
       // a store that is shrinking says when it runs out
-      (d < 0 && state.resources[k] > 0 ? ` <span class="bad" title="At this rate">&middot; empty in ${duration(state.resources[k] / -d * 3600)}</span>` : ''));
+      (d < 0 && state.resources[k] > 0 ? ` <span class="bad" title="At this rate">&middot; empty in ${duration(state.resources[k] / -d * 3600)}</span>` : '') +
+      (status.unpaused_rates && rateText(status.unpaused_rates[k]) !== rateText(d) ? `<span class="potential-rate" title="Projected net rate at full housing with every building enabled. Includes input costs and meals; limited by workers, power and current supplies, hunger, weather and livestock. Market bills included.">Max pop: ${rateText(status.unpaused_rates[k])}</span>` : ''));
   }).join(''));
   [...$('resources').children].forEach((el, i) => {
     const key = Object.keys(defs.resources)[i];
@@ -1827,10 +1963,13 @@ function render() {
         ` &middot; <span class="good" title="With enough food for ${status.arrivals_max} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal">${rateText(growth)}</span>`) +
     stat('Workers', `${working} / ${status.jobs} jobs`,
       unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${status.idle} idle` : 'all filled') +
-    (status.power.supply || status.power.demand ? stat('Power', `${num(status.power.supply)} / ${num(status.power.demand)}`,
-      short ? '<span class="bad">not enough</span>' : 'enough') : '') +
+    (status.power.supply || status.power.demand || status.unpaused_power?.demand || status.unpaused_power?.supply ? stat('Power', powerCoverage(status.power),
+      (short ? '<span class="bad">not enough</span>' : '') +
+      (status.unpaused_power && (status.unpaused_power.supply !== status.power.supply || status.unpaused_power.demand !== status.power.demand)
+        ? `<span class="potential-rate" title="Power coverage at full housing with all buildings enabled">Max pop: ${powerCoverage(status.unpaused_power)}</span>` : '')) : '') +
     stat('Next meal', `<span data-timer="meal"></span>`,
-      state.hungry ? '<span class="bad">HUNGRY: half speed</span>' : `eats ${pop} food`));
+      (state.hungry ? '<span class="bad">HUNGRY: half speed</span>' : `eats ${pop} food`) +
+      (status.housing !== pop ? `<span class="potential-rate" title="Food consumed each meal at full housing">Max pop: ${num(status.housing)} food</span>` : '')));
 
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   // a beast mission, or an egg's own mission, is waiting
@@ -1841,7 +1980,7 @@ function render() {
     : 'Beast' + (challenged ? ' <span class="hi">(duel)</span>' : todo ? ' <span class="good">(mission)</span>' : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), gfx()
-    ? icon('trade') + 'Market' + (unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
+    ? icon('storefront') + 'Market' + (unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
     : 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
   const mailNew = visiting ? 0 : (state.messages || []).filter(m => !m.read).length;
   setHTML(document.querySelector('[data-tab=social]'), gfx()
@@ -2055,7 +2194,7 @@ function buildingFacts(rows, key) {
  const kinds = {Houses:'house',Makes:'materials',Workers:'people',Every:'clock',Generates:'power',Needs:'power',Status:'clock'};
  const primary = rows.filter(([label]) => kinds[label]);
  const other = rows.filter(([label]) => !kinds[label]);
- return `<div class="building-facts">${primary.map(([label,value]) => `<div class="building-fact"><div class="dim small">${icon(kinds[label])}${label}</div><div class="hi">${value}</div></div>`).join('')}</div>` + fold('buildingFacts:' + key, 'More effects', other.map(([label,value]) => `${label}: ${value}`));
+ return `<div class="building-facts">${primary.map(([label,value]) => `<div class="building-fact${['Makes', 'Every'].includes(label) ? ' wide' : ''}"><span class="dim">${label}</span><span class="hi">${value.replace(/<br\s*\/?\s*>/gi, ' &middot; ')}</span></div>`).join('')}</div>` + fold('buildingFacts:' + key, 'More effects', other.map(([label,value]) => `${label}: ${value}`));
 }
 // ---- The build menu: search, kinds of building, recently built, and one line per building.
 const buildState = { q: '', cat: 'all' };
@@ -2133,12 +2272,11 @@ function renderTile() {
   const water = (terr.groups || []).includes('water');
 
   // ---- the ground ----
-  let html = `<div class="head"><span class="big" style="color:${esc(terr.color)}">${esc(terr.name)}</span>` +
-    `<span class="dim small">tile ${sel.x}, ${sel.y}</span></div>` +
+  let html = `<div class="terrain-summary"><span class="big" style="color:${esc(terr.color)}">${esc(terr.name)}</span>` +
     (gfx()
-      ? `<div class="tile-facts"><span title="Height">${icon('hill')}${t.height}</span><span title="Temperature">${t.temp}&deg;C</span><span>${icon(water ? 'water' : 'food')}${water ? t.fish : info.fertility}% ${water ? 'fish' : 'fertility'}</span></div>` +
+      ? `<div class="tile-facts"><span title="Height">${icon('hill')}${t.height}</span><span title="Temperature">${t.temp}&deg;C</span><span>${icon(water ? 'water' : 'food')}${water ? t.fish : info.fertility}% ${water ? 'fish' : 'fertility'}</span></div></div>` +
         (terr.desc ? fold('terrain', 'Terrain details', [esc(terr.desc)]) : '')
-      : kv([['Height', t.height], ['Temperature', `${t.temp}C`],
+      : `</div>` + kv([['Height', t.height], ['Temperature', `${t.temp}C`],
             water ? ['Fish', `${t.fish}%`]
                   : ['Fertility', `${info.fertility}%` + (info.fertility !== t.fertility ? ` <span class="good">(${t.fertility}% before nearby buildings)</span>` : '')]]) +
         (terr.desc ? `<div class="dim small">${esc(terr.desc)}</div>` : '')) +
@@ -2161,14 +2299,15 @@ function renderTile() {
     if (info.cycle) rows.push(['Status', `<span class="hi" data-timer="${sel.x},${sel.y}"></span>`]);
     html += section('building', 'Building', true) + `<div class="card"><div class="head"><span class="hi big">${esc(b.name)}</span>` +
       (gfx()
-        ? `<span class="owned-badge">${icon('check')}${visiting ? 'Built here' : 'You own this'}</span></div><div class="building-hero">${icon(buildingIcon(b))}<div><strong class="hi">${esc(b.name)}</strong><div class="small">${esc(b.desc)}</div></div></div>` + buildingFacts(rows,t.building) + `<details class="fold"><summary>Remove building</summary><div><button data-demolish>Demolish</button></div></details>`
-        : `<button data-demolish>Demolish</button></div><div class="desc">${esc(b.desc)}</div>` + kv(rows));
+        ? `<span class="owned-badge">${icon('check')}${visiting ? 'Built here' : 'You own this'}</span><button class="demolish-action" data-demolish>Demolish</button></div>` + buildingFacts(rows,t.building)
+        : `<button data-demolish>Demolish</button></div>` + kv(rows));
     if (info.power_in && status.power.supply < status.power.demand) html += `<div class="bad small">Short of power: ` +
       `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs.</div>`;
-    if (info.need && !visiting) html += `<div class="bar" style="margin-top:6px"><span class="dim">Staffing</span>` +
-      [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) =>
-        `<button data-priority="${p}" class="${info.priority === p ? 'on' : ''}">${label}</button>`).join('') + `</div>` +
-      `<div class="desc">First: gets workers before other buildings. Off: gets none.</div>`;
+    if (info.need && !visiting) html += `<div class="bar staffing-controls" style="margin-top:6px"><span class="dim">Staffing</span>` +
+      [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) => {
+        const button = `<button data-priority="${p}" aria-pressed="${info.priority === p}" class="${info.priority === p ? 'on' : ''}">${label}</button>`;
+        return p === -1 ? `<span class="staffing-off">${button}<span class="help-tip"><button type="button" aria-label="Staffing help" aria-expanded="false" aria-controls="staffingHelp">?</button><span class="help-popup" id="staffingHelp" hidden><span>First: gets workers before other buildings. Normal: gets workers after First. Off: gets none.</span></span></span></span>` : button;
+      }).join('') + `</div>`;
     html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) + `</div></details>`;
 
     // ---- additions ----
@@ -2176,12 +2315,11 @@ function renderTile() {
     if (waiting) html += `<p class="dim small">Loading what can be added here...</p>`;
     else if (t.additions.length || info.additions.length) {
       html += section('additions', `Additions: ${t.additions.length} of ${defs.max_additions} attached`, true);
-      for (const a of t.additions) html += `<div class="card"><span class="good">${esc(A[a].name)}</span> ` + (gfx() ? `<span class="owned-badge">${icon('check')}Owned</span>` : `<span class="dim small">attached</span>`) +
-        `<div class="desc">${esc(A[a].desc)}</div></div>`;
+      for (const a of t.additions) html += `<div class="card addition-card"><div class="addition-heading"><div class="addition-summary"><span class="good">${esc(A[a].name)}</span><span class="addition-effect">${esc(A[a].desc)}</span></div>` + (gfx() ? `<span class="owned-badge">${icon('check')}Owned</span>` : `<span class="dim small">attached</span>`) + `</div></div>`;
       const can = visiting ? [] : info.additions.filter(o => !o.problem), cannot = visiting ? [] : info.additions.filter(o => o.problem);
-      for (const o of can) html += `<div class="card"><div class="head"><span class="hi">${esc(A[o.id].name)}</span>` +
+      for (const o of can) html += `<div class="card addition-card"><div class="addition-heading"><div class="addition-summary"><span class="hi">${esc(A[o.id].name)}</span><span class="addition-effect">${esc(A[o.id].desc)}</span></div>` +
         `<button data-add="${esc(o.id)}" ${o.affordable ? '' : 'disabled'}>Add</button></div>` +
-        kv([['Cost', goods(A[o.id].cost)]]) + `<div class="desc">${esc(A[o.id].desc)}</div></div>`;
+        `<div class="addition-cost"><span class="dim">Cost</span>${goods(A[o.id].cost)}</div></div>`;
       if (t.additions.length < defs.max_additions) html += fold('noadd', 'Not available yet',
         cannot.map(o => `${esc(A[o.id].name)}: ${esc(o.problem)}`));
       html += `</details>`;
@@ -2279,7 +2417,8 @@ function renderExplore() {
   setHTML($('tameEverywhere'), tameAllButton(view.state.areas.map((a, n) => n), 'Tame all animals in every area'));
   const { defs, explore, state } = view, E = defs.environments, T = defs.terrains;
   const trip = explore.expedition;
-  const sendable = explore.destinations.filter(d => !d.problem && d.affordable).length;
+  const destinations = explore.destinations.filter(d => !trip || d.rx !== trip.rx || d.ry !== trip.ry);
+  const sendable = destinations.filter(d => !d.problem && d.affordable).length;
   const attention = view.areas.filter(a => a.problems).length;
 
   // ---- the two parts of the tab ----
@@ -2350,9 +2489,9 @@ function renderExplore() {
         ? (queueMore().length ? `The queue is full. More places: ${esc(queueMore().join(', '))}.` : 'The queue is full.')
         : `${explore.queue_room - queue.length} more can wait: pick a destination below and press Queue it. A queued team can head past land still being mapped.`) +
     `</p></div>` : '');
-  fillKinds($('destKind'), explore.destinations.map(d => d.env), 'Any land');
+  fillKinds($('destKind'), destinations.map(d => d.env), 'Any land');
   const dkind = $('destKind').value;
-  const dests = explore.destinations.filter(d => !dkind || d.env === dkind);
+  const dests = destinations.filter(d => !dkind || d.env === dkind);
   const dfilters = { all: ['All', () => true], afford: ['I can afford', d => !d.problem && d.affordable] };
   setHTML($('destFilters'), Object.entries(dfilters).map(([k, [label, test]]) =>
     `<button data-dest-filter="${k}" class="${destFilter === k ? 'on' : ''}">${label} (${dests.filter(test).length})</button>`).join(''));
@@ -2424,7 +2563,7 @@ function renderStats() {
 
   const words = $('statsSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const hit = text => words.every(w => text.toLowerCase().includes(w));
-  const pinButton = key => `<button class="pin ${pins.includes(key) ? 'on' : ''}" data-stat-pin="${esc(key)}" title="${pins.includes(key) ? 'Unpin' : 'Pin to the top'}">*</button>`;
+  const unpinButton = key => `<button class="pin" data-stat-pin="${esc(key)}" title="Remove from pinned stats">Unpin</button>`;
   let matches = 0;
   const panel = (id, title, body) => `<div class="panel" id="stats-${id}"><div class="head"><h2>${esc(title)}</h2>` +
     (statsView === 'all' && !words.length ? `<button class="pin" data-stats-top title="Back to the section buttons">top</button>` : '') + `</div>${body}</div>`;
@@ -2444,11 +2583,11 @@ function renderStats() {
         return desc ? -order : order;
       });
       body = `<div class="scroll"><table class="statTable"><tr>` + b.head.map((h, i) =>
-        `<th class="${i ? 'n' : ''}" data-stat-sort="${esc(key)}" data-col="${i}" title="Sort by ${esc(h.toLowerCase())}">${esc(h)}${col === i ? (desc ? ' v' : ' ^') : ''}</th>`).join('') + `<th></th></tr>` +
-        rows.map(r => `<tr>${r.map((v, i) => `<td class="${i ? 'n' : ''}">${statValue(v)}</td>`).join('')}<td>${pinButton(`${key}|${plain(r[0])}`)}</td></tr>`).join('') + `</table></div>`;
+        `<th class="${i ? 'n' : ''}" data-stat-sort="${esc(key)}" data-col="${i}" title="Sort by ${esc(h.toLowerCase())}">${esc(h)}${col === i ? (desc ? ' v' : ' ^') : ''}</th>`).join('') + `</tr>` +
+        rows.map(r => `<tr>${r.map((v, i) => `<td class="${i ? 'n' : ''}">${statValue(v)}</td>`).join('')}</tr>`).join('') + `</table></div>`;
     } else {
       body = `<div class="statKv">` + rows.map(([label, v, note]) =>
-        `<div>${pinButton(`${key}|${plain(label)}`)}${esc(label)}</div><div><span class="hi">${statValue(v)}</span>${note ? ` <span class="note">${statValue(note)}</span>` : ''}</div>`).join('') + `</div>`;
+        `<div>${esc(label)}</div><div><span class="hi">${statValue(v)}</span>${note ? ` <span class="note">${statValue(note)}</span>` : ''}</div>`).join('') + `</div>`;
     }
     if (!b.title) return body;
     // titled blocks fold away; long ones start folded unless a search is showing them
@@ -2461,7 +2600,7 @@ function renderStats() {
   if (pinned.length && (statsView === 'pinned' || (statsView === 'all' && !words.length))) {
     html += panel('pinned', 'Pinned', `<div class="statKv">` + pinned.map(k => {
       const [label, v, note, where] = all.get(k);
-      return `<div>${pinButton(k)}${esc(label)}</div><div><span class="hi">${statValue(v)}</span>` +
+      return `<div>${esc(label)} ${unpinButton(k)}</div><div><span class="hi">${statValue(v)}</span>` +
         `${note ? ` <span class="note">${statValue(note)}</span>` : ''} <span class="note">- ${esc(where)}</span></div>`;
     }).join('') + `</div>`);
   }
@@ -3639,15 +3778,15 @@ function renderMarket() {
   if (sortBy === 'auto') sortBy = gives && wants ? 'cheapest' : 'newest';
   const offers = narrowed.filter(filters[mktFilter][1]).sort(sorts[sortBy]);
   $('offersCount').textContent = `(${offers.length}${offers.length === market.offers.length ? '' : ' of ' + market.offers.length})`;
-  setHTMLKeep($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Price for one</th><th>Posted</th><th>Buy</th></tr>` +
+  setHTMLKeep($('offers'), offers.length ? `<table><tr><th>City</th><th>Selling</th><th>For</th><th>Unit price</th><th>Buy</th></tr>` +
     offers.map(o => {
       const l = lotOf(o), max = buyOf(o, 0).max;
-      return `<tr class="${mine(o) ? 'me' : ''}"><td>${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
+      return `<tr class="${mine(o) ? 'me' : ''}"><td title="Posted ${esc(clock(o.posted))}">${esc(o.city)}${mine(o) ? ' <span class="dim">(you)</span>' : ''}</td>` +
         `<td>${qty(o.give_qty, o.give)}` + (o.full_give > o.give_qty ? `<div class="dim small">${Math.round((1 - o.give_qty / o.full_give) * 100)}% sold</div>` : '') + `</td>` +
         `<td class="${mine(o) || max ? '' : 'bad'}">${qty(o.want_qty, o.want)}</td>` +
         `<td><span class="hi">${each(price(o))}</span> <span class="dim">${esc(R[o.want])} each</span>` +
         `<div class="dim small">${l.lots > 1 ? `in steps of ${qty(l.give, o.give)}` : l.give < o.give_qty || o.full_give > o.give_qty ? 'the last of it' : 'all at once'}</div></td>` +
-        `<td class="dim">${clock(o.posted)}</td><td>` +
+        `<td>` +
         (mine(o) ? `<button data-cancel="${o.id}">Cancel</button>`
           : l.lots > 1
             ? `<div class="buy"><input data-amount="${o.id}" data-k="buy${o.id}" type="text" inputmode="decimal" autocomplete="off" style="width:100px" ` +
@@ -3687,7 +3826,7 @@ function renderMarket() {
   const sales = state.sales || [];
   $('mktSales').hidden = !sales.length;
   if (sales.length) {
-    const total = (key, qty) => Object.entries(sales.reduce((sum, s) => (sum[s[key]] = (sum[s[key]] || 0) + s[qty], sum), {}))
+    const total = (key, amountKey) => Object.entries(sales.reduce((sum, s) => (sum[s[key]] = (sum[s[key]] || 0) + s[amountKey], sum), {}))
       .map(([k, n]) => qty(n, k)).join(', ');
     setHTML($('salesBody'),
       kv([['Sales', sales.length], ['You received', `<span class="good">${total('want', 'want_qty')}</span>`], ['You sold', total('give', 'give_qty')]]) +
@@ -3852,6 +3991,7 @@ function tick() {
 async function enter(name) {
   city = name; view = null; sel = null; board = null; areaIdx = 0; visiting = null;
   tab = settings.startTab === 'last' ? (settings.lastTab || 'city') : (settings.startTab || 'city');
+  readTabRoute();
   let data;
   try { data = await api(); } catch { data = { error: 'Could not reach the server.' }; }
   if (!data.state && data.auth) return signOut(data.error);
@@ -4229,6 +4369,28 @@ $('tile').addEventListener('toggle', e => {   // remember which sections are ope
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
 }, true);
+function setHelpOpen(tip, open) {
+  tip.querySelector('.help-popup').hidden = !open;
+  tip.querySelector('button').setAttribute('aria-expanded', String(open));
+}
+document.addEventListener('pointerover', e => {
+  const tip = e.target.closest('.help-tip');
+  if (tip && !tip.contains(e.relatedTarget)) setHelpOpen(tip, true);
+});
+document.addEventListener('pointerout', e => {
+  const tip = e.target.closest('.help-tip');
+  if (tip && !tip.contains(e.relatedTarget)) setHelpOpen(tip, false);
+});
+document.addEventListener('click', e => {
+  const tip = e.target.closest('.help-tip');
+  document.querySelectorAll('.help-tip').forEach(other => {
+    if (other !== tip) setHelpOpen(other, false);
+  });
+  if (tip) setHelpOpen(tip, tip.querySelector('.help-popup').hidden);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.help-tip').forEach(tip => setHelpOpen(tip, false));
+});
 $('tile').onclick = e => {
   const pick = e.target.closest('[data-build-cat]');
   if (pick) { buildState.cat = pick.dataset.buildCat; renderTile(); return; }
@@ -4243,7 +4405,8 @@ $('tile').onclick = e => {
   else if ('tame' in e.target.dataset) act('tame', { x: sel.x, y: sel.y });
   else if (e.target.dataset.priority) act('priority', { x: sel.x, y: sel.y, priority: +e.target.dataset.priority });
   else if ('demolish' in e.target.dataset) {
-    if (!settings.confirmDemolish || confirm('Demolish this building? You get back half of what it cost.')) act('demolish', { x: sel.x, y: sel.y });
+    const building = view.defs.buildings[view.state.areas[view.area].tiles[sel.y][sel.x].building];
+    if (confirm(`Demolish ${building.name}? This removes the building. You get back half of what it cost.`)) act('demolish', { x: sel.x, y: sel.y });
   }
 };
 function showArea(i) { areaIdx = i; sel = null; refresh(); }
@@ -4315,6 +4478,40 @@ $('slaughterForm').onsubmit = e => {
 };
 $('resSearch').oninput = () => renderResearch();
 for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { if (view && !visiting) renderMarket(); };
+function enhanceMarketQuantities() {
+  document.querySelectorAll('#tab-market input[type="text"][inputmode="decimal"]').forEach(input => {
+    if (input.closest('.quantity-stepper')) return;
+    const wrap = document.createElement('span');
+    wrap.className = 'quantity-stepper';
+    input.before(wrap); wrap.append(input);
+    const arrows = document.createElement('span');
+    arrows.className = 'quantity-arrows';
+    arrows.innerHTML = '<button type="button" data-quantity-step="1" aria-label="Increase quantity">&#9650;</button><button type="button" data-quantity-step="-1" aria-label="Decrease quantity">&#9660;</button>';
+    wrap.append(arrows);
+  });
+}
+function stepMarketQuantity(input, direction) {
+  const offer = input.dataset.amount && view?.market.offers.find(o => o.id === +input.dataset.amount);
+  const step = offer ? lotOf(offer).give : 1;
+  const current = amount(input.value) || 0;
+  input.value = Math.min(MAX_QTY, Math.max(offer ? 0 : 1, direction > 0 ? (Math.floor(current / step) + 1) * step : (Math.ceil(current / step) - 1) * step));
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+$('tab-market').addEventListener('pointerdown', e => {
+  if (e.target.closest('[data-quantity-step]')) e.preventDefault();
+});
+$('tab-market').addEventListener('click', e => {
+  const button = e.target.closest('[data-quantity-step]');
+  if (button) stepMarketQuantity(button.closest('.quantity-stepper').querySelector('input'), +button.dataset.quantityStep);
+});
+$('tab-market').addEventListener('keydown', e => {
+  if (e.target.matches('.quantity-stepper input') && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
+    e.preventDefault(); stepMarketQuantity(e.target, e.key === 'ArrowUp' ? 1 : -1);
+  }
+});
+new MutationObserver(enhanceMarketQuantities).observe($('tab-market'), { childList: true, subtree: true });
+enhanceMarketQuantities();
 $('offers').addEventListener('input', e => {
   if (e.target.dataset.amount) { lotInput.set(+e.target.dataset.amount, e.target.value); fillOffers(); }
 });
@@ -4345,11 +4542,36 @@ $('finished').addEventListener('change', e => {
   else { say('Amounts must be whole numbers of 1 or more.'); $('finished')._html = null; renderMarket(); }
 });
 $('salesSeen').onclick = () => act('market_seen');
+function applyOfferRatio(side = 'give', all = false) {
+  let g = Number($('ratioGive').value), w = Number($('ratioWant').value);
+  if (![g, w].every(n => Number.isSafeInteger(n) && n >= 1 && n <= MAX_QTY)) {
+    $('ratioNote').textContent = 'Enter positive whole numbers.';
+    return false;
+  }
+  const divisor = gcd(g, w); g /= divisor; w /= divisor;
+  const quantity = amount($(side === 'give' ? 'giveQty' : 'wantQty').value);
+  if (!(quantity >= 1)) return false;
+  const unit = side === 'give' ? g : w;
+  const lots = Math.min(Math.floor(MAX_QTY / Math.max(g, w)), all ? Math.floor(quantity / unit) : Math.max(1, Math.round(quantity / unit)));
+  if (lots < 1) { $('ratioNote').textContent = 'Not enough stock for one ratio lot.'; return false; }
+  $('giveQty').value = lots * g;
+  $('wantQty').value = lots * w;
+  $('ratioNote').textContent = `Steps of ${g} : ${w}`;
+  lotPreview();
+  return true;
+}
+$('ratioApply').onclick = () => { if (applyOfferRatio()) $('ratioLock').checked = true; };
+$('ratioLock').onchange = () => { if ($('ratioLock').checked && !applyOfferRatio()) $('ratioLock').checked = false; };
+for (const id of ['ratioGive', 'ratioWant']) $(id).onchange = () => { if ($('ratioLock').checked) applyOfferRatio(); };
+for (const [id, side] of [['giveQty', 'give'], ['wantQty', 'want']]) $(id).addEventListener('change', () => {
+  if ($('ratioLock').checked) applyOfferRatio(side);
+});
 $('offerForm').addEventListener('input', lotPreview);
-$('giveAll').onclick = () => { $('giveQty').value = Math.max(1, Math.floor(view.state.resources[$('giveRes').value])); lotPreview(); };
+$('giveAll').onclick = () => { $('giveQty').value = Math.max(0, Math.floor(view.state.resources[$('giveRes').value])); if ($('ratioLock').checked) { if (!applyOfferRatio('give', true)) { $('giveQty').value = ''; $('wantQty').value = ''; } } lotPreview(); };
 $('swapSides').onclick = () => {
   [$('giveRes').value, $('wantRes').value] = [$('wantRes').value, $('giveRes').value];
   [$('giveQty').value, $('wantQty').value] = [$('wantQty').value, $('giveQty').value];
+  [$('ratioGive').value, $('ratioWant').value] = [$('ratioWant').value, $('ratioGive').value];
   lotPreview();
 };
 $('mktSelling').onclick = e => {
@@ -4485,6 +4707,33 @@ $('banForm').onsubmit = e => {
   const name = $('banName').value.trim();
   if (name) { act('ban', { target: name }); $('banName').value = ''; }
 };
+// Only the main tab is bookmarkable. Filters, tiles, areas and scrolling stay local.
+const URL_TABS = new Set(['city','people','beast','explore','research','ideology','market','social','board','stats','guide','settings']);
+let urlTab = null;
+function readTabRoute() {
+  const requested = new URLSearchParams(location.hash.slice(1)).get('tab');
+  if (URL_TABS.has(requested)) tab = requested;
+}
+function writeTabRoute() {
+  if (!view || tab === urlTab) return;
+  const hash = '#tab=' + encodeURIComponent(tab);
+  if (location.hash !== hash) history[urlTab === null ? 'replaceState' : 'pushState'](null, '', location.pathname + location.search + hash);
+  urlTab = tab;
+}
+function restoreTabRoute() {
+  const requested = new URLSearchParams(location.hash.slice(1)).get('tab');
+  const next = URL_TABS.has(requested) ? requested : 'city';
+  if (tab === next) return;
+  tab = next;
+  urlTab = null; // Normalize this history entry without adding another one.
+  if (!view) return;
+  render();
+  if (tab === 'board') { if (board) renderBoard(); else loadBoard(); }
+  if (tab === 'stats' && !stats) refresh();
+}
+window.addEventListener('popstate', restoreTabRoute);
+window.addEventListener('hashchange', restoreTabRoute);
+
 applySettings();
 
 const saved = stored();
