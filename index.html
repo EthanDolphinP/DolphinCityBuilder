@@ -568,7 +568,7 @@
   .weather-row .weather-effect.good { color: var(--good); }
   .weather-effect, .weather-symbol { cursor: help; }
   .weather-effect .ui-icon { width: 16px; height: 16px; }
-  .weather-symbol { font-size: 19px; line-height: 1.2; }
+  .weather-symbol { white-space: pre; line-height: 1.2; margin-right: 6px; }   /* the SKY text pictures: never emoji */
   .weather-forecast { margin-left: 4px; gap: 7px; }
   .terrain-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
   .help-tip { position: relative; display: inline-flex; align-items: center; }
@@ -1694,7 +1694,6 @@ const SKY = { clear: '\\o/', cloudy: '(~~)', rain: "(~~)''", windy: '~~>', fog: 
               hail: 'o.o.o', dust: '..::>', warm_spell: '(o)~', frost: '*_*_', tornado: '\\\\//',
               tidal_surge: '~^~^~', harvest_moon: '(O)' };
 const skyName = id => view.defs.weather.weather[id].name;
-const WEATHER_SYMBOLS = {clear: '\u{2600}', cloudy: '\u{2601}', rain: '\u{1f327}', windy: '\u{1f32c}', fog: '\u{1f32b}', heatwave: '\u{1f321}', cold_snap: '\u{2744}', snow: '\u{1f328}', storm: '\u{26c8}', blizzard: '\u{2744}', sandstorm: '\u{1f32a}', monsoon: '\u{1f327}', drought: '\u{2600}', aurora: '\u{1f30c}', rainbow: '\u{1f308}', meteors: '\u{2604}', eclipse: '\u{25d0}', hail: '\u{1f328}', dust: '\u{1f32b}', warm_spell: '\u{1f324}', frost: '\u{2744}', tornado: '\u{1f32a}', tidal_surge: '\u{1f30a}', harvest_moon: '\u{1f315}'};
 function weatherEffects(list) {
   const kinds = {'Crops':'food', 'Livestock':'animal', 'Fishing':'dock', 'Solar power':'sun', 'Wind power':'wind', 'Water power':'water', 'Fuel power':'power', 'Materials':'materials', 'Shops and trade':'trade', 'Taverns, inns and shows':'house', 'Stargazers':'star', 'Night markets':'moon', 'Knowledge':'knowledge', 'Weather stations':'cloud', 'Ski resorts':'hill', 'Ice works':'snow', 'Everything':'chart'};
   return list.map(text => {
@@ -1707,7 +1706,7 @@ function renderWeather() {
   const env = view.environment, W = view.defs.weather, here = env.areas[view.area];
   if (!here) { setHTML($('weatherBar'), ''); return; }
   const w = W.weather[here.now], dn = env.night ? W.night : W.day;
-  const sky = (id, hint) => `<span class="weather-symbol ${W.weather[id].rare ? 'rareSky' : 'hi'}" tabindex="0" title="${esc(hint + W.weather[id].name + ': ' + W.weather[id].text.join(', '))}" aria-label="${esc(hint + W.weather[id].name)}">${WEATHER_SYMBOLS[id] || '\u2601'}</span>`;
+  const sky = (id, hint) => `<span class="weather-symbol ${W.weather[id].rare ? 'rareSky' : 'hi'}" tabindex="0" title="${esc(hint + W.weather[id].name + ': ' + W.weather[id].text.join(', '))}" aria-label="${esc(hint + W.weather[id].name)}">${esc(SKY[id] || '(~~)')}</span>`;
   setHTML($('weatherBar'),
     `<div class="weather-section"><div class="weather-heading"><strong>${sky(here.now, 'Current weather: ')}${esc(w.name)}</strong>` +
     `<span class="weather-forecast" title="Weather changes at the next meal"><span class="dim">Next in ${duration(env.change_in)}</span> ` +
