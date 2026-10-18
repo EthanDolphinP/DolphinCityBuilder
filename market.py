@@ -37,6 +37,7 @@ import random
 
 import beasts
 import game
+import moderation
 
 MAX_OFFERS_PER_CITY = 10
 MAX_BEAST_OFFERS_PER_CITY = 5
@@ -680,6 +681,8 @@ def send_message(state, now, to, text, get_city):
         return "Write a message first."
     if len(text) > MAX_MESSAGE:
         return f"Messages can be at most {MAX_MESSAGE} characters."
+    if moderation.check_message(text):
+        return moderation.check_message(text)
     recent = [m for m in _mailbox(state) if m["mine"] and now - m["t"] < 60]
     if len(recent) >= MESSAGES_PER_MINUTE:
         return "You are sending messages too quickly. Wait a moment."

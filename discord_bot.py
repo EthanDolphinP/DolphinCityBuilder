@@ -202,6 +202,20 @@ COMMANDS = [
     {"name": "resetpassword", "description": "Admin: let the next person to sign in to a city choose its password", "dm_permission": False,
      "default_member_permissions": str(ADMINISTRATOR),
      "options": [{"type": 3, "name": "city", "description": "The city's name", "required": True}]},
+    {"name": "renamecity", "description": "Admin: give a city a new name (for a name that is not allowed)", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "city", "description": "The city's name now", "required": True},
+                 {"type": 3, "name": "new", "description": "Its new name", "required": True}]},
+    {"name": "removecity", "description": "Admin: take a city out of the game (its save is kept aside)", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "city", "description": "The city's name", "required": True}]},
+    {"name": "blockword", "description": "Admin: block a word in city names, area names and messages", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "word", "description": "The word (or 'list' to see the ones you added)", "required": True},
+                 {"type": 3, "name": "action", "description": "Block it (the default) or unblock it", "required": False,
+                  "choices": [{"name": "Block", "value": "add"}, {"name": "Unblock", "value": "remove"}]}]},
+    {"name": "badnames", "description": "Admin: list city and area names the filter does not allow", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR)},
     {"name": "claim", "description": f"Get the {ROLE_NAME} role for your city", "dm_permission": False,
      "options": [{"type": 3, "name": "city", "description": "Your city's name", "required": True},
                  {"type": 3, "name": "code", "description": "The Discord code on your city's Settings tab in the game", "required": True}]},
@@ -354,7 +368,7 @@ def handle(body, headers, now):
         return 200, _reply(_game(server, now))
     if name == "claim":
         return 200, _claim(server, now, request, str(options.get("city") or "")[:24], str(options.get("code") or ""))
-    if name in ("present", "announce", "resetpassword"):
+    if name in ("present", "announce", "resetpassword", "renamecity", "removecity", "blockword", "badnames"):
         if not is_admin(request, settings):
             return 200, _reply(_embed("Not for you", "Only the game's admins can use that."), private=True)
         return 200, _reply(_admin(server, now, name, options), private=True)
@@ -399,6 +413,37 @@ def _admin(server, now, name, options):
         server.DIRTY.add(match)
         server.flush()
         return _embed("Password reset", f"Whoever signs in to **{match}** next chooses its new password. Tell its player to do it soon.")
+    if name == "renamecity":
+        city, new = str(options.get("city") or "")[:24], str(options.get("new") or "").strip()[:24]
+        error = server.rename_city(city, new, now)
+        if error:
+            return _embed("Not renamed", error)
+        return _embed("Renamed", f"That city is now called **{new}**, everywhere in the game. Its player signs in "
+                                 f"with the new name and the same password.")
+    if name == "removecity":
+        removed, error = server.remove_city(str(options.get("city") or "")[:24], now)
+        if error:
+            return _embed("Not removed", error)
+        return _embed("Removed", f"**{removed}** is out of the game. Its save was moved to the removed folder, not "
+                                 f"deleted, and its market offers are gone.")
+    if name == "blockword":
+        import moderation
+        word, action = moderation.plain(str(options.get("word") or ""))[:40], options.get("action") or "add"
+        words = moderation.extra_words()
+        if str(options.get("word") or "").strip().lower() == "list":
+            return _embed("Words you blocked", ", ".join(f"||{w}||" for w in words) or "None yet (the built-in list still applies).")
+        if len(word) < 3:
+            return _embed("Too short", "Give a word of at least 3 letters.")
+        words = sorted(set(words) - {word}) if action == "remove" else sorted(set(words) | {word})
+        Path(moderation.EXTRA_FILE).write_text(json.dumps(words, indent=1), encoding="utf-8")
+        flagged = [f"{c} ({what}: {n})" for c, what, n in server.flagged_names(now)]
+        return _embed("Unblocked" if action == "remove" else "Blocked",
+                      f"||{word}|| is {'allowed again' if action == 'remove' else 'blocked'} in names and messages." +
+                      (f"\nNames that are not allowed now: {', '.join(flagged)[:900]}. Use /renamecity." if flagged else ""))
+    if name == "badnames":
+        flagged = server.flagged_names(now)
+        return _embed("Names not allowed", "\n".join(f"**{c}** - {what}: ||{n}||" for c, what, n in flagged)[:3900]
+                      or "Every city and area name is fine.")
     return _embed("Unknown command", "")
 
 

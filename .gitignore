@@ -1,6 +1,8 @@
 # Live game data: holds password hashes, and must survive code updates.
 saves/
 old_saves/
+removed/          # cities an admin took out with /removecity (kept, not deleted)
+blocked_words.json   # words an admin blocked with /blockword
 market.json
 presents.json
 presents.taken

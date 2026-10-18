@@ -42,6 +42,7 @@ import beasts
 import discord_bot
 import game
 import market
+import moderation
 import weather
 
 ROOT = Path(__file__).parent
@@ -49,6 +50,8 @@ ROOT = Path(__file__).parent
 # (DCB_DATA, see deploy/) so that updating or replacing the code never touches it.
 DATA = Path(os.environ.get("DCB_DATA") or ROOT)
 SAVES = DATA / "saves"
+REMOVED = DATA / "removed"     # saves of cities an admin removed (kept, never deleted)
+moderation.EXTRA_FILE = DATA / "blocked_words.json"   # words an admin blocked with /blockword
 MARKET_FILE = DATA / "market.json"
 PRESENTS_FILE = DATA / "presents.json"   # presents sent from the console, waiting to be handed out
 CITY_NAME = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
@@ -139,6 +142,8 @@ def login(name, password, now):
         return 400, {"error": BAD_NAME}
     if not isinstance(password, str) or not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
         return 400, {"error": f"Passwords are {MIN_PASSWORD} to {MAX_PASSWORD} characters."}
+    if name not in all_city_names() and match_city(name):    # the same name with other capitals
+        return 400, {"error": f"There is already a city called {match_city(name)}: sign in with its name written the same way."}
     tries = FAILED.setdefault(name, [0, 0])
     if now < tries[1]:
         return 429, {"error": f"Too many wrong passwords. Try again in {int(tries[1] - now) + 1} seconds."}
@@ -146,6 +151,11 @@ def login(name, password, now):
     state = get_city(name, now)
     reply = {}
     if state is None:
+        problem = moderation.check_name(name) or (
+            f"There is already a city called {match_city(name)}: sign in with its name written the same way."
+            if match_city(name) else None)
+        if problem:
+            return 400, {"error": problem}
         state = get_city(name, now, create=True)
         set_password(state, password)
         reply["created"] = True
@@ -179,6 +189,94 @@ def all_city_names():
     if SAVES.exists():
         names.update(p.stem for p in SAVES.glob("*.json"))
     return sorted(names)
+
+
+def match_city(name):
+    """The city's own name for `name`, matched without minding capitals, or None."""
+    names = all_city_names()
+    return name if name in names else next((n for n in names if n.lower() == str(name).lower()), None)
+
+
+def _rename_in(value, old, new, pattern):
+    """`value` with every mention of the city `old` changed to `new`: whole strings, dict keys, and the name as a
+    word inside text (log lines, messages)."""
+    if isinstance(value, str):
+        return new if value == old else pattern.sub(new, value)
+    if isinstance(value, list):
+        return [_rename_in(v, old, new, pattern) for v in value]
+    if isinstance(value, dict):
+        return {(new if k == old else k): _rename_in(v, old, new, pattern) for k, v in value.items()}
+    return value
+
+
+def rename_city(old, new, now):
+    """An admin's: give a city a new name, everywhere it is mentioned (other cities, the market). Needs LOCK.
+    Returns an error, or None."""
+    old = match_city(old)
+    if not old:
+        return "There is no such city."
+    if not isinstance(new, str) or not CITY_NAME.match(new):
+        return BAD_NAME
+    if new.lower() != old.lower() and match_city(new):
+        return f"There is already a city called {match_city(new)}."
+    problem = moderation.check_name(new)
+    if problem:
+        return problem
+    global MARKET
+    pattern = re.compile(rf"(?<![A-Za-z0-9_-]){re.escape(old)}(?![A-Za-z0-9_-])")
+    for name in all_city_names():
+        state = get_city(name, now)
+        if state is not None:
+            CITIES[name] = _rename_in(state, old, new, pattern)
+    CITIES[new] = CITIES.pop(old)
+    CITIES[new]["name"] = new
+    MARKET = _rename_in(MARKET, old, new, pattern)
+    for book in (ONLINE, ACTIVE, FAILED):
+        if old in book:
+            book[new] = book.pop(old)
+    DIRTY.discard(old)
+    DIRTY.update(CITIES)
+    flush()
+    old_file = SAVES / f"{old}.json"
+    if old_file.exists() and old.lower() != new.lower():
+        old_file.unlink()          # its contents are in the new file now
+    elif old_file.exists():       # only the capitals changed: on Windows that is the same file
+        old_file.rename(SAVES / f"{new}.json")
+    return None
+
+
+def remove_city(name, now):
+    """An admin's: take a city out of the game. Its save is moved to the "removed" folder, not deleted, and its
+    offers, bills and duels are taken off the market. Needs LOCK. Returns (its name, None) or (None, an error)."""
+    name = match_city(name)
+    if not name:
+        return None, "There is no such city."
+    get_city(name, now)
+    flush()
+    REMOVED.mkdir(exist_ok=True)
+    path = SAVES / f"{name}.json"
+    if path.exists():
+        path.replace(REMOVED / f"{name}-{int(now)}.json")
+    CITIES.pop(name, None)
+    DIRTY.discard(name)
+    for book in (ONLINE, ACTIVE, FAILED):
+        book.pop(name, None)
+    market.drop_city(MARKET, name)
+    flush()
+    return name, None
+
+
+def flagged_names(now):
+    """[(city, what, the name)] for every city and area name the filter would not allow now."""
+    out = []
+    for name in all_city_names():
+        if moderation.check_name(name):
+            out.append((name, "city name", name))
+        state = get_city(name, now)
+        for area in (state or {}).get("areas", []):
+            if area.get("label") and moderation.check_name(area["label"]):
+                out.append((name, "area name", area["label"]))
+    return out
 
 
 def flush():

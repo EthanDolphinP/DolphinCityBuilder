@@ -35,6 +35,7 @@ import re
 
 import beasts
 import ideology
+import moderation
 import weather
 
 MIN = 60  # seconds
@@ -2953,6 +2954,8 @@ def rename_area(state, now, area, name):
     name = " ".join(name.split()) if isinstance(name, str) else None
     if name is None or (name and not AREA_NAME.match(name)):
         return "Area names are up to 24 letters, digits, spaces and simple punctuation."
+    if name and moderation.check_name(name):
+        return moderation.check_name(name)
     old = area_name(area)
     area["label"] = name
     if area_name(area) != old:
