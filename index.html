@@ -325,6 +325,9 @@
   #away .head h1, #report .head h1, #present .head h1, #ideologyPick .head h1 { margin: 0; }
   #presentBody .opt, #presentBody h2 { text-align: left; }
   #ideologyPick .panel { max-width: 860px; }
+  .giftScale td, .giftScale th { padding: 1px 8px 1px 0; white-space: nowrap; text-align: left; }
+  .giftScale tr.hi td { color: var(--bright); }
+  .giftBar { color: var(--good); letter-spacing: -1px; }
   .ideoCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .ideoCard { border: 1px solid var(--line); background: var(--inset); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
   .ideoCard.on { border-color: var(--accent); }
@@ -3186,22 +3189,54 @@ function effectWords(eff) {
 }
 const scaleEffects = (eff, s) => Object.fromEntries(Object.entries(eff).map(([k, v]) =>
   [k, k === 'speed' ? Object.fromEntries(Object.entries(v).map(([c, x]) => [c, x * s])) : v * s]));
-// What a gift buys at the city's rank: [strength, seconds], as ideology.ritual_terms() works it out.
-function ritualTerms(r, gold) {
-  const doublings = Math.log2(gold / r.least);
-  return [r.base_strength * (1 + r.gift_strength * doublings), r.base_time * (1 + r.gift_time * doublings)];
+// ---- gifts of Gold (rituals and hexes alike) ----
+// A gift buys strength and time: every doubling of it over the least adds the same step, with no top, so each
+// extra Gold adds a little less than the one before but never nothing (as ideology.ritual_terms / curse_terms).
+// k = { least, bs, bt, gs, gt }: the least Gold, strength and seconds at the least, and the step per doubling.
+const giftTerms = (k, g) => { const d = Math.log2(Math.max(1, g / k.least)); return [k.bs * (1 + k.gs * d), k.bt * (1 + k.gt * d)]; };
+const ritualKind = r => ({ least: r.least, bs: r.base_strength, bt: r.base_time, gs: r.gift_strength, gt: r.gift_time });
+const curseKind = (c, least) => ({ least, bs: c.strength, bt: c.time, gs: c.gift_strength, gt: c.gift_time });
+// What one more Gold adds at a gift of g: [strength, seconds] (the slope of the curve above).
+const giftEdge = (k, g) => [k.bs * k.gs / (Math.max(g, k.least) * Math.LN2), k.bt * k.gt / (Math.max(g, k.least) * Math.LN2)];
+// A small number written out in full, however small: 0.000000000043.
+function tiny(x) {
+  if (!(x > 0)) return '0';
+  if (x >= 0.01) return (+x.toFixed(2)).toLocaleString();
+  return x.toFixed(Math.min(100, 1 - Math.floor(Math.log10(x))));
 }
-// The gift sliders: 10 notches for every doubling, from the least up to all the Gold the city has (at least
-// 1,024x the least). There is no top on a gift: the box beside each slider takes any amount, the slider's end moves
-// as the city's Gold does, and every doubling adds the same step (diminishing returns).
-const NOTCHES = 10;
-const sliderEnd = least => Math.max(10 * NOTCHES, Math.ceil(NOTCHES * Math.log2(Math.max(least, view.state.resources.gold) / least)));
-const giftFromSlider = (r, v) => Math.round(r.least * 2 ** (v / NOTCHES));
-const sliderFromGift = (r, g) => Math.max(0, Math.round(NOTCHES * Math.log2(g / r.least)));
-function ritualLine(gift, strength, seconds) {
-  const r = view.ideology.rituals;
-  return `A gift of <span class="hi">${num(gift)} Gold</span> makes it <span class="hi">${strength.toFixed(2)}x</span> as strong and last ` +
-    `<span class="hi">${duration(seconds)}</span>. <span class="dim">(At least ${num(r.least)}; every doubling of the gift adds the same again. You have ${num(Math.floor(view.state.resources.gold))}.)</span>`;
+// The Gold box and its quick buttons. kind is 'ritual' or 'curse'.
+function giftBox(kind, gold, least) {
+  const have = Math.floor(view.state.resources.gold);
+  const set = (label, g, title) => `<button data-gift-set="${kind}" data-gold="${Math.max(least, Math.round(g))}" title="${title}">${label}</button>`;
+  return `<div class="cat">Your gift</div><div class="bar">` +
+    `<input type="text" inputmode="decimal" autocomplete="off" data-gift-box="${kind}" data-k="gift-${kind}" value="${num(gold)}" style="width:170px" ` +
+    `title="Any amount of Gold, e.g. 5000, 2.5m or 10b"> Gold ` +
+    set('Least', least, 'The least it takes') + set('Half', gold / 2, 'Half as much') + set('Double', gold * 2, 'Twice as much') +
+    set('x10', gold * 10, 'Ten times as much') + set('All I have', have, 'All the Gold you have') + `</div>`;
+}
+// The line under the box: what the gift buys, and what one more Gold would still add.
+function giftLine(k, gold) {
+  const [s, t] = giftTerms(k, gold), [ds, dt] = giftEdge(k, gold), have = Math.floor(view.state.resources.gold);
+  return `<span class="hi">${num(gold)} Gold</span> makes it <span class="hi">${s.toFixed(3)}x</span> as strong for <span class="hi">${duration(t)}</span>. ` +
+    (gold > have ? `<span class="bad">You have ${num(have)}.</span> ` : '') +
+    `<br><span class="dim">One more Gold would add +${tiny(ds)}x strength and +${tiny(dt)} seconds: less each time, never nothing.</span>`;
+}
+// What more Gold buys, as a text table: ten times the Gold each row, a bar of '=' for the strength, and what one more
+// Gold adds there (it shrinks row by row but never reaches 0). The row for this gift is marked.
+function giftScale(k, gold) {
+  const top = Math.max(gold, Math.floor(view.state.resources.gold), k.least) * 10;
+  const steps = Math.max(1, Math.ceil(Math.log10(top / k.least))), every = Math.ceil(steps / 9);
+  const rows = [];
+  for (let e = 0; e <= steps; e += every) rows.push(k.least * 10 ** e);
+  if (!rows.some(x => Math.abs(x - gold) < 1e-9 * gold)) rows.push(gold);
+  rows.sort((a, b) => a - b);
+  const biggest = giftTerms(k, rows[rows.length - 1])[0];
+  return `<div class="cat">What more Gold buys</div><table data-keep-table class="small giftScale"><tr><th></th><th>Gold</th><th>Strength</th><th></th><th>Lasts</th><th>One more Gold adds</th></tr>` +
+    rows.map(x => {
+      const [s, t] = giftTerms(k, x), mine = Math.abs(x - gold) < 1e-9 * gold;
+      return `<tr class="${mine ? 'hi' : ''}"><td>${mine ? '&gt;' : ''}</td><td>${num(x)}</td><td>${s.toFixed(2)}x</td>` +
+        `<td class="giftBar">${'='.repeat(Math.max(1, Math.round(16 * s / biggest)))}</td><td>${duration(t)}</td><td class="dim">+${tiny(giftEdge(k, x)[0])}x</td></tr>`;
+    }).join('') + `</table>`;
 }
 function ritualPanel(i, iv, own) {
   const r = iv.rituals, R = view.defs.research, gold = Math.floor(view.state.resources.gold);
@@ -3209,18 +3244,14 @@ function ritualPanel(i, iv, own) {
   const next = ranks[r.rank];
   let html = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.ritual_plural)}</h2>` +
     `<p class="dim small" style="margin-top:0">Give Gold to ${esc(i.name)} to hold a ${esc(i.ritual_word.toLowerCase())}: a bonus for a while. ` +
-    `Giving more makes it stronger and last longer, with no top, but each doubling of the gift adds the same step. Different ones can run at once; holding one that is running starts it again.</p>` +
+    `Giving more makes it stronger and last longer, with no top: each extra Gold adds a little less than the one before, but never nothing. Different ones can run at once; holding one that is running starts it again.</p>` +
     `<div class="opt">Ritual research: <span class="hi">rank ${r.rank} of ${ranks.length}</span>` +
     (next ? ` <span class="dim">- next: ${esc(next[1].name)} (${esc(view.defs.tech[next[1].tech].name)}), which opens another and makes them all stronger and longer</span>` : ' <span class="good">- all done</span>') + `</div>`;
   if (!r.rank) return html + `<p class="dim">Research ${esc(ranks[0][1].name)} on the Research tab to hold your first ${esc(i.ritual_word.toLowerCase())}.</p></div>`;
   if (ritualGift === null || ritualGift < r.least) ritualGift = r.least;
-  const [strength, seconds] = ritualTerms(r, ritualGift);
-  if (own) html += `<div class="cat">Your gift</div><div class="bar">` +
-    `<input type="range" data-ritual-gift="slider" data-k="ritual-range" min="0" max="${Math.max(sliderEnd(r.least), sliderFromGift(r, ritualGift))}" step="1" value="${sliderFromGift(r, ritualGift)}" style="flex:1 1 200px">` +
-    `<input type="text" inputmode="decimal" autocomplete="off" data-ritual-gift="box" data-k="ritual-num" value="${ritualGift}" style="width:110px"> Gold` +
-    `<button data-ritual-preset="${r.least}">Least</button>` +
-    `<button data-ritual-preset="${Math.max(r.least, Math.floor(view.state.resources.gold))}" title="All the Gold you have">All I have</button></div>` +
-    `<div class="opt small" id="ritualLine">${ritualLine(ritualGift, strength, seconds)}</div>`;
+  const strength = giftTerms(ritualKind(r), ritualGift)[0];
+  if (own) html += giftBox('ritual', ritualGift, r.least) + `<div class="opt small" id="ritualLine">${giftLine(ritualKind(r), ritualGift)}</div>` +
+    giftScale(ritualKind(r), ritualGift);
   html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(i.rituals).map(([id, x], n) => {
     const open = n < r.rank, running = r.active[id];
     const opens = ranks[n] && ranks[n][1];
@@ -3236,7 +3267,7 @@ function ritualPanel(i, iv, own) {
 }
 // ---- curses: laid on another city for a while, paid for in Gold (and more, for the later ones) ----
 let curseTarget = '';      // the city picked to curse
-let curseGift = 1;         // how many times each curse's least Gold to give (one slider for them all)
+let curseGold = null;      // the Gold to give for each (one box for them all; each needs at least its own least)
 const CURSE_PENALTY = { power: 'Generators give {} less power', explore: 'Expeditions {} slower', wildlife: 'Wild animals appear {} less often',
                         hatch: 'Eggs hatch {} slower', missions: 'Beast missions come {} less often' };
 // A curse's penalty in words, at a strength (as ideology.describe_penalty works it out).
@@ -3245,11 +3276,6 @@ function penaltyWords(pen, s) {
   for (const [cat, x] of Object.entries(pen.speed || {})) out.push(`${cat === 'all' ? 'All buildings' : C[cat] + ' buildings'} ${pct(x)} slower`);
   for (const [k, words] of Object.entries(CURSE_PENALTY)) if (pen[k]) out.push(words.replace('{}', pct(pen[k])));
   return out;
-}
-// What a gift of `gift` times the least buys: [strength, seconds], as ideology.curse_terms() works it out.
-function curseTerms(c, gift) {
-  const d = Math.log2(Math.max(1, gift));
-  return [c.strength * (1 + c.gift_strength * d), c.time * (1 + c.gift_time * d)];
 }
 function cursedPanel(iv) {
   const c = iv.curses;
@@ -3281,10 +3307,6 @@ function renderEffects() {
   setHTML($('effectsBar'), chips.length ? `<span class="dim">Now:</span>` + chips.join('') : '');
 }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-function curseLine(strength, seconds) {
-  return `Each would be <span class="hi">${strength.toFixed(2)}x</span> as strong and last <span class="hi">${duration(seconds)}</span>. ` +
-    `<span class="dim">Like a ritual's gift: every doubling of the Gold adds the same step again. Other goods stay the same.</span>`;
-}
 function cursePanel(i, iv, own) {
   const c = iv.curses, R = view.defs.research, state = view.state, T = view.defs.tech;
   const ranks = Object.entries(R).filter(([, x]) => x.ritual).sort((a, b) => a[1].ritual - b[1].ritual);
@@ -3294,16 +3316,13 @@ function cursePanel(i, iv, own) {
     `Each of your ${esc(i.curse_plural.toLowerCase())} can be on one city at a time; those from different cities pile up on the same city. ` +
     `The same research that opens ${esc(i.ritual_plural.toLowerCase())} opens ${esc(i.curse_plural.toLowerCase())}, and makes them stronger and longer.</p>`;
   if (!c.rank) return html + `<p class="dim">Research ${esc(ranks[0][1].name)} to open your first ${esc(i.curse_word.toLowerCase())}.</p></div>`;
-  const [strength, seconds] = curseTerms(c, curseGift);
-  const firstLeast = Object.values(c.costs)[0].gold;     // the cheapest curse: the slider reaches all your Gold for it
-  if (own) html += `<div class="cat">Your gift</div><div class="bar">` +
-    `<input type="range" data-curse-gift="slider" data-k="curse-gift" min="0" ` +
-    `max="${Math.max(sliderEnd(firstLeast), Math.round(NOTCHES * Math.log2(curseGift)))}" step="1" value="${Math.round(NOTCHES * Math.log2(curseGift))}" style="flex:1 1 200px">` +
-    `<input type="text" inputmode="decimal" autocomplete="off" data-curse-gift="box" data-k="curse-box" value="${+curseGift.toPrecision(4)}" style="width:90px" ` +
-    `title="Any number of times the least, e.g. 3, 250 or 2.5k">` +
-    `<span class="dim">times the least Gold</span>` +
-    `<button data-curse-preset="1">Least</button></div>` +
-    `<div class="opt small" id="curseLine">${curseLine(strength, seconds)}</div>`;
+  const leasts = Object.fromEntries(Object.entries(c.costs).map(([id, x]) => [id, x.gold]));
+  const order = Object.keys(i.curses), first = order[0], firstLeast = leasts[first];
+  if (curseGold === null || curseGold < firstLeast) curseGold = firstLeast;
+  if (own) html += giftBox('curse', curseGold, firstLeast) +
+    `<div class="opt small" id="curseLine">${esc(i.curses[first].name)}: ${giftLine(curseKind(c, firstLeast), curseGold)}</div>` +
+    `<p class="dim small">Each needs at least its own least Gold; the later ones need more Gold for the same strength. The table is for ${esc(i.curses[first].name)}.</p>` +
+    giftScale(curseKind(c, firstLeast), curseGold);
   if (own) {
     if (!board) { loadBoard(); html += `<p class="dim">Finding cities in reach...</p>`; }
     else {
@@ -3317,15 +3336,19 @@ function cursePanel(i, iv, own) {
   }
   html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(i.curses).map(([id, x], n) => {
     const open = n < c.rank, laid = c.cursing[id];
-    const cost = { ...c.costs[id], gold: Math.round(c.costs[id].gold * curseGift) };
-    const afford = Object.entries(cost).every(([k, v]) => state.resources[k] >= v);
+    const enough = curseGold >= leasts[id];
+    const [strength, seconds] = giftTerms(curseKind(c, leasts[id]), Math.max(curseGold, leasts[id]));
+    const cost = { ...c.costs[id], gold: Math.round(Math.max(curseGold, leasts[id])) };
+    const afford = enough && Object.entries(cost).every(([k, v]) => state.resources[k] >= v);
     return `<div class="ideoCard ${laid ? 'on' : open ? '' : 'locked'}"><span class="name">${esc(x.name)}</span>` +
       `<span class="dim small">${esc(x.desc)}</span>` +
       `<div class="small bad">${(open ? penaltyWords(c.penalties[id], strength) : x.text).map(esc).join('<br>')}</div>` +
-      (open ? `<div class="small">Costs ${goods(cost)}</div>` : `<span class="dim small">Opens with ${esc(ranks[n] ? ranks[n][1].name : 'more research')}</span>`) +
+      (open ? (enough ? `<div class="small">${strength.toFixed(3)}x as strong for ${duration(seconds)}</div><div class="small">Costs ${goods(cost)}</div>`
+                      : `<div class="small bad">Needs at least ${num(leasts[id])} Gold</div><div class="small dim">Then costs ${goods(cost)}</div>`)
+            : `<span class="dim small">Opens with ${esc(ranks[n] ? ranks[n][1].name : 'more research')}</span>`) +
       (laid ? `<div class="small good">On ${esc(laid.target)} until about ${esc(clock(laid.until))}</div>` : '') +
       (own && open && !laid ? `<button data-curse-cast="${id}" ${afford && curseTarget ? '' : 'disabled'} ` +
-        `title="${afford ? '' : 'You cannot afford it'}">${esc(cap(i.curse_verb))} ${esc(curseTarget || '...')}</button>` : '') + `</div>`;
+        `title="${afford ? '' : enough ? 'You cannot afford it' : 'Give at least its least Gold'}">${esc(cap(i.curse_verb))} ${esc(curseTarget || '...')}</button>` : '') + `</div>`;
   }).join('') + `</div></div>`;
   return html;
 }
@@ -3872,7 +3895,7 @@ $('reportOk').onclick = () => { $('report').hidden = true; act('report_seen'); }
 $('tutorial').onclick = e => { if ('tutorialHide' in e.target.dataset) { settings.tutorial = false; saveSettings(); render(); } };
 // Choosing an ideology (in the window or on the tab), taking perks, and putting the choice off.
 document.addEventListener('click', e => {
-  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-ritual-preset], [data-curse-cast], [data-curse-preset]');
+  const d = e.target.closest('[data-ideology-choose], [data-perk-take], [data-ideology-later], [data-ritual-start], [data-gift-set], [data-curse-cast]');
   if (!d || visiting || !view) return;
   if ('ideologyLater' in d.dataset) { settings.ideologyLater = new Date().toDateString(); saveSettings(); render(); }
   else if (d.dataset.ideologyChoose) {
@@ -3882,42 +3905,38 @@ document.addEventListener('click', e => {
   else if (d.dataset.perkTake) act('perk_take', { perk: d.dataset.perkTake });
   else if (d.dataset.ritualStart) {
     const name = view.defs.ideologies[view.ideology.id].rituals[d.dataset.ritualStart].name;
-    if (confirm(`Give ${ritualGift} Gold to hold ${name}?`)) act('ritual_start', { ritual: d.dataset.ritualStart, gold: ritualGift });
+    if (confirm(`Give ${ritualGift.toLocaleString()} Gold to hold ${name}?`)) act('ritual_start', { ritual: d.dataset.ritualStart, gold: ritualGift });
   }
-  else if (d.dataset.ritualPreset) { ritualGift = +d.dataset.ritualPreset; renderIdeology(); }
-  else if (d.dataset.cursePreset) { curseGift = 1; renderIdeology(); }
+  else if (d.dataset.giftSet) {
+    if (d.dataset.giftSet === 'ritual') ritualGift = +d.dataset.gold; else curseGold = +d.dataset.gold;
+    renderIdeology();
+  }
   else if (d.dataset.curseCast) {
     const i = view.defs.ideologies[view.ideology.id], name = i.curses[d.dataset.curseCast].name;
-    const gold = Math.round(view.ideology.curses.costs[d.dataset.curseCast].gold * curseGift);
+    const gold = Math.round(Math.max(curseGold, view.ideology.curses.costs[d.dataset.curseCast].gold));
     if (curseTarget && confirm(`${name}: ${i.curse_verb} ${curseTarget} for ${gold.toLocaleString()} Gold?`))
       act('curse_cast', { curse: d.dataset.curseCast, target: curseTarget, gold });
   }
 });
-// While the gift is being dragged or typed only its line changes; the cards follow once it is let go of.
+// While a gift is being typed only its line changes; the cards and the table follow once the box is left.
 $('ideologyBody').addEventListener('input', e => {
-  if ('curseGift' in e.target.dataset) {     // dragging or typing: only the line changes; the cards follow when it is let go of
-    const slider = e.target.dataset.curseGift === 'slider';
-    const v = slider ? 2 ** (+e.target.value / NOTCHES) : amount(e.target.value);
-    if (!(v >= 1)) return;
-    curseGift = v;
-    for (const box of $('ideologyBody').querySelectorAll('[data-curse-gift]'))
-      if (box !== e.target) box.value = box.dataset.curseGift === 'slider' ? Math.round(NOTCHES * Math.log2(v)) : +v.toPrecision(4);
-    const [s, secs] = curseTerms(view.ideology.curses, curseGift);
-    if ($('curseLine')) $('curseLine').innerHTML = curseLine(s, secs);
-    return;
+  const kind = e.target.dataset.giftBox;
+  if (!kind) return;
+  const v = Math.round(amount(e.target.value));
+  if (kind === 'ritual') {
+    const r = view.ideology.rituals;
+    if (!(v >= r.least)) return;
+    ritualGift = v;
+    $('ritualLine').innerHTML = giftLine(ritualKind(r), v);
+  } else {
+    const c = view.ideology.curses, id = Object.keys(c.costs)[0], least = c.costs[id].gold;
+    if (!(v >= least)) return;
+    curseGold = v;
+    $('curseLine').innerHTML = `${esc(view.defs.ideologies[view.ideology.id].curses[id].name)}: ${giftLine(curseKind(c, least), v)}`;
   }
-  if (!('ritualGift' in e.target.dataset)) return;
-  const r = view.ideology.rituals, slider = e.target.dataset.ritualGift === 'slider';
-  const v = slider ? giftFromSlider(r, +e.target.value) : amount(e.target.value);
-  if (!(v >= r.least)) return;
-  ritualGift = v;
-  for (const box of $('ideologyBody').querySelectorAll('[data-ritual-gift]'))
-    if (box !== e.target) box.value = box.dataset.ritualGift === 'slider' ? sliderFromGift(r, v) : v;
-  const [strength, seconds] = ritualTerms(r, v);
-  $('ritualLine').innerHTML = ritualLine(v, strength, seconds);
 });
 $('ideologyBody').addEventListener('change', e => {
-  if ('ritualGift' in e.target.dataset || 'curseGift' in e.target.dataset) renderIdeology();
+  if ('giftBox' in e.target.dataset) renderIdeology();
   if ('curseTarget' in e.target.dataset) { curseTarget = e.target.value; renderIdeology(); }
 });
 $('ideologyBody').addEventListener('click', e => {

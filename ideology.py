@@ -586,7 +586,7 @@ def ritual_terms(state, gold):
     doublings = math.log2(gold / least)
     strength = (1 + RITUAL_RANK_STRENGTH * (rank - 1)) * (1 + RITUAL_GIFT_STRENGTH * doublings)
     seconds = (RITUAL_TIME + RITUAL_RANK_TIME * (rank - 1)) * (1 + RITUAL_GIFT_TIME * doublings)
-    return round(strength, 3), round(seconds)
+    return strength, round(seconds)
 
 
 def start_ritual(state, now, ritual_id, gold):
@@ -599,8 +599,9 @@ def start_ritual(state, now, ritual_id, gold):
     rank = ritual_rank(state)
     if order.index(ritual_id) >= rank:
         return f"That {ideo['ritual_word'].lower()} needs more ritual research first."
-    if not (isinstance(gold, int) and not isinstance(gold, bool)):
+    if not (isinstance(gold, (int, float)) and not isinstance(gold, bool)) or gold != gold or gold == float("inf"):
         return "Say how much gold to give."
+    gold = int(gold)
     least = RITUAL_GOLD[state["tech"]]
     terms = ritual_terms(state, gold)
     if not terms:
@@ -691,7 +692,7 @@ def cast_curse(caster, target, now, curse_id, gold=None):
     curse = ideo["curses"][curse_id]
     caster["cursing"][curse_id] = {"target": target["name"], "until": now + seconds}
     target.setdefault("curses", []).append({"from": caster["name"], "ideology": caster["ideology"], "curse": curse_id,
-                                            "start": now, "until": now + seconds, "scale": round(strength, 3)})
+                                            "start": now, "until": now + seconds, "scale": strength})
     words = ", ".join(describe_penalty(_scaled(curse["penalty"], strength)))
     hours = f"{seconds // 3600}h {seconds % 3600 // 60:02d}m"
     game.tally(caster, "curses_cast")
@@ -853,7 +854,7 @@ def view(state):
                                 "text": describe(_scaled(ideo["rituals"][rid]["effects"], r["scale"]))}
                           for rid, r in active_rituals(state)} if ideo else {}}
     strength, seconds = curse_terms(state)
-    curses = {"rank": rank, "strength": round(strength, 3), "time": seconds, "below": CURSE_BELOW, "above": CURSE_ABOVE,
+    curses = {"rank": rank, "strength": strength, "time": seconds, "below": CURSE_BELOW, "above": CURSE_ABOVE,
               "costs": {cid: curse_cost(state, n) for n, cid in enumerate(ideo["curses"])} if ideo else {},
               "gift_strength": CURSE_GIFT_STRENGTH, "gift_time": CURSE_GIFT_TIME,
               "penalties": {cid: c["penalty"] for cid, c in ideo["curses"].items()} if ideo else {},
