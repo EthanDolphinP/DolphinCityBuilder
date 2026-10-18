@@ -3033,7 +3033,7 @@ def tile_cycle(state, area, x, y, bid):
     belief = ideology.speed_bonus(state, b.get("category"))
     if belief:
         factors.append(belief)
-    # Curses other cities have laid on this one.
+    # Hexes, sabotage and the like other cities have done to this one.
     hexed = ideology.curse_speed(state, b.get("category"))
     if hexed:
         factors.append(hexed)
@@ -4245,7 +4245,7 @@ TALLIES = [
     ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
-    ("rituals", "Rituals held"), ("curses_cast", "Curses laid on other cities"), ("curses_taken", "Curses laid on your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+    ("rituals", "Rituals held"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
 ]
 
 

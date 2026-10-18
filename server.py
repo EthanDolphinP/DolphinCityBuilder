@@ -487,10 +487,11 @@ def handle_post(path, data, token, now):
         target = find_city(data.get("target"), now)
         error = game.ideology.cast_curse(state, target, now, data.get("curse"), data.get("gold"))
         if not error:
-            curse = game.ideology.chosen(state)["curses"][data["curse"]]
-            market.social(state, now, target["name"], "curse", f"You laid {curse['name']} on them.")
-            market.social(target, now, name, "curse", f"They laid {curse['name']} on you.")
-            discord_bot.announce(f"\U0001F56F\uFE0F **{name}** has laid **{curse['name']}** on **{target['name']}**.")
+            ideo = game.ideology.chosen(state)
+            curse = ideo["curses"][data["curse"]]
+            market.social(state, now, target["name"], "curse", f"{curse['name']}: you {ideo['curse_past']} them.")
+            market.social(target, now, name, "curse", f"{curse['name']}: they {ideo['curse_past']} you.")
+            discord_bot.announce(f"\U0001F56F\uFE0F **{name}** {ideo['curse_past']} **{target['name']}**: **{curse['name']}**.")
     elif action == "messages_read":
         error = market.read_messages(state, data.get("other"))
     elif action == "duel_post":
