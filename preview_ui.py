@@ -58,8 +58,20 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 # The hosted city and its saved state are never changed here.
                 if path in {"/api/state", "/api/action", "/api/visit", "/api/login"}:
                     data = json.loads(payload)
-                    if "state" in data and "status" in data and "food_potential" not in data["status"]:
-                        data["status"]["food_potential"] = game.view(data["state"], data.get("area", 0))["status"]["food_potential"]
+                    if "state" in data and "status" in data:
+                        if "food_potential" not in data["status"]:
+                            data["status"]["food_potential"] = game.view(data["state"], data.get("area", 0))["status"]["food_potential"]
+                        if "unpaused_rates" not in data["status"] or "unpaused_power" not in data["status"]:
+                            projection = game.unpaused_projection(data["state"])
+                            data["status"].setdefault("unpaused_power", projection["power"])
+                        if "unpaused_rates" not in data["status"]:
+                            projected = projection["rates"]
+                            current = game.view(data["state"], data.get("area", 0))["status"]["rates"]
+                            # Preserve hosted bill income/costs in the projection.
+                            data["status"]["unpaused_rates"] = {
+                                k: round(v + data["status"]["rates"][k] - current[k], 1)
+                                for k, v in projected.items()
+                            }
                         payload = json.dumps(data).encode()
                 self.reply(response.status, payload, response.headers.get("Content-Type", "application/json"))
         except HTTPError as error:

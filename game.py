@@ -3979,7 +3979,41 @@ def _queue_view(state):
     return out
 
 
+def unpaused_projection(state):
+    """Net rates at full housing with paused buildings enabled; never edit the city."""
+    from copy import deepcopy
+    projected = deepcopy(state)
+    for area in projected["areas"]:
+        for row in area["tiles"]:
+            for tile in row:
+                if tile.get("priority", 0) < 0:
+                    tile["priority"] = 0
+    with _stats_cached():
+        _, housing, _ = work_plan(projected)
+        projected["population"] = housing
+        jobs, _, _ = work_plan(projected)
+        env = weather.job_factors(projected, jobs, projected["updated"])
+        supply, demand, power = power_status(projected, jobs, env)
+        rates = {k: 0.0 for k in RESOURCES}
+        rates["food"] = -housing * 3600 / MEAL_TIME
+        for i, job in enumerate(jobs):
+            if not job["cycle"] or _missing(projected, job["b"].get("consumes", {})):
+                continue
+            per_hour = 3600 / job["cycle"] * _speed(projected, job, power, env[i][0])
+            for k, v in job_output(projected, job).items():
+                rates[k] += v * per_hour
+            for k, v in job["b"].get("consumes", {}).items():
+                rates[k] -= v * per_hour
+        return {"rates": {k: round(v, 1) for k, v in rates.items()},
+                "power": {"supply": round(supply, 1), "demand": demand}}
+
+
+def unpaused_rates(state):
+    return unpaused_projection(state)["rates"]
+
+
 def _view(state, ai, detail):
+    projected = unpaused_projection(state)
     if not 0 <= ai < len(state["areas"]):
         ai = 0
     area = state["areas"][ai]
@@ -4090,6 +4124,8 @@ def _view(state, ai, detail):
             "herd_room": totals["herd_room"],
             "power": {"supply": round(supply, 1), "demand": demand},
             "rates": {k: round(v, 1) for k, v in rates.items()},
+            "unpaused_rates": projected["rates"],
+            "unpaused_power": projected["power"],
             "meal_time": MEAL_TIME,
             "food_made": round(food_made, 1),
             "food_potential": round(food_potential, 1),
