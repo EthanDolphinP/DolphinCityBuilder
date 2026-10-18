@@ -3114,15 +3114,40 @@ def work_plan(state):
     first. Buildings switched off (priority -1) get nobody.
 
     Returns (jobs, housing, totals) where jobs is a list of working buildings.
+    Inside reading() it is worked out once per city and handed out again (as copies) after that.
     """
+    if _PLAN_CACHE is not None:
+        key = id(state)
+        if key not in _PLAN_CACHE:
+            _PLAN_CACHE[key] = _work_plan(state)
+        jobs, housing, totals = _PLAN_CACHE[key]
+        return [dict(j) for j in jobs], housing, dict(totals)
     with _stats_cached():
         return _work_plan(state)
 
 
+_PLAN_CACHE = None     # inside reading(): id(state) -> its work plan
+
+
+@contextmanager
+def reading():
+    """For a reply that only looks at cities (a view, a Find, the Stats tab) and changes nothing in them: each
+    city's work plan and city_stat values are worked out once, however many parts of the reply ask for them."""
+    global _PLAN_CACHE
+    if _PLAN_CACHE is not None:      # already inside one
+        yield
+        return
+    _PLAN_CACHE = {}
+    try:
+        with _stats_cached():
+            yield
+    finally:
+        _PLAN_CACHE = None
+
+
 def _work_plan(state):
-    free = state["population"]
     housing = BASE_HOUSING + int(beasts.bonus(state, "housing")) + int(ideology.value(state, "housing"))
-    needed, herd_room, jobs = 0, 0, []
+    herd_room, jobs = 0, []
     beast_power = (1 + beasts.bonus(state, "power") + ideology.value(state, "power")) * ideology.curse_factor(state, "power")     # generators give more (or less, cursed)
     for ai, area in enumerate(state["areas"]):
         for y, row in enumerate(area["tiles"]):
@@ -3152,6 +3177,12 @@ def _work_plan(state):
                     "power_out": round(power_out, 1),
                 })
                 herd_room += tile_stat(tile, "herd")
+    return jobs, housing, _staff(jobs, state["population"], herd_room)
+
+
+def _staff(jobs, free, herd_room):
+    """Hand `free` workers out to the jobs: "first" buildings first, switched-off ones none. Returns the totals."""
+    needed = 0
     for job in sorted(jobs, key=lambda j: -j["priority"]):   # stable: map order within a priority
         off = job["priority"] < 0
         job["staff"] = 0 if off else min(job["need"], free)
@@ -3159,7 +3190,7 @@ def _work_plan(state):
         needed += 0 if off else job["need"]
         job["ratio"] = 0.0 if off else (job["staff"] / job["need"] if job["need"] else 1.0)
         job["herd_room"] = herd_room
-    return jobs, housing, {"jobs": needed, "idle": free, "herd_room": herd_room}
+    return {"jobs": needed, "idle": free, "herd_room": herd_room}
 
 
 def job_herd(state, job):
@@ -3982,28 +4013,24 @@ def _queue_view(state):
     return out
 
 
-def unpaused_projection(state):
-    """Net rates at full housing with paused buildings enabled; never edit the city."""
-    from copy import deepcopy
-    projected = deepcopy(state)
-    for area in projected["areas"]:
-        for row in area["tiles"]:
-            for tile in row:
-                if tile.get("priority", 0) < 0:
-                    tile["priority"] = 0
+def unpaused_projection(state, plan=None, env=None):
+    """Net rates at full housing with paused buildings enabled; never edits the city.
+    plan / env: the city's work_plan() and weather.job_factors() if the caller has them already. What each
+    building is and how fast it runs do not depend on who works where, so only the workers are handed out again."""
     with _stats_cached():
-        _, housing, _ = work_plan(projected)
-        projected["population"] = housing
-        jobs, _, _ = work_plan(projected)
-        env = weather.job_factors(projected, jobs, projected["updated"])
-        supply, demand, power = power_status(projected, jobs, env)
+        jobs, housing, totals = plan or work_plan(state)
+        jobs = [dict(j, priority=max(0, j["priority"])) for j in jobs]
+        _staff(jobs, housing, totals["herd_room"])
+        if env is None:
+            env = weather.job_factors(state, jobs, state["updated"])
+        supply, demand, power = power_status(state, jobs, env)
         rates = {k: 0.0 for k in RESOURCES}
         rates["food"] = -housing * 3600 / MEAL_TIME
         for i, job in enumerate(jobs):
-            if not job["cycle"] or _missing(projected, job["b"].get("consumes", {})):
+            if not job["cycle"] or _missing(state, job["b"].get("consumes", {})):
                 continue
-            per_hour = 3600 / job["cycle"] * _speed(projected, job, power, env[i][0])
-            for k, v in job_output(projected, job).items():
+            per_hour = 3600 / job["cycle"] * _speed(state, job, power, env[i][0])
+            for k, v in job_output(state, job).items():
                 rates[k] += v * per_hour
             for k, v in job["b"].get("consumes", {}).items():
                 rates[k] -= v * per_hour
@@ -4016,7 +4043,6 @@ def unpaused_rates(state):
 
 
 def _view(state, ai, detail):
-    projected = unpaused_projection(state)
     if not 0 <= ai < len(state["areas"]):
         ai = 0
     area = state["areas"][ai]
@@ -4028,6 +4054,7 @@ def _view(state, ai, detail):
     here = {}
     env = weather.job_factors(state, jobs, state["updated"])
     supply, demand, power = power_status(state, jobs, env)
+    projected = unpaused_projection(state, (jobs, housing, totals), env)
     for i, job in enumerate(jobs):
         job["env"], job["power_env"] = env[i][0], env[i][1]
         job["notes"] = job["notes"] + env[i][2]

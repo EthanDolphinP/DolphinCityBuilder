@@ -97,6 +97,7 @@
   .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
   .tile.hl { background: var(--hl); box-shadow: inset 0 0 0 1px var(--accent); }
   .tile.hl.best { box-shadow: inset 0 0 0 2px var(--good); }
+  .tile.pending { opacity: .55; }     /* clicked: on the map at once, faded until the server has done it */
   .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
   #areaPick { flex: 1 1 160px; min-width: 0; max-width: 340px; }
   .areaChips { margin: 8px 0 0; gap: 6px; align-items: center; }
@@ -1840,18 +1841,75 @@ function say(text, good) {
   if (text) msgTimer = setTimeout(() => { $('msg').textContent = ''; }, good ? 6000 : 12000);
 }
 let pendingActions = 0, actionRevision = 0, refreshRevision = 0;
+// ---- clicks answered at once ----
+// Building, demolishing, adding to a building, setting its priority and taming show on the map the moment they are
+// clicked, faded until the server has done them. Its answer then replaces the guess: the same, or put back with
+// the reason if it was refused. Guesses for actions still on their way are made again on top of each answer.
+const pendingTiles = new Set();     // "area:x,y" of tiles the page has changed ahead of the server
+const guesses = [];                 // [{id, action, extra}] waiting for the server's answer
+let guessId = 0;
+function predict(action, extra) {
+  if (!view || visiting || !extra || !('x' in extra)) return false;
+  const { state, defs } = view, area = view.area;
+  if (extra.area !== undefined && extra.area !== area) return false;
+  const t = state.areas[area] && state.areas[area].tiles[extra.y] && state.areas[area].tiles[extra.y][extra.x];
+  const cell = view.tiles[extra.y] && view.tiles[extra.y][extra.x];
+  if (!t || !cell) return false;
+  const have = state.resources;
+  const afford = cost => Object.entries(cost).every(([k, v]) => have[k] >= v);
+  const pay = cost => { for (const [k, v] of Object.entries(cost)) have[k] -= v; };
+  if (action === 'build') {
+    const b = defs.buildings[extra.building], opt = (cell.build || []).find(o => o.id === extra.building);
+    if (!b || t.building || (opt && opt.problem) || !afford(b.cost)) return false;
+    pay(b.cost);
+    Object.assign(t, { building: extra.building, progress: 0, additions: [], priority: 0, animal: null });
+    view.tiles[extra.y][extra.x] = { fertility: cell.fertility };       // its details come with the answer
+  } else if (action === 'demolish') {
+    if (!t.building) return false;
+    Object.assign(t, { building: null, progress: 0, additions: [], priority: 0 });
+    view.tiles[extra.y][extra.x] = { fertility: cell.fertility };
+  } else if (action === 'add') {
+    const a = defs.additions[extra.addition], opt = (cell.additions || []).find(o => o.id === extra.addition);
+    if (!a || !t.building || t.additions.includes(extra.addition) || (opt && opt.problem) || !afford(a.cost)) return false;
+    pay(a.cost);
+    t.additions = [...t.additions, extra.addition];
+    delete cell.additions;
+  } else if (action === 'priority') {
+    if (!t.building) return false;
+    t.priority = cell.priority = extra.priority;
+  } else if (action === 'tame') {
+    if (!t.animal || !cell.tame || cell.tame.problem || !afford(cell.tame.cost)) return false;
+    pay(cell.tame.cost);
+    t.animal = null;
+    delete cell.tame;
+  } else return false;
+  pendingTiles.add(`${area}:${extra.x},${extra.y}`);
+  return true;
+}
+
 async function act(action, extra) {
   if (visiting) return;
   if (action === 'add' && pendingActions) return;
   actionRevision++;
   pendingActions++;
   const log = view ? view.state.log : [], last = log.length ? log[log.length - 1] : null;
+  const id = ++guessId;
+  if (predict(action, extra)) { guesses.push({ id, action, extra }); render(); }
+  const settle = () => {       // this action is answered: forget its guess, keep the others'
+    const i = guesses.findIndex(g => g.id === id);
+    if (i >= 0) guesses.splice(i, 1);
+    pendingTiles.clear();
+  };
   let data;
   try { data = await api(action, extra); }
-  catch { say('Lost contact with the server.'); return; }
-  finally { pendingActions--; }
+  catch { pendingActions--; settle(); say('Lost contact with the server.'); refresh(); return; }
+  pendingActions--;
+  settle();
   if (data.auth) return signOut(data.error);
-  if (data.state) accept(data);
+  if (data.state) {
+    accept(data);
+    if (guesses.some(g => predict(g.action, g.extra))) render();     // ones still on their way, again
+  } else refresh();
   if (data.error) say(data.error);
   else if (data.state) {
     // What the action did, in the city's own words: the newest line it added to the Chronicle.
@@ -2050,7 +2108,8 @@ function render() {
   fitMap();
   setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
     const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
-    const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' + (marked.get(`${x},${y}`).best ? ' best' : '') : '');
+    const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' + (marked.get(`${x},${y}`).best ? ' best' : '') : '') +
+      (pendingTiles.has(`${view.area}:${x},${y}`) ? ' pending' : '');
     const info = view.tiles[y][x];
     const state_ = !('need' in info) ? '' : info.priority < 0 || info.status.startsWith('stopped:') ? 'off' : info.status === 'working' ? '' : 'stop';
     const bar = timers[`${x},${y}`] ? `<i data-bar="${x},${y}" aria-hidden="true"></i><span class="tile-countdown" data-tile-timer="${x},${y}"></span>` : '';

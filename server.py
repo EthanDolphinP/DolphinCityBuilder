@@ -375,7 +375,27 @@ def _tile(value):
         return None
 
 
+# The tile facts the page uses for areas other than the one on screen (the mini maps, counts, Find, taming).
+OTHER_AREA_TILE = ("terrain", "building", "animal", "additions")
+
+
+def _sent_state(state, shown):
+    """The save as the page gets it: nothing private, and only the area on screen with every fact about each tile.
+    The others' tiles carry only what the page needs of them, and leave out what is empty (no building, no animal):
+    the page reads a missing one as none."""
+    out = {k: v for k, v in state.items() if k not in PRIVATE and k != "areas"}
+    out["areas"] = [a if i == shown else {**{k: v for k, v in a.items() if k != "tiles"},
+                                         "tiles": [[{k: t[k] for k in OTHER_AREA_TILE if t[k]} for t in row] for row in a["tiles"]]}
+                    for i, a in enumerate(state["areas"])]
+    return out
+
+
 def city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=False):
+    with game.reading():        # the work plan and city stats once for the whole reply
+        return _city_view(state, now, area, find, tile, have_defs, stats)
+
+
+def _city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=False):
     global DEFS_VERSION
     out = game.view(state, area if isinstance(area, int) else 0, _tile(tile))
     if DEFS_VERSION is None:
@@ -385,7 +405,7 @@ def city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=Fa
         del out["defs"]           # the page has these already: about 80 KB less on every update
     if isinstance(find, str) and ":" in find:      # the Find box: "kind:what"
         out["found"] = game.find(state, *find.split(":", 1), here=out["area"])
-    out["state"] = {k: v for k, v in state.items() if k not in PRIVATE}
+    out["state"] = _sent_state(state, out["area"])
     out["now"] = now
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]))
     out["cities"] = all_city_names()
