@@ -286,7 +286,7 @@ def city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=Fa
     if have_defs == DEFS_VERSION:
         del out["defs"]           # the page has these already: about 80 KB less on every update
     if isinstance(find, str) and ":" in find:      # the Find box: "kind:what"
-        out["found"] = game.find(state, *find.split(":", 1))
+        out["found"] = game.find(state, *find.split(":", 1), here=out["area"])
     out["state"] = {k: v for k, v in state.items() if k not in PRIVATE}
     out["now"] = now
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]))

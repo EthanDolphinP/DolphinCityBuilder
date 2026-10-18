@@ -4158,9 +4158,10 @@ def _clock(seconds):
 FIND_LIMIT = 60     # most results the Find box is given
 
 
-def find(state, kind, what):
-    """Search every area of the city. Returns {"results": [...], "total": n, "areas": {area: n}} or
-    {"locked": research name} if the search needs research the city lacks.
+def find(state, kind, what, here=None):
+    """Search every area of the city. Returns {"results": [...], "total": n, "areas": {area: n},
+    "here": [...]} or {"locked": research name} if the search needs research the city lacks. "results" is the
+    first FIND_LIMIT over the whole city; "here" is every match in area `here` (the one on screen), for the map.
 
     kind is "buildings" (what = a building id, or "" for all), "problems",
     "wildlife", "sites" (what = a building id: where it could go, fastest
@@ -4203,7 +4204,17 @@ def find(state, kind, what):
     per_area = {}       # every match counts here, including those past FIND_LIMIT
     for _, r in found:
         per_area[r["area"]] = per_area.get(r["area"], 0) + 1
-    return {"results": [r for _, r in found[:FIND_LIMIT]], "total": len(found), "areas": per_area}
+    # the best in each area: the quickest sites, the most livestock (the lowest sort key there, when keys differ)
+    best = {}
+    for key, r in found:
+        best.setdefault(r["area"], key)
+    keys = {}
+    for key, r in found:
+        keys.setdefault(r["area"], set()).add(key)
+    for key, r in found:
+        r["best"] = kind in ("sites", "wildlife") and len(keys[r["area"]]) > 1 and key == best[r["area"]]
+    return {"query": f"{kind}:{what}", "results": [r for _, r in found[:FIND_LIMIT]], "total": len(found),
+            "areas": per_area, "here": [r for _, r in found if r["area"] == here]}
 
 
 def housing_sources(state):

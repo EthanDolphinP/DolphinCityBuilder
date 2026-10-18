@@ -85,6 +85,7 @@
           font-size: calc(var(--tw, 44px) * 0.39); font-weight: bold; background: #101614; color-scheme: dark; overflow: hidden; isolation: isolate; }
   .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
   .tile.hl { background: var(--hl); box-shadow: inset 0 0 0 1px var(--accent); }
+  .tile.hl.best { box-shadow: inset 0 0 0 2px var(--good); }
   .tile b.stop { color: var(--bad); } .tile b.off { color: var(--dim); }
   #areaPick { flex: 1 1 160px; min-width: 0; max-width: 340px; }
   .areaChips { margin: 8px 0 0; gap: 6px; align-items: center; }
@@ -405,6 +406,7 @@
   .gfx .tile .animal { color: #ffd3ef; }
   .gfx .tile.sel { outline-width: 3px; }
   .gfx .tile.hl { box-shadow: inset 0 0 0 2px var(--accent); background: var(--terrain); }
+  .gfx .tile.hl.best { box-shadow: inset 0 0 0 3px var(--good); }
   .gfx .tile .warning { position: absolute; top: 1px; left: 2px; background: #772e20; color: white; border-radius: 3px; font: bold 10px system-ui; padding: 0 3px; }
   .gfx .tile u { color: #fff; background: #101614b0; border-radius: 3px; }
   .gfx #tile .card { background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 8px; }
@@ -1883,7 +1885,7 @@ function render() {
 
   // One menu of every area with arrows either side, then a short row of only the areas worth a look:
   // the ones holding what the Find box is looking for, or (with no search) the ones with a problem.
-  const hits = (finder.kind && view.found && view.found.areas) || null, n = view.areas.length;
+  const hits = (foundNow() && foundNow().areas) || null, n = view.areas.length;
   const chip = (i, count, cls, title) => `<button data-area="${i}" class="chip ${i === view.area ? 'on' : ''}" title="${title}">` +
     `${esc(view.areas[i].name)} <span class="${cls}">${count}</span></button>`;
   const withHits = hits ? view.areas.map((a, i) => i).filter(i => hits[i]) : [];
@@ -1901,30 +1903,32 @@ function render() {
       : withProblems.length ? `<div class="bar areaChips"><span class="dim small">Needs attention</span>` +
         withProblems.map(i => chip(i, view.areas[i].problems + '!', 'bad', 'Buildings here are not working properly')).join('') + `</div>` : ''));
   renderWeather();
-  const marked = new Set(((view.found && view.found.results) || []).filter(r => r.area === view.area).map(r => `${r.x},${r.y}`));
+  // every match in this area is highlighted (the best of them brighter), with what Find says about it on hover
+  const findNote = (x, y) => { const r = marked.get(`${x},${y}`); return r ? `\nFound: ${r.label}${r.note ? ' - ' + r.note : ''}${r.best ? ' (best here)' : ''}` : ''; };
+  const marked = new Map(((foundNow() && foundNow().here) || []).map(r => [`${r.x},${r.y}`, r]));
   $('areas').hidden = view.areas.length < 2;
 
   $('map').style.gridTemplateColumns = `repeat(${area.size}, auto)`;
   fitMap();
   setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
     const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
-    const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' : '');
+    const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' + (marked.get(`${x},${y}`).best ? ' best' : '') : '');
     const info = view.tiles[y][x];
     const state_ = !('need' in info) ? '' : info.priority < 0 || info.status.startsWith('stopped:') ? 'off' : info.status === 'working' ? '' : 'stop';
     const bar = timers[`${x},${y}`] ? `<i data-bar="${x},${y}" aria-hidden="true"></i><span class="tile-countdown" data-tile-timer="${x},${y}"></span>` : '';
     const adds = t.additions.map(a => defs.additions[a].name);
-    const label = `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">`;
+    const label = `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : '') + findNote(x, y))}">`;
     if (!gfx()) return `<button class="tile${on}" style="color:${esc(defs.terrains[t.terrain].color)}" data-x="${x}" data-y="${y}" ` + label +
       (b ? `${g}<b class="${state_}">${esc(b.glyph)}</b>` : t.animal ? `${g}<em>${esc(defs.wildlife[t.animal].glyph)}</em>` : g + g) + (adds.length ? `<u>${'<s></s>'.repeat(adds.length)}</u>` : '') + bar + `</button>`;
     return `<button class="tile visual-tile${on}" style="--terrain:${esc(defs.terrains[t.terrain].color)}80;background-color:var(--terrain)" data-x="${x}" data-y="${y}" ` +
-      `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : ''))}">` +
+      `aria-label="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + ' tile ' + x + ', ' + y)}" aria-pressed="${!!(sel && sel.x === x && sel.y === y)}" title="${esc(defs.terrains[t.terrain].name + (b ? ' - ' + b.name : '') + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : '') + findNote(x, y))}">` +
       (b ? icon(buildingIcon(b), state_) : t.animal ? icon('animal', 'animal') : icon(terrainIcon(defs.terrains[t.terrain]))) + (state_ === 'stop' ? '<span class="warning">!</span>' : '') + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + (b ? `<span class="tile-name" aria-hidden="true">${esc(b.name)}</span>` : '') + bar + `</button>`;
   }).join('')).join(''));
 
   setHTML($('mapKey'), gfx()
     ? `<div class="tile-facts"><span class="animal">${icon('animal')}Wildlife</span><span class="bad">${icon('alert')}Needs attention</span><span>${icon('pin')}Selected / found</span></div>`
     : `Second letter: <b class="hi">white</b> working building, <span class="bad">red</span> something wrong, ` +
-      `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results.`);
+      `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results (green edge: the best of them here).`);
   renderFinder();
   renderTile();
   setHTML($('tameHere'), tameAllButton([view.area], 'Tame all animals here'));
@@ -2488,9 +2492,12 @@ function tameAllButton(areaIdxs, label) {
     `<span class="dim small">${!taming ? 'Research Animal Taming first.'
       : `${num(food)} Food for ${worth} Livestock` + (have < food ? ` <span class="bad">- you have ${num(have)}, so only some will be tamed</span>` : '')}</span>`;
 }
+// The Find answer for the search now in the box, or null (none yet, or one for an older search).
+const foundNow = () => finder.kind && view.found && (!view.found.query || view.found.query === findParam()) ? view.found : null;
 function renderFinder() {
-  const found = view.found, out = $('findOut');
+  const found = foundNow(), out = $('findOut');
   $('findClear').hidden = !finder.kind;
+  if (finder.kind && !found && !(view.found && view.found.locked)) { setHTML(out, `<span class="dim">Searching...</span>`); return; }
   if (!finder.kind || !found) { setHTML(out, ''); return; }
   if (found.locked) {
     setHTML(out, `<span class="bad">Research ${esc(found.locked)} (Research tab, Tribe level) to search the land.</span>`);
@@ -2500,13 +2507,21 @@ function renderFinder() {
     setHTML(out, `<span class="dim">${finder.kind === 'problems' ? 'Every building is working properly.' : 'Nothing found in any of your areas.'}</span>`);
     return;
   }
-  const inAreas = Object.keys(found.areas || {}).length;
+  // This area's matches first (all of them, as on the map), then the others area by area.
+  const inAreas = Object.keys(found.areas || {}).length, here = found.here || [], hereN = (found.areas || {})[view.area] || 0;
+  const row = r => `<div class="row" data-go="${r.area},${r.x},${r.y}">` +
+    `<span class="hi">${esc(r.label)}</span> <span class="dim">tile ${r.x}, ${r.y}</span>` + (r.best ? ` <span class="good">[best here]</span>` : '') +
+    (r.note ? `<br><span class="${finder.kind === 'problems' ? 'bad' : 'dim'}">${esc(r.note)}</span>` : '') + `</div>`;
+  const others = {};
+  for (const r of found.results) if (r.area !== view.area) (others[r.area] = others[r.area] || []).push(r);
+  const listed = found.results.filter(r => r.area !== view.area).length + here.length;
   setHTML(out, `<div class="dim">${found.total} found` + (view.areas.length > 1 ? ` in ${inAreas} ${inAreas === 1 ? 'area' : 'areas'}` : '') +
-    (found.total > found.results.length ? `, showing the first ${found.results.length}` : '') +
-    (finder.kind === 'sites' ? ', fastest first' : '') + `. Click one to go there.</div>` +
-    found.results.map(r => `<div class="row" data-go="${r.area},${r.x},${r.y}">` +
-      `<span class="hi">${esc(r.label)}</span> <span class="dim">${esc(view.areas[r.area].name)}, tile ${r.x}, ${r.y}</span>` +
-      (r.note ? `<br><span class="${finder.kind === 'problems' ? 'bad' : 'dim'}">${esc(r.note)}</span>` : '') + `</div>`).join(''));
+    (finder.kind === 'sites' ? ', fastest first' : '') + `. Highlighted on the map; click one to go there.</div>` +
+    (view.areas.length > 1 ? `<div class="cat">This area: ${esc(view.areas[view.area].name)} (${hereN})</div>` : '') +
+    (here.length ? here.map(row).join('') : `<div class="dim">None here.</div>`) +
+    Object.entries(others).map(([a, rs]) => `<div class="cat" data-go-area="${a}" style="cursor:pointer" title="Show this area">` +
+      `${esc(view.areas[a].name)} (${found.areas[a]})</div>` + rs.map(row).join('')).join('') +
+    (found.total > listed ? `<div class="dim">${found.total - listed} more in other areas; open an area to see all of its matches.</div>` : ''));
 }
 
 // Fill the second Find menu for the kind of search chosen.
@@ -4251,6 +4266,8 @@ $('findKind').onchange = () => { finder.kind = $('findKind').value; findChoices(
 $('findWhat').onchange = () => { finder.what = $('findWhat').value; refresh(); };
 $('findClear').onclick = () => { finder = { kind: '', what: '' }; $('findKind').value = ''; $('findWhat').hidden = true; refresh(); };
 $('findOut').onclick = e => {
+  const head = e.target.closest('[data-go-area]');
+  if (head) { showArea(+head.dataset.goArea); return; }
   const row = e.target.closest('[data-go]');
   if (!row) return;
   const [area, x, y] = row.dataset.go.split(',').map(Number);
