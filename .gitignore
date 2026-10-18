@@ -1,12 +1,14 @@
 # Live game data: holds password hashes, and must survive code updates.
 saves/
 old_saves/
-removed/          # cities an admin took out with /removecity (kept, not deleted)
-blocked_words.json   # words an admin blocked with /blockword
+# cities an admin took out with /removecity (kept, not deleted), and words blocked with /blockword
+removed/
+blocked_words.json
 market.json
 presents.json
 presents.taken
-discord.json      # the Discord bot's token and keys (see discord_bot.py)
+# the Discord bot's token and keys (see discord_bot.py)
+discord.json
 *.tmp
 
 __pycache__/
