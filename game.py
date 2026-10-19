@@ -318,19 +318,21 @@ AWAY_TIME = 5 * MIN         # unwatched for this long -> the player gets a "whil
 #   cost        resources paid
 #   research    how many things the city must have researched (of any level)
 #   areas       how many areas the city must own, counting home
+# What each level asks for. Set in October 2026 from the leaderboard: a little below what cities a level lower
+# already had (so no one settled there is stuck), with resources in step with what each level's research costs.
 # Each level's cost includes livestock: the feast that marks the city's new standing.
 TECH_LEVELS = [
     {"name": "Tribe"},
-    {"name": "Village", "population": 12, "research": 3,
-     "cost": {"food": 100, "wood": 150, "stone": 80, "knowledge": 20, "livestock": 4}},
-    {"name": "Town", "population": 30, "research": 8, "areas": 2,
-     "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100, "livestock": 15}},
-    {"name": "City", "population": 90, "research": 22, "areas": 4,
-     "cost": {"stone": 2000, "ore": 800, "tools": 400, "gold": 1500, "knowledge": 800, "livestock": 50}},
-    {"name": "Metropolis", "population": 200, "research": 44, "areas": 6,
-     "cost": {"stone": 6000, "ore": 2000, "tools": 2000, "gold": 8000, "knowledge": 3000, "livestock": 150}},
-    {"name": "Megacity", "population": 400, "research": 56, "areas": 9,
-     "cost": {"tools": 5000, "electronics": 3000, "gold": 30000, "knowledge": 10000, "livestock": 400}},
+    {"name": "Village", "population": 18, "research": 4,
+     "cost": {"food": 300, "wood": 500, "stone": 300, "knowledge": 150, "livestock": 4}},
+    {"name": "Town", "population": 70, "research": 15, "areas": 3,
+     "cost": {"wood": 1500, "stone": 1500, "ore": 500, "gold": 500, "knowledge": 600, "livestock": 15}},
+    {"name": "City", "population": 250, "research": 30, "areas": 5,
+     "cost": {"stone": 8000, "ore": 3000, "tools": 1500, "gold": 5000, "knowledge": 4000, "livestock": 50}},
+    {"name": "Metropolis", "population": 700, "research": 50, "areas": 8,
+     "cost": {"stone": 25000, "ore": 8000, "tools": 8000, "gold": 30000, "knowledge": 15000, "livestock": 150}},
+    {"name": "Megacity", "population": 1600, "research": 70, "areas": 14,
+     "cost": {"food": 50000, "tools": 25000, "electronics": 10000, "gold": 120000, "knowledge": 60000, "livestock": 400}},
 ]
 
 # Groups the build menu is divided into, in the order they are shown. Every
