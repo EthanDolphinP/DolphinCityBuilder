@@ -544,10 +544,23 @@ def points(state):
 
 
 def effects(state):
-    """Everything the ideology and the perks taken give, added up."""
+    """Everything the ideology, the perks taken, its rituals and the Cauldron's brews give, added up."""
+    import cauldron
+    total = own_effects(state)
+    for key, value in cauldron.effects(state).items():
+        if key == "speed":
+            for cat, x in value.items():
+                total["speed"][cat] = total["speed"].get(cat, 0) + x
+        else:
+            total[key] = total.get(key, 0) + value
+    return total
+
+
+def own_effects(state):
+    """What the ideology itself gives: its own effects, the perks taken and the rituals running."""
     ideo = chosen(state)
     if not ideo:
-        return {}
+        return {"speed": {}}
     total = {"speed": {}}
     for eff in ([ideo["effects"]] + [ideo["perks"][p]["effects"] for p in state.get("perks", []) if p in ideo["perks"]]
                 + [_scaled(ideo["rituals"][rid]["effects"], r["scale"]) for rid, r in active_rituals(state)]):
@@ -764,7 +777,7 @@ def speed_bonus(state, category):
     ideo = chosen(state)
     if not ideo:
         return None
-    per = effects(state)["speed"]
+    per = own_effects(state)["speed"]     # the Cauldron's brews have a line of their own (cauldron.speed_bonus)
     extra = per.get(category, 0) + per.get("all", 0)
     return (1 + extra, ideo["name"]) if extra else None
 
@@ -867,4 +880,4 @@ def view(state):
               "load": {**{cat: round(1 - curse_factor(state, "speed", cat), 3) for cat in game.CATEGORIES},
                        **{k: round(1 - curse_factor(state, k), 3) for k in PENALTY_WORDS}}}
     return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state), "rituals": rituals, "curses": curses,
-            "total": describe(effects(state)) if chosen(state) else []}
+            "total": describe(own_effects(state)) if chosen(state) else []}

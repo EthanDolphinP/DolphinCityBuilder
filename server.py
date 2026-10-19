@@ -525,7 +525,7 @@ def handle_get(path, query, token, now):
 # would look a list or an object up in its tables. Anything else there is dropped, and the action then
 # says what is missing. "bet" (and a beast trade's "want") may be small objects, whose own name fields are checked too.
 NAME_FIELDS = {"action", "building", "addition", "research", "ideology", "perk", "ritual", "give", "want", "to", "text",
-               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse"}
+               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse", "recipe"}
 
 
 def _clean(data, inner=False):

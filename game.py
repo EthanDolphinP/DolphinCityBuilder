@@ -34,6 +34,7 @@ from contextlib import contextmanager
 import re
 
 import beasts
+import cauldron
 import ideology
 import moderation
 import weather
@@ -3127,6 +3128,10 @@ def tile_cycle(state, area, x, y, bid):
     belief = ideology.speed_bonus(state, b.get("category"))
     if belief:
         factors.append(belief)
+    # Brews from the Cauldron.
+    brewed = cauldron.speed_bonus(state, b.get("category"))
+    if brewed:
+        factors.append(brewed)
     # Hexes, sabotage and the like other cities have done to this one.
     hexed = ideology.curse_speed(state, b.get("category"))
     if hexed:
@@ -3416,8 +3421,9 @@ def advance_time(state, now):
     start = now - remaining
     state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
-    # Caught up in stretches that end where a ritual ends, so each counts for exactly as long as it ran.
-    ends = sorted({r["until"] for r in list(state.get("rituals", {}).values()) + state.get("curses", []) if start < r["until"] < now})
+    # Caught up in stretches that end where a ritual, hex or brew ends, so each counts for exactly as long as it ran.
+    ends = sorted({t for t in [r["until"] for r in list(state.get("rituals", {}).values()) + state.get("curses", [])]
+                   + cauldron.ends(state) if start < t < now})
     for end in ends + [now]:
         state["ritual_now"] = start
         with _stats_cached():     # buildings and ideology don't change within a stretch
@@ -3425,6 +3431,7 @@ def advance_time(state, now):
         start = end
     state.pop("ritual_now", None)
     ideology.tidy_rituals(state)
+    cauldron.tidy(state)
     trip = state["expedition"]
     while trip and now >= trip["arrive"]:
         _arrive(state, trip)
@@ -3987,6 +3994,8 @@ def apply_action(state, now, action, data):
         return ideology.take(state, now, data.get("perk"))
     if action == "ritual_start":
         return ideology.start_ritual(state, now, data.get("ritual"), data.get("gold"))
+    if action == "cauldron_brew":
+        return cauldron.brew(state, now, data.get("recipe"), data.get("times", 1))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":
@@ -4098,6 +4107,7 @@ def defs():
             "environments": ENVIRONMENTS,
             "wildlife": WILDLIFE,
             "ideologies": ideology.defs(),
+            "cauldron": cauldron.defs(),
             "weather": weather.defs(),
         }
     return DEFS
@@ -4275,6 +4285,7 @@ def _view(state, ai, detail):
                      for rid, r in RESEARCH.items()],
         "beast": beasts.view(state, state["updated"]),
         "ideology": ideology.view(state),
+        "cauldron": cauldron.view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -4423,7 +4434,7 @@ TALLIES = [
     ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
-    ("rituals", "Rituals held"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+    ("rituals", "Rituals held"), ("brews", "Brews from the Cauldron"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
 ]
 
 
@@ -4613,7 +4624,7 @@ def _city_stats(state, now, rates):
     # ---- bonuses
     def factor(cat):
         out = 1.0
-        for bonus in (beasts.speed_bonus(state, cat), ideology.speed_bonus(state, cat)):
+        for bonus in (beasts.speed_bonus(state, cat), ideology.speed_bonus(state, cat), cauldron.speed_bonus(state, cat)):
             if bonus:
                 out *= bonus[0]
         return out
