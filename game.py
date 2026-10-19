@@ -4176,6 +4176,10 @@ def _view(state, ai, detail):
     env = weather.job_factors(state, jobs, state["updated"])
     supply, demand, power = power_status(state, jobs, env)
     projected = unpaused_projection(state, (jobs, housing, totals), env)
+    # The Cauldron's ingredients, taken every hour while it brews (its effect is in the buildings' speed already).
+    for k, v in cauldron.hourly(state).items():
+        rates[k] -= v
+        projected["rates"][k] = round(projected["rates"][k] - v, 1)
     for i, job in enumerate(jobs):
         job["env"], job["power_env"] = env[i][0], env[i][1]
         job["notes"] = job["notes"] + env[i][2]

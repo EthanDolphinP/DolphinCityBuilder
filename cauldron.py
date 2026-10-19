@@ -151,6 +151,15 @@ def renew(state, when):
         game.log(state, when, f"The cauldron is bubbling again: {name}.")
 
 
+def hourly(state):
+    """What the cauldron takes each hour while it is brewing ({} when it is empty, stopped or cold), for the city's
+    per-hour figures."""
+    pot = state.get("cauldron")
+    if not pot or not pot.get("recipe") or pot["recipe"] not in RECIPES or not pot.get("brewing"):
+        return {}
+    return {k: v * HOUR / BREW_TIME for k, v in cost(pot["recipe"], pot["times"]).items()}
+
+
 def ends(state):
     """When the hour under way ends, for game.advance_time (it stops there and calls renew)."""
     pot = state.get("cauldron")
