@@ -292,6 +292,12 @@
   .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame], .visiting [data-tame-all],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
+  .beastTop, .eggTop { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .beastTop > div, .eggTop > div { flex: 1 1 200px; }
+  .eggList { display: flex; flex-direction: column; }
+  .eggRow { border-top: 1px solid var(--line); padding: 8px 4px; }
+  .eggSteps { display: flex; flex-wrap: wrap; gap: 2px 18px; margin-top: 2px; }
+  #beastTodo:empty { display: none; }
   details.spc { border-top: 1px solid var(--line); padding: 7px 0; }
   details.spc > summary { cursor: pointer; }
   details.spc > summary:hover .big { text-decoration: underline; }
@@ -762,7 +768,8 @@
 
     <!-- Beast -->
     <div id="tab-beast" hidden>
-      <div class="panel"><h2>Beasts</h2><div id="beastViews" class="bar" style="margin-top:0"></div></div>
+      <div class="panel"><h2>Beasts</h2><div id="beastViews" class="bar" style="margin-top:0"></div>
+        <p id="beastAbout" class="dim small" style="margin:8px 0 0"></p><div id="beastTodo" class="bar"></div></div>
       <div class="cols" data-bst="overview">
         <div class="panel"><h2>Your beast</h2><div id="beastActive"></div></div>
         <div class="panel"><h2>Beast mission</h2><div id="beastMission"></div></div>
@@ -788,16 +795,18 @@
         <div id="beastBreeding"></div>
       </details>
       <details class="panel" id="beastTradePanel" open data-bst="trades">
-        <summary class="cat">Beast trades <span id="beastTradeCount" class="count"></span></summary>
+        <summary class="cat">Trade market <span id="beastTradeCount" class="count"></span></summary>
+        <p class="dim small" style="margin:0 0 6px">To put one of yours up, press Trade on it under Your beasts or Eggs.</p>
         <div id="beastTrades" class="scroll"></div>
       </details>
       <details class="panel" id="arenaPanel" open data-bst="arena">
         <summary class="cat">Arena <span id="duelCount" class="count"></span></summary>
-        <p class="dim small" style="margin-top:0">Challenge another city to a duel. They can see your beast but not your
+        <details class="fold" data-fold="arena:how" style="margin-top:0"><summary>How duels work</summary>
+          <p class="dim small" style="margin:4px 0">Challenge another city to a duel. They can see your beast but not your
           bet, and they choose whether to accept. If they do, they pick a beast and a bet of their own, both bets are
           shown, and the beasts fight. The winner's city takes both bets and the winning beast gains a little
           experience. Level does not matter in the fight: a beast fights harder the more is bet on it, and much
-          harder when the bet is the material it likes.</p>
+          harder when the bet is the material it likes.</p></details>
         <form id="duelForm" class="bar" style="margin-top:0">
           <span class="pair">Send <select id="duelBeast"></select></span>
           <span class="pair">against <input id="duelTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px"></span>
@@ -2791,19 +2800,39 @@ function renderBeastViews() {
   const eggTodo = eggs.filter(b => b.task && !b.task.complete).length;
   const forMe = (view.market.duels || []).filter(d => d.to === state.name).length;
   const mine = (view.market.beast_offers || []).filter(o => o.city === state.name).length;
+  const canDeliver = eggs.filter(b => b.task && !b.task.complete && b.task.pay && view.state.resources[b.task.pay] >= b.task.need).length;
   const parts = {
-    overview: ['Your beast', !own || !bv.hatched ? '' : m && !m.complete ? '<span class="good">mission to do</span>' : 'mission done'],
-    eggs: ['Eggs', `${eggs.length}` + (own && eggTodo ? `, <span class="good">${eggTodo} waiting on you</span>` : '')],
-    beasts: ['All beasts', `${hatched}`],
-    ...(own ? { breeding: ['Breeding', bv.breeding.eggs.length ? `<span class="good">${bv.breeding.eggs.length} ${bv.breeding.eggs.length === 1 ? 'egg' : 'eggs'} to collect</span>`
-                                     : bv.breeding.male ? 'pair breeding' : ''] } : {}),
-    ...(own ? { trades: ['Trades', `${(view.market.beast_offers || []).length} on offer` + (mine ? `, ${mine} yours` : '')],
-                arena: ['Arena', forMe ? `<span class="hi">${forMe} ${forMe === 1 ? 'challenge' : 'challenges'} for you</span>` : ''] } : {}),
+    overview: ['Your beast', !own || !bv.hatched ? '' : m && !m.complete ? '<span class="good">mission</span>' : ''],
+    eggs: ['Eggs', `${eggs.length}` + (own && canDeliver ? ` &middot; <span class="good">${canDeliver} ready</span>` : '')],
+    beasts: ['Your beasts', `${hatched}`],
+    ...(own ? { breeding: ['Breeding', bv.breeding.eggs.length ? `<span class="good">${bv.breeding.eggs.length} to collect</span>` : bv.breeding.male ? 'pair set' : ''] } : {}),
+    ...(own ? { trades: ['Trade market', `${(view.market.beast_offers || []).length}` + (mine ? `, ${mine} yours` : '')],
+                arena: ['Arena', forMe ? `<span class="hi">${forMe} for you</span>` : ''] } : {}),
     all: ['Everything', ''],
   };
+  // what each view is for, in a line
+  const about = {
+    overview: 'The beast that is working for your city now: what it gives you, and the mission it has set.',
+    eggs: 'Each egg hatches once it has been kept warm long enough and its own mission is done.',
+    beasts: 'Every beast you have hatched. Make one active to change what your city gets, or trade it.',
+    breeding: 'Put a male and a female of the same kind together and they lay an egg every few hours.',
+    trades: 'Beasts and eggs other cities are trading, and your own on offer.',
+    arena: 'Bet goods on a beast against another city. The winner takes both bets.',
+    all: 'Every part of the Beast tab at once.',
+  };
+  // what is waiting on the player, each a button that opens the view it is in
+  const todo = !own ? [] : [
+    m && !m.complete && m.pay && view.state.resources[m.pay] >= m.need && ['overview', `Beast mission ready to deliver`],
+    canDeliver && ['eggs', `${canDeliver} ${canDeliver === 1 ? 'egg' : 'eggs'} to deliver for`],
+    bv.breeding.eggs.length && ['breeding', `${bv.breeding.eggs.length} bred ${bv.breeding.eggs.length === 1 ? 'egg' : 'eggs'} to collect`],
+    forMe && ['arena', `${forMe} ${forMe === 1 ? 'challenge' : 'challenges'} to answer`],
+  ].filter(Boolean);
   if (!parts[beastView]) beastView = 'overview';
   setHTML($('beastViews'), Object.entries(parts).map(([k, [label, note]]) =>
     `<button data-beast-view="${k}" class="${beastView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
+  $('beastAbout').textContent = about[beastView] || '';
+  setHTML($('beastTodo'), todo.length ? `<span class="dim small">Needs you:</span>` +
+    todo.map(([k, text]) => `<button class="chip" data-beast-view="${k}">${esc(text)}</button>`).join('') : '');
   for (const panel of document.querySelectorAll('#tab-beast [data-bst]')) panel.hidden = !beastShows(panel.dataset.bst);
 }
 // ---- stat grades: how good a stat is for its species. F to A from the lowest it can roll up, S the best ----
@@ -2851,48 +2880,43 @@ function renderBeast() {
       `<div class="dim small">It leaves your city and is held until another city takes the trade or you cancel it. See Beast trades below.</div></div>`;
   };
 
-  const eggCard = b => {
-    const warm = b.warm >= b.warm_needed, t = b.task;
-    let html = `<div class="head"><span class="big" style="color:${esc(b.color)}">${esc(b.name)}</span></div>` +
-      `<pre class="beastArt" style="color:${esc(b.color)}">${EGG_ART}</pre>` +
-      (b.bred ? `<div class="small">Bred from ${esc(b.bred.parents.join(' and '))}: a <span class="hi">${esc(b.bred.name)}</span> ${sexMark(b.sex)}</div>` +
-        `<div class="small">${Object.entries(bv.stats).map(([k, name]) => `<span class="dim">${esc(name)}</span> ${b.bred.stats[k]}${gradeTag(b.bred.species, k, b.bred.stats[k])}`).join(' &nbsp; ')}` +
-        ` &nbsp; <span class="dim">Overall</span> ${gradeTag(b.bred.species, null, b.bred.stats)}</div>`
-        : `<div class="dim small">Nobody knows what is inside until it hatches.</div>`) +
-      `<div class="dim small">${b.tasks_needed > 1 ? 'Rarer eggs ask for more. ' : ''}It needs two things:</div>` +
-      `<div class="opt">${tick(warm)} Kept warm for ${duration(b.warm_needed)}` +
-      (warm ? '' : ` - <span class="hi" data-timer="hatch${b.id}"></span> to go`) + `</div>` +
-      `<div class="opt">${tick(b.missions >= b.tasks_needed)} ${b.tasks_needed > 1 ? `Its own missions, one after another (${Math.min(b.missions, b.tasks_needed)} of ${b.tasks_needed} done)` : 'Its own mission'}` +
-      (t ? `: <span class="${b.missions >= b.tasks_needed ? 'good' : 'hi'}">${esc(t.text)}</span>` : ' done') + `</div>`;
-    if (t && !t.complete && t.pay) {
-      const have = Math.floor(state.resources[t.pay]), ok = have >= t.need;
-      html += `<div class="small">You have ${have} of ${t.need} ${esc(R[t.pay])}</div>` + meter(Math.min(have, t.need), t.need, ok ? '' : 'alt') +
-        (own ? `<div class="bar"><button data-egg-deliver="${b.id}" ${ok ? '' : 'disabled'}>Deliver ${t.need} ${esc(R[t.pay])}</button></div>` : '');
-    } else if (t && !t.complete) {
-      html += `<div class="small">${t.done} of ${t.need} done <span class="dim">- this counts up by itself as you do it</span></div>` + meter(t.done, t.need, 'alt');
-    }
-    if (warm && b.missions >= b.tasks_needed) html += `<div class="good small">Hatching...</div>`;
-    if (own) html += tradeFor === b.id ? tradeForm(b) : `<div class="bar"><button data-trade="${b.id}">Trade</button></div>`;
-    return html;
+  // One egg in a line or two: what it is, whether it is warm yet, its mission, and the buttons.
+  const eggRow = b => {
+    const warm = b.warm >= b.warm_needed, t = b.task, done = b.missions >= b.tasks_needed;
+    const have = t && t.pay ? Math.floor(state.resources[t.pay]) : 0, ok = t && t.pay && have >= t.need;
+    const what = b.bred ? `<span class="small">bred: <span class="hi">${esc(b.bred.name)}</span> ${sexMark(b.sex)} ${gradeTag(b.bred.species, null, b.bred.stats)}</span>` : '';
+    const mission = done ? `<span class="good">done</span>`
+      : !t ? `<span class="dim">coming</span>`
+      : `<span class="hi">${esc(t.text)}</span>` + (b.tasks_needed > 1 ? ` <span class="dim">(${b.missions + 1} of ${b.tasks_needed})</span>` : '') +
+        (t.pay ? ` <span class="${ok ? 'dim' : 'bad'} small">you have ${num(have)}</span>` : ` <span class="dim small">${t.done} of ${t.need}, counts up by itself</span>`);
+    const buttons = !own ? '' : (t && !t.complete && t.pay ? `<button data-egg-deliver="${b.id}" ${ok ? '' : 'disabled'}>Deliver ${num(t.need)} ${esc(R[t.pay])}</button>` : '') +
+      (tradeFor === b.id ? '' : `<button data-trade="${b.id}">Trade</button>`);
+    return `<div class="eggRow"><div class="eggName"><span style="color:${esc(b.color)}">${esc(b.name)}</span> ${what}</div>` +
+      `<div class="eggSteps small"><span>${tick(warm)} Warm ${warm ? '' : `<span class="hi" data-timer="hatch${b.id}"></span> to go`}</span>` +
+      `<span>${tick(done)} Mission: ${mission}</span>${warm && done ? ' <span class="good">Hatching...</span>' : ''}</div>` +
+      (buttons ? `<div class="bar" style="margin-top:4px">${buttons}</div>` : '') + (own && tradeFor === b.id ? tradeForm(b) : '') + `</div>`;
   };
 
   // ---- the active beast ----
   const hatched = bv.beasts.filter(b => !b.egg), eggs = bv.beasts.filter(b => b.egg);
   const mine = hatched.find(b => b.active);
   setHTML($('beastActive'), mine
-    ? `<div class="head"><span class="big" style="color:${esc(mine.color)}">${esc(mine.name)}</span><span class="dim small">${esc(mine.rarity)}</span></div>` +
-      `<pre class="beastArt" style="color:${esc(mine.color)}">${esc(mine.art)}</pre><div class="desc">${esc(mine.desc)}</div>` +
-      kv([['Nature', esc(mine.nature)], ['Sex', sexMark(mine.sex, true)], ['Level', `<span class="hi">${mine.level}</span> <span class="dim small">(${esc(mine.rarity.toLowerCase())} beasts are fully grown at ${mine.cap}; ` +
-        `past that each level takes 30% more experience and adds less)</span>`]]) +
+    ? `<div class="beastTop"><pre class="beastArt" style="color:${esc(mine.color)}">${esc(mine.art)}</pre><div>` +
+      `<div class="head"><span class="big" style="color:${esc(mine.color)}">${esc(mine.name)}</span>` +
+      `<span class="dim small">${esc(mine.rarity)}, level ${mine.level} ${sexMark(mine.sex)}</span></div>` +
+      `<div class="desc">${esc(mine.desc)}</div></div></div>` +
+      `<div class="cat">Gives your city</div>` + mine.bonus.map(x => `<div class="opt good">${esc(x)}</div>`).join('') +
       (mine.max_level ? `<div class="good small">As far as a beast can go.</div>`
-        : (mine.grown ? `<div class="good small">Fully grown, and still growing slowly.</div>` : '') + `<div class="small">Experience ${mine.xp} of ${mine.xp_needed} <span class="dim">(a mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed)) +
-      `<div class="cat">Stats</div><div class="opt">${statLine(mine.stats, mine.species)}</div>` +
+        : `<div class="small" style="margin-top:8px">Level ${mine.level}: experience ${mine.xp} of ${mine.xp_needed} ` +
+          `<span class="dim">(each mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed) +
+          `<div class="small dim">At level ${mine.level + 1}: ${mine.next_bonus.map(esc).join(', ')}</div>`) +
+      `<details class="fold" data-fold="beast:details" ${isOpen('beast:details', false) ? 'open' : ''}><summary>Stats and details</summary>` +
+      `<div class="opt">${statLine(mine.stats, mine.species)}</div>` +
       `<div class="opt dim small">Grades show how good each stat is for a ${esc(mine.name)}: F is the lowest it can roll, A near the top, S the best possible.</div>` +
-      `<div class="opt dim small">Likes ${esc(R[mine.likes])}: bet it on this beast in the Arena below to make it fight harder.</div>` +
-      (mine.home && mine.home.length ? `<div class="opt dim small">Its eggs are found most often in: ${esc(mine.home.join(', '))}.</div>` : '') +
-      `<div class="cat">Gives the city</div>` + mine.bonus.map(t => `<div class="opt good">${esc(t)}</div>`).join('') +
-      (mine.max_level ? '' : `<div class="cat">At level ${mine.level + 1}</div>` + mine.next_bonus.map(t => `<div class="opt dim">${esc(t)}</div>`).join(''))
-    : `<span class="dim">${eggs.length ? 'No beast has hatched yet. Your eggs are below.' : 'You have no beast.'}</span>`);
+      kv([['Nature', esc(mine.nature)], ['Grows', `fully grown at level ${mine.cap}${mine.grown ? ' (it is: each level now takes 30% more experience and adds less)' : ''}`],
+          ['Likes', `${esc(R[mine.likes])} <span class="dim small">(bet it on this beast in the Arena to make it fight harder)</span>`],
+          ...(mine.home && mine.home.length ? [['Eggs found in', esc(mine.home.join(', '))]] : [])]) + `</details>`
+    : `<span class="dim">${eggs.length ? 'No beast has hatched yet. See Eggs: each one hatches once it is warm and its mission is done.' : 'You have no beast yet. Expeditions sometimes bring back eggs.'}</span>`);
 
   // ---- the daily beast mission ----
   const m = bv.mission;
@@ -2915,15 +2939,22 @@ function renderBeast() {
   }
   setHTML($('beastMission'), html + (bv.hatched ?
     `<div class="opt">Next mission in <span class="hi" data-timer="mission"></span>` +
-    (m && !m.complete ? ` <span class="dim small">- an unfinished mission is replaced then</span>` : '') + `</div>` +
-    `<div class="opt dim small">A new beast mission comes every ${duration(bv.mission_period)}. Egg missions are separate and do not use it up.</div>` : ''));
+    (m && !m.complete ? ` <span class="dim small">(this one is replaced then if it is not done)</span>` : '') + `</div>` +
+    `<div class="opt dim small">Missions give your beast experience, and a higher level gives your city more. Egg missions are separate.</div>` : ''));
 
   // ---- eggs ----
   const count = list => Object.entries(list.reduce((n, k) => (n[k] = (n[k] || 0) + 1, n), {}));
   $('eggCount').textContent = `(${eggs.length})`;
+  // the ones the player can do something about now first, then those nearest hatching
+  const eggReady = b => b.task && !b.task.complete && b.task.pay && state.resources[b.task.pay] >= b.task.need;
+  const eggOrder = [...eggs].sort((a, b) => eggReady(b) - eggReady(a) || (b.missions >= b.tasks_needed) - (a.missions >= a.tasks_needed) ||
+    (b.warm / b.warm_needed) - (a.warm / a.warm_needed));
+  const readyCount = eggs.filter(eggReady).length;
   setHTMLKeep($('beastEggs'), (eggs.length
-      ? `<div class="dim small" style="margin-bottom:8px">${count(eggs.map(b => b.name)).map(([name, n]) => esc(name) + (n > 1 ? ' x' + n : '')).join(', ')}</div>` +
-        `<div class="areaCards">` + eggs.map(b => `<div class="areaCard"><div class="info">${eggCard(b)}</div></div>`).join('') + `</div>`
+      ? `<div class="eggTop"><pre class="beastArt dim">${EGG_ART}</pre><div><div>${count(eggs.map(b => b.name)).map(([name, n]) => esc(name) + (n > 1 ? ' x' + n : '')).join(', ')}</div>` +
+        `<div class="dim small">Nobody knows what is inside an egg until it hatches (a bred egg shows what it will be).</div>` +
+        (own && readyCount > 1 ? `<div class="bar"><button data-egg-deliver-all>Deliver to every egg you can (${readyCount})</button></div>` : '') + `</div></div>` +
+        `<div class="eggList">` + eggOrder.map(eggRow).join('') + `</div>`
       : `<p class="dim" style="margin:0">No eggs waiting to hatch.</p>`) +
     (bv.nest_at ? `<div class="opt">Nesting Ground: next egg in <span class="hi" data-timer="nest"></span>` +
       `</div>` : '') +
@@ -4401,13 +4432,20 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!$('report').hidden) $('reportOk').click(); else if (!$('away').hidden) $('awayOk').click();
 });
-$('beastViews').onclick = e => {
+$('beastTodo').onclick = $('beastViews').onclick = e => {   // the Needs you buttons open their view too
   const b = e.target.closest('[data-beast-view]');
   if (b) { beastView = settings.beastView = b.dataset.beastView; saveSettings(); renderBeast(); fitTables($('tab-beast')); }
 };
 $('tab-beast').onclick = e => {
   if ('deliver' in e.target.dataset) act('mission_deliver');
   else if (e.target.dataset.eggDeliver) act('egg_deliver', { beast: +e.target.dataset.eggDeliver });
+  else if ('eggDeliverAll' in e.target.dataset) (async () => {      // one after another, while the goods last
+    const ready = view.beast.beasts.filter(b => b.egg && b.task && !b.task.complete && b.task.pay && view.state.resources[b.task.pay] >= b.task.need);
+    for (const b of ready) {
+      const egg = view.beast.beasts.find(x => x.id === b.id);
+      if (egg && egg.task && !egg.task.complete && view.state.resources[egg.task.pay] >= egg.task.need) await act('egg_deliver', { beast: b.id });
+    }
+  })();
   else if (e.target.dataset.beastActive) act('beast_active', { beast: +e.target.dataset.beastActive });
   else if ('breedStart' in e.target.dataset) act('breed_set', { male: +breedDraft.male, female: +breedDraft.female });
   else if (e.target.closest('[data-breed-kind]')) {
