@@ -3539,21 +3539,25 @@ const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 // ---- the Cauldron: open from the start; takes a new brew every hour, from as much as the city throws in ----
 let brewTimes = 1;          // the batch: how many times each recipe's least ingredients go in (one box for them all)
 let potFrame = 0;           // which picture of the bubbles is showing
-// The cauldron in text: bubbles and steam while something is brewing, in the colour of the newest brew.
+// The cauldron in text: a witch's pot over a log fire. POT_FRAMES holds four pictures while brewing (steam, bubbles,
+// the brew sloshing and dripping, the fire flickering) and one idle (still brew, embers). Each line comes with a
+// mask of the same length: how to colour each character (see POT_INK); 'c' takes the colour of the newest brew.
+const POT_FRAMES = [[["        (   )     (    )    (","        ddddddddddddddddddddd"],["       .   o    O   .   o   .","       cccccccccccccccccccccc"],["                           //","                           ss"],["   .~^~^~^~^~^~^~^~^~^~^~^/^~^~.","   cccccccccccccccccccccccsccccc"],[" (===============================)"," ddddddddddddddddddddddddddddddddd"],["   \\ :                         /","     c                          "],["  /             .-.             \\","                ddd              "],[" |             (o.o)             |","               ddddd              "],[" |              |=|              |","                ddd               "],["  \\                             /","                                 "],["   `.                         .'","                                "],["     `-._____________________.-'","                                "],["      /_/                  \\_\\","                              "],["        '   '    '   '   '","        yyyyyyyyyyyyyyyyyy"],["       )  ( )  ) (  ( )  (  )","       ffffffffffffffffffffff"],["    ==//=======\\===//=======\\==","    lllllllllllllllllllllllllll"]],[["        )    (    )     (    )","        dddddddddddddddddddddd"],["       o   .   o    .  O    .","       cccccccccccccccccccccc"],["                           //","                           ss"],["   .^~^~^~^~^~^~^~^~^~^~^~/~^~^.","   cccccccccccccccccccccccsccccc"],[" (===============================)"," ddddddddddddddddddddddddddddddddd"],["   \\  :                        /","      c                         "],["  /             .-.             \\","                ddd              "],[" |             (o.o)             |","               ddddd              "],[" |              |=|              |","                ddd               "],["  \\                             /","                                 "],["   `.                         .'","                                "],["     `-._____________________.-'","                                "],["      /_/                  \\_\\","                              "],["         '   '   '    '   '","        yyyyyyyyyyyyyyyyyyy"],["        ( )  ( (  ) )  ( )  (","       ffffffffffffffffffffff"],["    ==//=======\\===//=======\\==","    lllllllllllllllllllllllllll"]],[["         (    )   (   )   (","        ddddddddddddddddddd"],["        O    .   o    .   O","       cccccccccccccccccccc"],["                           //","                           ss"],["   .~^~^~^~^~^~^~^~^~^~^~^/^~^~.","   cccccccccccccccccccccccsccccc"],[" (===============================)"," ddddddddddddddddddddddddddddddddd"],["   \\ .                         /","     c                          "],["  /             .-.             \\","                ddd              "],[" |             (o.o)             |","               ddddd              "],[" |              |=|              |","                ddd               "],["  \\                             /","                                 "],["   `.                         .'","                                "],["     `-._____________________.-'","                                "],["      /_/                  \\_\\","                              "],["        '    '   '   '    '","        yyyyyyyyyyyyyyyyyyy"],["       (  ) ) (  ( ) ) ( )  )","       ffffffffffffffffffffff"],["    ==//=======\\===//=======\\==","    lllllllllllllllllllllllllll"]],[["        )   (    )    (    )","        dddddddddddddddddddd"],["       .  o    .   O    o   .","       cccccccccccccccccccccc"],["                           //","                           ss"],["   .^~^~^~^~^~^~^~^~^~^~^~/~^~^.","   cccccccccccccccccccccccsccccc"],[" (===============================)"," ddddddddddddddddddddddddddddddddd"],["   \\   .                       /","       c                        "],["  /             .-.             \\","                ddd              "],[" |             (o.o)             |","               ddddd              "],[" |              |=|              |","                ddd               "],["  \\                             /","                                 "],["   `.                         .'","                                "],["     `-._____________________.-'","                                "],["      /_/                  \\_\\","                              "],["         '   '    '   '   '","        yyyyyyyyyyyyyyyyyyy"],["        ) (  ( ) )  ( (  ) (","       fffffffffffffffffffff"],["    ==//=======\\===//=======\\==","    lllllllllllllllllllllllllll"]],[["",""],["",""],["                           //","                           ss"],["   .~   ~    ~    ~    ~  / ~  .","   cccccccccccccccccccccccsccccc"],[" (===============================)"," ddddddddddddddddddddddddddddddddd"],["   \\                           /","                                "],["  /             .-.             \\","                ddd              "],[" |             (o.o)             |","               ddddd              "],[" |              |=|              |","                ddd               "],["  \\                             /","                                 "],["   `.                         .'","                                "],["     `-._____________________.-'","                                "],["      /_/                  \\_\\","                              "],["",""],["         .   ,   .   ,   .","         ddddddddddddddddd"],["    ==//=======\\===//=======\\==","    lllllllllllllllllllllllllll"]]];
+const POT_IDLE = '#5a7a52';     // murky green, while nothing is brewing
+const POT_INK = { d: 'color:var(--dim)', f: 'color:#e8833a', y: 'color:#f2c14e', l: 'color:#8a6a3a', s: 'color:#b08a5a' };
 function potArt(colour, busy, frame) {
-  const bubbles = ['   .  o   .    O    .  o  ', '  o    .  O   .   o    .  ', '    O   .   o    .  O    .', '  .   O    .  o    .   o  '];
-  const steam = ['     (   )    (   )   (  ', '      ) (    )  (    ) ( ', '     (   )   (    )  (   ', '      )  (    ) (   )  ( '];
-  const liquid = frame % 2 ? ' ~^~^~^~^~^~^~^~^~^~^~^~ ' : ' ^~^~^~^~^~^~^~^~^~^~^~^ ';
-  const fire = busy ? (frame % 2 ? '   ( ) ( ( ) ) ( ) (   ' : '  ) ( ) ) ( ( ) ( )   ') : '    .   .  .   .   .   ';
-  const line = s => `<span class="dim">${esc(s)}</span>`;
-  return [busy ? line(steam[frame % 4]) : line(''), busy ? line(bubbles[(frame + 1) % 4]) : line(''),
-          '  _________________________',
-          ' (_________________________)',
-          ` \\<span style="color:${esc(colour)}">${esc((busy ? liquid : ' ~   ~    ~    ~    ~   ~').padEnd(25).slice(0, 25))}</span>/`,
-          '  \\                       /',
-          '   \\_____________________/',
-          '    /_/               \\_\\',
-          `<span class="${busy ? 'bad' : 'dim'}">${esc(fire)}</span>`].join('\n');
+  const ink = { ...POT_INK, c: `color:${colour}` };
+  return POT_FRAMES[busy ? frame % 4 : 4].map(([text, mask]) => {
+    let out = '', i = 0;
+    while (i < text.length) {      // runs of one colour become one span
+      let j = i;
+      while (j < text.length && mask[j] === mask[i]) j++;
+      const piece = esc(text.slice(i, j));
+      out += ink[mask[i]] ? `<span style="${ink[mask[i]]}">${piece}</span>` : piece;
+      i = j;
+    }
+    return out;
+  }).join('\n');
 }
 // What a batch of `times` buys, as cauldron.terms() works it out: [strength, seconds].
 function brewTerms(times) {
@@ -3568,7 +3572,7 @@ function renderCauldron() {
   const c = view.cauldron, C = view.defs.cauldron, R = view.defs.resources, state = view.state;
   const active = Object.entries(c.active), newest = active.sort((a, b) => b[1].until - a[1].until)[0];
   const busy = active.length > 0, ready = c.next <= view.now + (performance.now() - fetchedAt) / 1000;
-  const colour = newest ? C.recipes[newest[0]].colour : 'var(--dim)';
+  const colour = newest ? C.recipes[newest[0]].colour : POT_IDLE;
   const [strength, seconds] = brewTerms(brewTimes);
   const keepTimes = x => Math.max(1, +x.toPrecision(4));
   const set = (label, x, title) => `<button data-brew-times="${keepTimes(x)}" title="${title}">${label}</button>`;
@@ -3619,7 +3623,7 @@ setInterval(() => {
   if (tab !== 'cauldron' || !view || !$('potArt')) return;
   const c = view.cauldron, active = Object.entries(c.active).sort((a, b) => b[1].until - a[1].until);
   potFrame = (potFrame + 1) % 4;
-  $('potArt').innerHTML = potArt(active.length ? view.defs.cauldron.recipes[active[0][0]].colour : 'var(--dim)', active.length > 0, potFrame);
+  $('potArt').innerHTML = potArt(active.length ? view.defs.cauldron.recipes[active[0][0]].colour : POT_IDLE, active.length > 0, potFrame);
 }, 700);
 $('cauldronBody').addEventListener('click', e => {
   const b = e.target.closest('[data-brew], [data-brew-times]');
