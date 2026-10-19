@@ -142,8 +142,12 @@
   #advanceMore > summary { margin-top: 6px; }
   .mobile #toMap { display: inline-block; }
   #toMap { display: none; }
-  #msg { margin-top: 8px; }
-  #msg:empty { display: none; }      /* no empty gap under the figures when there is nothing to say */
+  /* The line saying what an action did floats over the page, bottom right: it comes and goes by itself, and in the
+     page it pushed every menu down and back up again. */
+  #msg:empty { display: none; }
+  #msg:not(:empty) { position: fixed; bottom: 18px; right: 18px; z-index: 100; max-width: min(460px, calc(100vw - 36px));
+                     margin: 0; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 18px #0005; }
+  .mobile #msg:not(:empty) { left: 12px; right: 12px; bottom: 12px; max-width: none; }
   .glyph { display: inline-block; min-width: 2.2em; font-weight: bold; }
   .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   #topbar { position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;
@@ -151,7 +155,6 @@
   #titleBlock { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 14px; }
   #topbar h1 { margin: 0; font-size: 21px; line-height: 1.25; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #status { font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #msg:not(:empty) { margin-top: 12px; }
   html:not(.mobile) main:has(> #game:not([hidden])) { max-width: calc(var(--page) + 512px); }
   html:not(.mobile) #advancePanel { flex: 0 0 240px; position: sticky; top: calc(var(--topbar-h, 54px) + 12px);
     max-height: calc(100vh - var(--topbar-h, 54px) - 24px); overflow-y: auto; }
@@ -322,6 +325,7 @@
   #effectsBar .fx.good { border-color: color-mix(in srgb, var(--good) 60%, var(--line)); }
   #effectsBar .fx.bad { border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
   #effectsBar .fx .dim { margin-left: 4px; }
+  #effectsBar [data-timer] { display: inline-block; min-width: 7ch; }   /* "9m 58s" and "59m 58s" take the same room */
   .pin { background: none; border: none; padding: 0 4px; color: var(--dim); cursor: pointer; font: inherit; }
   .pin.on { color: var(--hi); }
   .statTable th[data-stat-sort] { cursor: pointer; }
@@ -444,8 +448,7 @@
   #tile .addition-heading > button { min-height: 0; padding: 4px 10px; font-size: 14px; }
   .addition-cost { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; font-size: 13px; }
   .gfx .addition-cost .cost-pills { margin: 0; }
-  .gfx #msg:empty { display: none; }
-  .gfx #msg:not(:empty) { position: fixed; bottom: 18px; right: 18px; z-index: 100; max-width: min(460px, calc(100vw - 36px)); margin: 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 18px #0005; }
+  .gfx #msg:not(:empty) { padding: 10px 14px; border-radius: 8px; }
   .gfx #inspectorClose { display: none; }
   .gfx.mobile button, .gfx.mobile select, .gfx.mobile input { min-height: 44px; }
   .gfx.mobile main { padding-bottom: 20px; }
@@ -3531,8 +3534,9 @@ function renderEffects() {
     chips.push(`<span class="fx" data-fx="cauldron" style="color:${esc(r.colour)}" title="${esc(b.text.join('\n'))}">[~] ${esc(r.name)}` +
                `<span class="dim" data-timer="brew:${id}"></span></span>`);
   }
-  $('effectsBar').hidden = !chips.length;
-  setHTML($('effectsBar'), chips.length ? `<span class="dim">Now:</span>` + chips.join('') : '');
+  // Always shown for your own city, even with nothing running, so the menus below never move when something starts or ends.
+  $('effectsBar').hidden = !!visiting;
+  setHTML($('effectsBar'), `<span class="dim">Now:</span>` + (chips.join('') || `<span class="dim">nothing running (rituals, brews and hexes show here)</span>`));
 }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -3572,7 +3576,6 @@ function renderCauldron() {
   const c = view.cauldron, C = view.defs.cauldron, R = view.defs.resources, state = view.state;
   const active = Object.entries(c.active), newest = active.sort((a, b) => b[1].until - a[1].until)[0];
   const busy = active.length > 0, ready = c.next <= view.now + (performance.now() - fetchedAt) / 1000;
-  const colour = newest ? C.recipes[newest[0]].colour : POT_IDLE;
   const [strength, seconds] = brewTerms(brewTimes);
   const keepTimes = x => Math.max(1, +x.toPrecision(4));
   const set = (label, x, title) => `<button data-brew-times="${keepTimes(x)}" title="${title}">${label}</button>`;
@@ -3588,7 +3591,7 @@ function renderCauldron() {
         `<td class="giftBar">${'='.repeat(Math.max(1, Math.round(16 * s / biggest)))}</td><td>${duration(secs)}</td>` +
         `<td class="dim">+${tiny(C.gift_strength / (x * Math.LN2))}x</td></tr>`;
     }).join('') + `</table>`;
-  let html = `<div class="panel"><h2>Cauldron</h2><div class="potRow"><pre class="pot" id="potArt">${potArt(colour, busy, potFrame)}</pre><div>` +
+  let html = `<div class="panel"><h2>Cauldron</h2><div class="potRow"><pre class="pot" id="potArt"></pre><div>` +
     `<p class="dim small" style="margin-top:0">Throw resources in and the cauldron brews a bonus for a while. It takes a new brew every ` +
     `${duration(C.every)}; brews already bubbling keep going. The more you put in, the stronger and longer the brew, with no top: ` +
     `each extra batch adds a little less than the one before, but never nothing. New recipes open as your city gets new resources.</p>` +
@@ -3614,21 +3617,30 @@ function renderCauldron() {
       (on ? `<div class="small good">Brewing: <span data-timer="brew:${id}"></span> left</div>` : '') +
       (visiting || lockedBy.length ? '' : `<div class="bar"><button data-brew="${id}" ${afford && ready ? '' : 'disabled'} ` +
         `title="${!ready ? 'The cauldron is still bubbling' : afford ? '' : 'You do not have enough'}">${on ? 'Brew again' : 'Brew'}</button>` +
-        `<button data-brew-times="${brewMost(r)}" title="The biggest batch of this you could make now">Most I can (x${num(brewMost(r))})</button></div>`) + `</div>`;
+        `<button data-brew-most="${id}" title="The biggest batch of this you could make now">Most I can</button></div>`) + `</div>`;
   }).join('') + `</div></div>`;
   setHTML($('cauldronBody'), html);
+  drawPot();
+}
+// The pot is drawn on its own, so the bubbling never makes the rest of the tab be drawn again.
+function drawPot() {
+  if (!view || !$('potArt')) return;
+  const active = Object.entries(view.cauldron.active).sort((a, b) => b[1].until - a[1].until);
+  const html = potArt(active.length ? view.defs.cauldron.recipes[active[0][0]].colour : POT_IDLE, active.length > 0, potFrame);
+  if ($('potArt')._pot !== html) { $('potArt').innerHTML = html; $('potArt')._pot = html; }
 }
 // The bubbles move while the tab is open.
 setInterval(() => {
-  if (tab !== 'cauldron' || !view || !$('potArt')) return;
-  const c = view.cauldron, active = Object.entries(c.active).sort((a, b) => b[1].until - a[1].until);
+  if (tab !== 'cauldron') return;
   potFrame = (potFrame + 1) % 4;
-  $('potArt').innerHTML = potArt(active.length ? view.defs.cauldron.recipes[active[0][0]].colour : POT_IDLE, active.length > 0, potFrame);
+  drawPot();
 }, 700);
 $('cauldronBody').addEventListener('click', e => {
-  const b = e.target.closest('[data-brew], [data-brew-times]');
+  const b = e.target.closest('[data-brew], [data-brew-times], [data-brew-most]');
   if (!b || visiting) return;
   if (b.dataset.brewTimes) { brewTimes = Math.max(1, +b.dataset.brewTimes); renderCauldron(); return; }
+  // worked out when clicked, not drawn on the button: the page then stays the same between updates
+  if (b.dataset.brewMost) { brewTimes = brewMost(view.defs.cauldron.recipes[b.dataset.brewMost]); renderCauldron(); return; }
   const r = view.defs.cauldron.recipes[b.dataset.brew];
   if (confirm(`Brew ${r.name} from ${plain(brewCost(r, brewTimes))}?`)) act('cauldron_brew', { recipe: b.dataset.brew, times: brewTimes });
 });
