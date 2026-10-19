@@ -288,7 +288,18 @@ MAX_EXPEDITION_QUEUE = 5    # most expeditions that can wait for the one under w
 # Room in the queue comes from research and buildings with "exp_queue" (each adds that many places).
 # What an expedition may bring back besides its map: (resource, least, most), per step of distance.
 EXPEDITION_LOOT = [("food", 15, 40), ("wood", 15, 40), ("stone", 10, 30), ("gold", 5, 15),
-                   ("livestock", 1, 3), ("knowledge", 3, 8)]
+                   ("livestock", 2, 5), ("knowledge", 3, 8)]
+# What an expedition's supplies come to (see expedition_cost): the land's own food and wood, times
+#   distance ** EXPEDITION_DISTANCE_POWER          further out costs more than in proportion,
+#   1 + EXPEDITION_AREA_STEP * areas held           every area held or being explored makes the next one dearer,
+#   1 + EXPEDITION_TECH_STEP * tech level           a bigger city sends a bigger team;
+# plus pack animals (livestock), tools from Town on and gold from City on.
+EXPEDITION_DISTANCE_POWER = 1.4
+EXPEDITION_AREA_STEP = 0.25
+EXPEDITION_TECH_STEP = 0.3
+EXPEDITION_LIVESTOCK = (1.0, 0.3)  # pack animals per step of distance: this, and this more for every area held
+EXPEDITION_TOOLS = 0.15            # tools, as a share of the food, from Town on
+EXPEDITION_GOLD = 0.1              # gold, as a share of the food, from City on
 EXPEDITION_LOOT_CHANCE = 0.7
 FULL_EXPLORE_SPEED = 1.0    # buildings' expedition speed counts in full up to this (1.0 = twice as fast)...
 EXPLORE_SPEED_STEP = 0.3    # ...and past it this much more for every doubling: see explore_speed()
@@ -306,18 +317,19 @@ AWAY_TIME = 5 * MIN         # unwatched for this long -> the player gets a "whil
 #   cost        resources paid
 #   research    how many things the city must have researched (of any level)
 #   areas       how many areas the city must own, counting home
+# Each level's cost includes livestock: the feast that marks the city's new standing.
 TECH_LEVELS = [
     {"name": "Tribe"},
     {"name": "Village", "population": 12, "research": 3,
-     "cost": {"food": 100, "wood": 150, "stone": 80, "knowledge": 20}},
+     "cost": {"food": 100, "wood": 150, "stone": 80, "knowledge": 20, "livestock": 4}},
     {"name": "Town", "population": 30, "research": 8, "areas": 2,
-     "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100}},
+     "cost": {"wood": 400, "stone": 350, "ore": 120, "gold": 150, "knowledge": 100, "livestock": 15}},
     {"name": "City", "population": 90, "research": 22, "areas": 4,
-     "cost": {"stone": 2000, "ore": 800, "tools": 400, "gold": 1500, "knowledge": 800}},
+     "cost": {"stone": 2000, "ore": 800, "tools": 400, "gold": 1500, "knowledge": 800, "livestock": 50}},
     {"name": "Metropolis", "population": 200, "research": 44, "areas": 6,
-     "cost": {"stone": 6000, "ore": 2000, "tools": 2000, "gold": 8000, "knowledge": 3000}},
+     "cost": {"stone": 6000, "ore": 2000, "tools": 2000, "gold": 8000, "knowledge": 3000, "livestock": 150}},
     {"name": "Megacity", "population": 400, "research": 56, "areas": 9,
-     "cost": {"tools": 5000, "electronics": 3000, "gold": 30000, "knowledge": 10000}},
+     "cost": {"tools": 5000, "electronics": 3000, "gold": 30000, "knowledge": 10000, "livestock": 400}},
 ]
 
 # Groups the build menu is divided into, in the order they are shown. Every
@@ -543,6 +555,13 @@ BUILDINGS = {
         "housing": 2, "attracts": 1,
         "desc": "Stone pools over hot springs. Earns gold, has rooms for 2, and its fame brings one extra arrival per meal like a tavern.",
     },
+    "chicken_coop": {
+        "name": "Chicken Coop", "glyph": "\u00e7", "tech": 0, "category": "food", "research": "animal_taming",
+        "terrain": ["plains", "forest", "savanna", "meadow"],
+        "cost": {"wood": 25}, "workers": 1, "time": 45 * MIN,
+        "consumes": {"food": 5}, "produces": {"livestock": 1},
+        "desc": "Hens and a fence: 1 head of livestock from 5 food, slowly. The first steady supply before Selective Breeding.",
+    },
     "breeding_pen": {
         "name": "Breeding Pen", "glyph": "{", "tech": 1, "category": "food", "research": "selective_breeding",
         "terrain": ["plains"],
@@ -589,6 +608,14 @@ BUILDINGS = {
         "consumes": {"livestock": 1}, "produces": {"gold": 6, "food": 4},
         "modifiers": ["adjacent_water"],
         "desc": "Turns livestock into hides to sell and meat to eat. Faster next to fresh water.",
+    },
+    "leatherworks": {
+        "name": "Leatherworks", "glyph": "\u00a3", "tech": 2, "category": "trade", "research": "tanning",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"wood": 60, "stone": 40, "ore": 10}, "workers": 2, "time": 25 * MIN,
+        "consumes": {"livestock": 2}, "produces": {"tools": 3, "gold": 12},
+        "modifiers": ["adjacent_water"],
+        "desc": "Saddles, belts and harness from your herd: 2 livestock become tools and gold. Faster next to fresh water.",
     },
     "caravanserai": {
         "name": "Caravanserai", "glyph": "C", "tech": 1, "category": "trade",
@@ -830,6 +857,14 @@ BUILDINGS = {
         "consumes": {"livestock": 2}, "produces": {"food": 34, "gold": 6},
         "desc": "Tins meat so none of it spoils: 2 livestock become far more food than a butcher gets, with gold from what is sold on.",
     },
+    "stockyard": {
+        "name": "Stockyard", "glyph": "\u00a5", "tech": 3, "category": "food", "research": "selective_breeding",
+        "terrain": ["plains", "savanna", "meadow", "scrubland"],
+        "cost": {"wood": 80, "stone": 120, "gold": 60}, "workers": 3, "time": 30 * MIN,
+        "consumes": {"food": 20}, "produces": {"livestock": 4},
+        "modifiers": ["fertility"],
+        "desc": "Pens and feed lots on a large scale: 4 livestock from 20 food. Faster on fertile grass.",
+    },
     "coal_plant": {
         "name": "Coal Power Station", "glyph": "δ", "tech": 3, "category": "power", "research": "steam_turbines",
         "terrain": ["plains", "desert", "hill"],
@@ -870,6 +905,20 @@ BUILDINGS = {
         "terrain": ["plains", "desert"], "max_height": 2,
         "cost": {"stone": 300, "tools": 60, "gold": 150}, "housing": 30,
         "desc": "A steel and glass tower of flats. Needs flat ground.",
+    },
+    "livestock_complex": {
+        "name": "Livestock Complex", "glyph": "\u00a7", "tech": 4, "category": "food", "power": 4, "research": "mechanised_farming",
+        "terrain": ["plains", "savanna", "meadow", "scrubland", "desert"],
+        "cost": {"stone": 300, "tools": 100, "gold": 200}, "workers": 4, "time": 30 * MIN,
+        "consumes": {"food": 45, "electronics": 1}, "produces": {"livestock": 10},
+        "desc": "Climate-controlled barns and automatic feeders: 10 livestock from 45 food and a little electronics.",
+    },
+    "meat_packing": {
+        "name": "Meat Packing Plant", "glyph": "\u00b5", "tech": 4, "category": "food", "power": 4, "research": "canning",
+        "terrain": ["plains", "desert"],
+        "cost": {"stone": 300, "ore": 100, "tools": 80}, "workers": 4, "time": 20 * MIN,
+        "consumes": {"livestock": 4}, "produces": {"food": 110, "gold": 20},
+        "desc": "Cuts, packs and chills on an industrial line: 4 livestock become a great deal of food, and gold from what is sold on.",
     },
     "hospital": {
         "name": "Hospital", "glyph": "8", "tech": 4, "category": "support", "research": "modern_medicine",
@@ -1647,6 +1696,48 @@ RESEARCH = {
         "desc": "A plan to map everything, one team after another.",
     },
 }
+
+# The costs above are the base; every research but the ritual ranks (already priced on their own) costs:
+#   its knowledge times RESEARCH_SCALE[its tech level];
+#   if it is important (opens a building, or is one of IMPORTANT_EFFECTS), materials of its era as well:
+#     RESEARCH_MATERIALS[tech level], each a share of that knowledge;
+#   if it is about animals (ANIMAL_RESEARCH), livestock: RESEARCH_LIVESTOCK[tech level].
+RESEARCH_SCALE = [2, 3, 4, 5, 6, 8]
+IMPORTANT_EFFECTS = ("explore_range", "explore_discount", "exp_queue", "taming", "surveying", "breeding", "forecast")
+RESEARCH_MATERIALS = [{"wood": 1.0, "stone": 0.5},
+                      {"wood": 0.8, "stone": 0.8},
+                      {"stone": 0.6, "ore": 0.6, "tools": 0.2},
+                      {"ore": 0.5, "tools": 0.5, "gold": 0.5},
+                      {"tools": 0.6, "electronics": 0.2, "gold": 0.6},
+                      {"tools": 0.4, "electronics": 0.4, "gold": 0.8}]
+ANIMAL_RESEARCH = {"animal_husbandry", "dairying", "beast_lore", "selective_breeding", "draft_animals", "incubation",
+                   "tanning", "beast_training", "beast_bonding", "canning", "mechanised_farming"}
+RESEARCH_LIVESTOCK = [2, 5, 10, 20, 40, 80]
+
+
+def _nice(x):
+    """A cost rounded to a number that reads well: 5s under 100, 10s under 1,000, then 50s."""
+    step = 5 if x < 100 else 10 if x < 1000 else 50
+    return max(step, int(round(x / step)) * step)
+
+
+def _price_research():
+    opens = {b["research"] for b in BUILDINGS.values() if b.get("research")}
+    for rid, r in RESEARCH.items():
+        if r.get("ritual"):
+            continue
+        tech = r["tech"]
+        knowledge = _nice(r["cost"]["knowledge"] * RESEARCH_SCALE[tech])
+        cost = {"knowledge": knowledge}
+        if rid in opens or any(r.get(k) for k in IMPORTANT_EFFECTS):
+            for k, share in RESEARCH_MATERIALS[tech].items():
+                cost[k] = _nice(knowledge * share)
+        if rid in ANIMAL_RESEARCH:
+            cost["livestock"] = RESEARCH_LIVESTOCK[tech]
+        r["cost"] = cost
+
+
+_price_research()
 
 # Additions are attached to a building that is already standing. Fields:
 #   for       building ids it can be attached to
@@ -3756,11 +3847,21 @@ def explore_discount(state):
 
 
 def expedition_cost(state, rx, ry):
-    """Supplies for the team: depends on the land it is heading into and how far it is."""
+    """Supplies for the team: the land it is heading into, how far it is, how much land the city holds already
+    (counting expeditions on their way or queued) and its tech level. See EXPEDITION_DISTANCE_POWER."""
     distance = abs(rx) + abs(ry)
+    held = len(state["areas"]) + len(planned(state))
+    scale = (distance ** EXPEDITION_DISTANCE_POWER * (1 + EXPEDITION_AREA_STEP * (held - 1))
+             * (1 + EXPEDITION_TECH_STEP * state["tech"]))
+    cost = {k: v * scale for k, v in ENVIRONMENTS[region_env(state, rx, ry)]["cost"].items()}
+    cost["livestock"] = distance * (EXPEDITION_LIVESTOCK[0] + EXPEDITION_LIVESTOCK[1] * held)
+    food = cost.get("food", 0)
+    if state["tech"] >= 2:
+        cost["tools"] = food * EXPEDITION_TOOLS
+    if state["tech"] >= 3:
+        cost["gold"] = food * EXPEDITION_GOLD
     discount = explore_discount(state)
-    base = ENVIRONMENTS[region_env(state, rx, ry)]["cost"]
-    return {k: math.ceil(v * distance * discount) for k, v in base.items()}
+    return {k: max(1, math.ceil(v * discount)) for k, v in cost.items()}
 
 
 def expedition_time(state, rx, ry):
