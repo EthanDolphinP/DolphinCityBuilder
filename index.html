@@ -1445,10 +1445,14 @@ function rateText(perHour) {
 // Only touch the DOM when something changed, so buttons aren't replaced mid-click.
 function setHTML(el, html) {
   if (el._html === html) return;
+  const y = window.scrollY;
   el.innerHTML = html;
   el._html = html;
   if (html.includes('<table')) { labelTables(el); fitTables(el); }
   if (html.includes('chip')) foldChips(el);
+  // Keep the page where the player had it: while new content is laid out (and its tables measured) the page can be
+  // shorter for a moment, and some browsers pull the scroll position up to fit, which looks like the menu jumping.
+  if (window.scrollY !== y && document.documentElement.scrollHeight - innerHeight >= y) window.scrollTo(0, y);
 }
 // A row of chips longer than CHIPS_SHOWN shows that many and a "+N more" button (which is remembered per row).
 const CHIPS_SHOWN = 12, chipsOpen = new Set();
@@ -1478,13 +1482,20 @@ function foldChips(el) {
 // of labelled lines (see ".mobile td" in the styles) instead of making it scroll sideways.
 // After drawing: a table wider than the space it has is shown as a list (the "stacked" class), the way a phone
 // shows every table, rather than making the panel scroll sideways. Checked again when the window changes size.
+// Each table is measured once for the width it has: measuring means showing it as a table for a moment, which can
+// make the page much shorter (a long stacked list becomes a short wide table), so it is not done again on every
+// update, only when the table is new or its space has changed width. The scroll position is kept either way.
 function fitTables(root = document) {
+  const y = window.scrollY;
   for (const table of root.querySelectorAll('table')) {
     if (!table.offsetParent || table.closest('[data-keep-table]')) continue;   // e.g. the Leaderboard: kept a table, scrolling sideways
-    const box = table.parentElement;
+    const box = table.parentElement, width = box.clientWidth;
+    if (table._fitWidth === width) continue;
     table.classList.remove('stacked');
-    if (table.scrollWidth > box.clientWidth + 2) table.classList.add('stacked');
+    table.classList.toggle('stacked', table.scrollWidth > width + 2);
+    table._fitWidth = box.clientWidth;
   }
+  if (window.scrollY !== y && document.documentElement.scrollHeight - innerHeight >= y) window.scrollTo(0, y);
 }
 function labelTables(el) {
   for (const table of el.querySelectorAll('table')) {
@@ -1513,7 +1524,7 @@ function setHTMLKeep(el, html, fill) {
   const changed = el._html !== html;
   setHTML(el, html);
   if (fill) fill();     // put back what the player had typed, where a panel has boxes
-  if (changed && key) { const again = el.querySelector(`[data-k="${key}"]`); if (again) again.focus(); }
+  if (changed && key) { const again = el.querySelector(`[data-k="${key}"]`); if (again) again.focus({ preventScroll: true }); }   // never scrolls the page
 }
 // What typing `typed` into an offer's box would buy: whole lots only, never more than is left.
 function buyOf(o, typed) {
@@ -4392,7 +4403,7 @@ document.addEventListener('keydown', e => {
 });
 $('beastViews').onclick = e => {
   const b = e.target.closest('[data-beast-view]');
-  if (b) { beastView = settings.beastView = b.dataset.beastView; saveSettings(); renderBeast(); }
+  if (b) { beastView = settings.beastView = b.dataset.beastView; saveSettings(); renderBeast(); fitTables($('tab-beast')); }
 };
 $('tab-beast').onclick = e => {
   if ('deliver' in e.target.dataset) act('mission_deliver');
