@@ -3423,14 +3423,20 @@ def advance_time(state, now):
     start = now - remaining
     state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
-    # Caught up in stretches that end where a ritual, hex or brew ends, so each counts for exactly as long as it ran.
-    ends = sorted({t for t in [r["until"] for r in list(state.get("rituals", {}).values()) + state.get("curses", [])]
-                   + cauldron.ends(state) if start < t < now})
-    for end in ends + [now]:
+    # Caught up in stretches that end where a ritual, hex or the Cauldron's hour ends, so each counts for exactly as
+    # long as it ran. At the end of each hour the Cauldron brews the next one (which sets the next stop), so the
+    # stops are found one at a time.
+    while True:
+        end = min([t for t in [r["until"] for r in list(state.get("rituals", {}).values()) + state.get("curses", [])]
+                   + cauldron.ends(state) if start < t < now], default=now)
         state["ritual_now"] = start
         with _stats_cached():     # buildings and ideology don't change within a stretch
             _advance(state, end, end - start)
         start = end
+        if end >= now:
+            break
+        state["ritual_now"] = end
+        cauldron.renew(state, end)
     state.pop("ritual_now", None)
     ideology.tidy_rituals(state)
     cauldron.tidy(state)
@@ -3996,8 +4002,10 @@ def apply_action(state, now, action, data):
         return ideology.take(state, now, data.get("perk"))
     if action == "ritual_start":
         return ideology.start_ritual(state, now, data.get("ritual"), data.get("gold"))
-    if action == "cauldron_brew":
-        return cauldron.brew(state, now, data.get("recipe"), data.get("times", 1))
+    if action == "cauldron_set":
+        return cauldron.set_recipe(state, now, data.get("recipe"), data.get("times", 1))
+    if action == "cauldron_stop":
+        return cauldron.stop(state, now)
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":

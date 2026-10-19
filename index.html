@@ -358,6 +358,19 @@
   .ideoCard.on { border-color: var(--accent); }
   .potRow { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
   .potRow > div { flex: 1 1 260px; }
+  .potStatus { border: 1px solid var(--line); background: var(--inset); padding: 12px 14px; align-self: stretch; }
+  .brewName { font-size: 17px; font-weight: bold; margin-bottom: 4px; }
+  .recipeList { display: flex; flex-direction: column; }
+  .recipeRow { border-top: 1px solid var(--line); padding: 8px 6px; cursor: pointer; }
+  .recipeRow:hover { background: var(--inset); }
+  .recipeRow.open { background: var(--inset); cursor: default; }
+  .recipeRow.locked { cursor: default; opacity: .55; }
+  .recipeHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .recipeHead .name { font-weight: bold; }
+  .recipeWhat { color: var(--good); }
+  .recipeCost { margin-top: 2px; }
+  .swatch { font-weight: bold; letter-spacing: -1px; }
+  .brewDetail { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--brew); background: var(--panel); }
   .pot { margin: 0; line-height: 1.15; color: var(--fg); font-size: 13px; }
   .gfx #ideologyBody > .panel { border-radius: 16px; }
   .gfx #ideologyBody button, .gfx #ideologyPick button { border-radius: 9px; }
@@ -1581,7 +1594,8 @@ const HOWTO = [
   ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow further before they are fully grown (common at 10, legendary at 20); past that a beast still levels up, but each level takes 30% more experience than the last and adds less. Their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
-  ['Cauldron', 'The Cauldron tab is open from the start. Pick a recipe, throw in its ingredients and it brews a bonus for a while: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. It takes a new brew once an hour, and brews already bubbling keep going, so two or three can work at once. A bigger batch (the box above the recipes, or Most I can) makes the brew stronger and last longer, with no top: each extra batch adds a little less than the one before. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
+  ['Cauldron', 'The Cauldron tab is open from the start. Set one recipe and how much of it goes in: every hour the cauldron takes those ingredients and brews for that hour, again and again, even while you are away, until you change or stop it. Only one brew works at a time, and each does two or three things: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster and cheaper expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. Putting in more makes the brew stronger, never longer, with no top: each extra handful adds a little less than the one before. If an hour\'s ingredients are not there, the cauldron goes cold for that hour and tries again the next. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
+
   ['Hexes, sabotage and rivals', 'Each ideology can also act against another city in its own way: The Old Faith lays Hexes, Progress commits Sabotage, Commerce sets Embargoes, Kinship with the Wild spreads Blights, The Wayfarers send Misfortunes and Community starts Feuds. Each has five, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can act against cities from one tech level below yours to two above, and each of yours can be on one city at a time; those from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Anything rivals have done to your city is shown on the Ideology tab and wears off by itself.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
@@ -1983,10 +1997,8 @@ function render() {
   if (bv.nest_at) timers.nest = { cycle: bv.nest_time, progress: bv.nest_time - (bv.nest_at - view.now), speed: 1, waiting: [] };
   for (const [id, x] of Object.entries((view.ideology.rituals || {}).active || {}))
     timers['ritual:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
-  for (const [id, x] of Object.entries((view.cauldron || {}).active || {}))
-    timers['brew:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
-  if (view.cauldron && view.cauldron.next > view.now)
-    timers.cauldron = { cycle: view.cauldron.next - view.now, progress: 0, speed: 1, waiting: [] };
+  if (view.cauldron && view.cauldron.until > view.now)
+    timers.cauldron = { cycle: view.cauldron.until - view.now, progress: 0, speed: 1, waiting: [] };
   ((view.ideology.curses || {}).on_me || []).forEach((x, n) => { timers['cursed:' + n] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] }; });
   for (const [id, x] of Object.entries((view.ideology.curses || {}).cursing || {}))
     timers['cursing:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
@@ -3529,11 +3541,13 @@ function renderEffects() {
   if (!visiting && iv.id) for (const [id, c] of Object.entries((iv.curses || {}).cursing || {}))
     chips.push(`<span class="fx" data-fx="curses" title="Your ${esc(I[iv.id].curse_word.toLowerCase())}, on ${esc(c.target)}">[&gt;] ${esc(I[iv.id].curses[id].name)} <span class="dim">on ${esc(c.target)}</span>` +
                `<span class="dim" data-timer="cursing:${id}"></span></span>`);
-  if (!visiting) for (const [id, b] of Object.entries((view.cauldron || {}).active || {})) {
-    const r = view.defs.cauldron.recipes[id];
-    chips.push(`<span class="fx" data-fx="cauldron" style="color:${esc(r.colour)}" title="${esc(b.text.join('\n'))}">[~] ${esc(r.name)}` +
-               `<span class="dim" data-timer="brew:${id}"></span></span>`);
-  }
+  const pot = view.cauldron;
+  if (!visiting && pot && pot.brewing) {
+    const r = view.defs.cauldron.recipes[pot.recipe || pot.stopped];
+    chips.push(`<span class="fx" data-fx="cauldron" style="color:${esc(r.colour)}" title="${esc(pot.text.join('\n'))}">[~] ${esc(r.name)}` +
+               `<span class="dim" data-timer="cauldron"></span></span>`);
+  } else if (!visiting && pot && pot.recipe)
+    chips.push(`<span class="fx bad" data-fx="cauldron" title="Not enough ingredients for this hour">[~] Cauldron cold</span>`);
   // Always shown for your own city, even with nothing running, so the menus below never move when something starts or ends.
   $('effectsBar').hidden = !!visiting;
   setHTML($('effectsBar'), `<span class="dim">Now:</span>` + (chips.join('') || `<span class="dim">nothing running (rituals, brews and hexes show here)</span>`));
@@ -3541,7 +3555,8 @@ function renderEffects() {
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
 // ---- the Cauldron: open from the start; takes a new brew every hour, from as much as the city throws in ----
-let brewTimes = 1;          // the batch: how many times each recipe's least ingredients go in (one box for them all)
+let brewPick = null;       // the recipe opened in the list (to set it, or change how much goes in)
+let brewTimes = 1;          // how many times its least ingredients would go in each hour
 let potFrame = 0;           // which picture of the bubbles is showing
 // The cauldron in text: a witch's pot over a log fire. POT_FRAMES holds four pictures while brewing (steam, bubbles,
 // the brew sloshing and dripping, the fire flickering) and one idle (still brew, embers). Each line comes with a
@@ -3563,70 +3578,82 @@ function potArt(colour, busy, frame) {
     return out;
   }).join('\n');
 }
-// What a batch of `times` buys, as cauldron.terms() works it out: [strength, seconds].
-function brewTerms(times) {
-  const c = view.defs.cauldron, d = Math.log2(Math.max(1, times));
-  return [1 + c.gift_strength * d, c.time * (1 + c.gift_time * d)];
-}
+// How strong a brew of `times` the recipe is, as cauldron.strength() works it out. It always lasts an hour.
+const brewStrength = times => 1 + view.defs.cauldron.gift_strength * Math.log2(Math.max(1, times));
 const brewCost = (r, times) => Object.fromEntries(Object.entries(r.ingredients).map(([k, v]) => [k, Math.ceil(v * times)]));
-// The biggest batch of this recipe the city could make now (at least 1).
+// The biggest amount of this recipe the city could put in for one hour now (at least 1).
 const brewMost = r => Math.max(1, Math.floor(Math.min(...Object.entries(r.ingredients).map(([k, v]) => (view.state.resources[k] || 0) / v)) * 100) / 100);
+// How many hours the stores would keep this going (not counting what comes in meanwhile).
+const brewHours = cost => Math.min(...Object.entries(cost).map(([k, v]) => Math.floor((view.state.resources[k] || 0) / v)));
+const brewSwatch = r => `<span class="swatch" style="color:${esc(r.colour)}">~~</span>`;
+// The detail of one recipe, opened in the list: how much goes in, what it does then, and the button to set it.
+function brewDetail(id, r) {
+  const pot = view.cauldron, s = brewStrength(brewTimes), cost = brewCost(r, brewTimes), hours = brewHours(cost);
+  const same = pot.recipe === id, set = (label, x) => `<button data-brew-times="${Math.max(1, +x.toPrecision(4))}">${label}</button>`;
+  const label = !pot.recipe ? 'Start brewing' : same ? (brewTimes === pot.times ? 'Brew a fresh hour now' : 'Change the amount') : `Brew this instead of ${view.defs.cauldron.recipes[pot.recipe].name}`;
+  return `<div class="brewDetail" style="--brew:${esc(r.colour)}"><p class="dim small" style="margin:0 0 8px">${esc(r.desc)}</p>` +
+    `<div class="bar" style="margin-top:0"><span class="dim">Amount</span>` +
+    `<input type="text" inputmode="decimal" autocomplete="off" data-brew-box data-k="brew-times" value="x${+brewTimes.toPrecision(4)}" style="width:100px" ` +
+    `title="How many times the recipe goes in each hour, e.g. 3, 250 or 2.5k">` +
+    set('x1', 1) + set('Half', brewTimes / 2) + set('Double', brewTimes * 2) + set('x10', brewTimes * 10) +
+    `<button data-brew-most="${id}" title="The most you have in store for one hour">Most I can</button></div>` +
+    `<div id="brewPreview">${brewPreview(r, brewTimes)}</div>` +
+    `<div class="bar"><button class="primary" data-brew-set="${id}" ${hours >= 1 ? '' : 'disabled'}>${esc(label)}</button>` +
+    `<span class="dim small">Takes this hour's ingredients now; then the same every hour until you stop it.</span></div></div>`;
+}
+// What the amount in the box would do: the effects at that strength, the cost per hour, and how long the stores last.
+function brewPreview(r, times) {
+  const s = brewStrength(times), cost = brewCost(r, times), hours = brewHours(cost);
+  return kv([['Does', `<span class="good">${effectWords(scaleEffects(r.effects, s)).map(esc).join('<br>')}</span>`],
+             ['Strength', `<span class="hi">${s.toFixed(2)}x</span> <span class="dim">the recipe's least (x1); every doubling adds +${view.defs.cauldron.gift_strength}x. Always lasts an hour.</span>`],
+             ['Each hour', goods(cost)],
+             ['In store', hours >= 1 ? `enough for <span class="hi">${num(hours)}</span> ${hours === 1 ? 'hour' : 'hours'}` : `<span class="bad">not enough for an hour</span>`]]);
+}
 function renderCauldron() {
   if (tab !== 'cauldron' || !view) return;
-  const c = view.cauldron, C = view.defs.cauldron, R = view.defs.resources, state = view.state;
-  const active = Object.entries(c.active), newest = active.sort((a, b) => b[1].until - a[1].until)[0];
-  const busy = active.length > 0, ready = c.next <= view.now + (performance.now() - fetchedAt) / 1000;
-  const [strength, seconds] = brewTerms(brewTimes);
-  const keepTimes = x => Math.max(1, +x.toPrecision(4));
-  const set = (label, x, title) => `<button data-brew-times="${keepTimes(x)}" title="${title}">${label}</button>`;
-  // what more ingredients buy: ten times the batch each row, with a bar of '=' for the strength
-  const rows = [1, 10, 100, 1000, 1e4, 1e5, 1e6];
-  if (!rows.includes(brewTimes)) rows.push(brewTimes);
-  rows.sort((a, b) => a - b);
-  const biggest = brewTerms(rows[rows.length - 1])[0];
-  const scale = `<table data-keep-table class="small giftScale"><tr><th></th><th>Batch</th><th>Strength</th><th></th><th>Lasts</th><th>One more batch adds</th></tr>` +
-    rows.map(x => {
-      const [s, secs] = brewTerms(x), mine = x === brewTimes;
-      return `<tr class="${mine ? 'hi' : ''}"><td>${mine ? '&gt;' : ''}</td><td>x${num(x)}</td><td>${s.toFixed(2)}x</td>` +
-        `<td class="giftBar">${'='.repeat(Math.max(1, Math.round(16 * s / biggest)))}</td><td>${duration(secs)}</td>` +
-        `<td class="dim">+${tiny(C.gift_strength / (x * Math.LN2))}x</td></tr>`;
-    }).join('') + `</table>`;
-  let html = `<div class="panel"><h2>Cauldron</h2><div class="potRow"><pre class="pot" id="potArt"></pre><div>` +
-    `<p class="dim small" style="margin-top:0">Throw resources in and the cauldron brews a bonus for a while. It takes a new brew every ` +
-    `${duration(C.every)}; brews already bubbling keep going. The more you put in, the stronger and longer the brew, with no top: ` +
-    `each extra batch adds a little less than the one before, but never nothing. New recipes open as your city gets new resources.</p>` +
-    (visiting ? '' : ready ? `<p class="good">Ready for a new brew.</p>` : `<p>Takes a new brew in <span class="hi" data-timer="cauldron"></span>.</p>`) +
-    (busy ? `<div class="cat">Brewing now</div>` + active.map(([id, b]) => `<div class="opt small"><span style="color:${esc(C.recipes[id].colour)}">${esc(C.recipes[id].name)}</span> ` +
-      `<span class="dim">x${num(b.times)}, ${b.scale.toFixed(2)}x as strong, <span data-timer="brew:${id}"></span> left:</span> ${esc(b.text.join(', '))}</div>`).join('') : '') +
-    `</div></div>`;
-  if (!visiting) html += `<div class="cat">Batch size</div><div class="bar">` +
-    `<input type="text" inputmode="decimal" autocomplete="off" data-brew-box data-k="brew-times" value="${+brewTimes.toPrecision(4)}" style="width:110px" ` +
-    `title="How many times each recipe's ingredients, e.g. 3, 250 or 2.5k"> <span class="dim">times each recipe</span> ` +
-    set('x1', 1, 'The least') + set('Half', brewTimes / 2, 'Half as much') + set('Double', brewTimes * 2, 'Twice as much') + set('x10', brewTimes * 10, 'Ten times as much') + `</div>` +
-    `<div class="opt small" id="brewLine">A batch of <span class="hi">x${num(brewTimes)}</span> makes a brew <span class="hi">${strength.toFixed(3)}x</span> as strong ` +
-    `for <span class="hi">${duration(seconds)}</span>.</div>` + `<details class="fold" data-fold="brewScale" ${isOpen('brewScale', false) ? 'open' : ''}><summary>What more ingredients buy</summary>${scale}</details>`;
-  html += `<div class="ideoCards" style="margin-top:8px">` + Object.entries(C.recipes).map(([id, r]) => {
-    const lockedBy = c.locked[id], on = c.active[id], cost = brewCost(r, brewTimes);
-    const afford = Object.entries(cost).every(([k, v]) => (state.resources[k] || 0) >= v);
-    const words = effectWords(scaleEffects(r.effects, lockedBy.length ? 1 : strength));
-    return `<div class="ideoCard ${on ? 'on' : lockedBy.length ? 'locked' : ''}"><span class="name" style="color:${esc(r.colour)}">${esc(r.name)}</span>` +
-      `<span class="dim small">${esc(r.desc)}</span>` +
-      `<div class="small good">${words.map(esc).join('<br>')}${lockedBy.length ? '' : ` <span class="dim">for ${duration(seconds)}</span>`}</div>` +
-      (lockedBy.length ? `<div class="small dim">Needs ${lockedBy.map(k => `${esc(R[k])} (from ${esc(view.defs.tech[C.resource_tech[k]].name)})`).join(', ')}</div>`
-        : `<div class="small">Takes ${goods(cost)}</div>`) +
-      (on ? `<div class="small good">Brewing: <span data-timer="brew:${id}"></span> left</div>` : '') +
-      (visiting || lockedBy.length ? '' : `<div class="bar"><button data-brew="${id}" ${afford && ready ? '' : 'disabled'} ` +
-        `title="${!ready ? 'The cauldron is still bubbling' : afford ? '' : 'You do not have enough'}">${on ? 'Brew again' : 'Brew'}</button>` +
-        `<button data-brew-most="${id}" title="The biggest batch of this you could make now">Most I can</button></div>`) + `</div>`;
-  }).join('') + `</div></div>`;
-  setHTML($('cauldronBody'), html);
+  const pot = view.cauldron, C = view.defs.cauldron, R = view.defs.resources, T = view.defs.tech;
+  const now = pot.recipe || pot.stopped, r = now && C.recipes[now];
+  // what the cauldron is doing
+  let status;
+  if (pot.brewing && pot.recipe)
+    status = `<div class="brewName" style="color:${esc(r.colour)}">${esc(r.name)} <span class="dim">x${num(pot.times)}</span></div>` +
+      `<div class="good">${pot.text.map(esc).join('<br>')}</div>` +
+      `<div class="small" style="margin-top:6px">Takes ${goods(pot.cost)} every hour. Next brew in <span class="hi" data-timer="cauldron"></span>.</div>` +
+      `<div class="small dim">Enough in store for ${num(brewHours(pot.cost))} more ${brewHours(pot.cost) === 1 ? 'hour' : 'hours'}.</div>` +
+      (visiting ? '' : `<div class="bar"><button data-brew-open="${pot.recipe}">Change amount</button><button data-brew-stop>Stop</button></div>`);
+  else if (pot.recipe)
+    status = `<div class="brewName bad">Gone cold</div><div>Not enough for an hour of <span style="color:${esc(r.colour)}">${esc(r.name)}</span> x${num(pot.times)} ` +
+      `(${goods(pot.cost)}). It tries again in <span class="hi" data-timer="cauldron"></span>.</div>` +
+      (visiting ? '' : `<div class="bar"><button data-brew-open="${pot.recipe}">Change amount</button><button data-brew-stop>Stop</button></div>`);
+  else if (pot.stopped && pot.brewing)
+    status = `<div class="brewName" style="color:${esc(r.colour)}">${esc(r.name)} <span class="dim">(last hour)</span></div>` +
+      `<div class="good">${pot.text.map(esc).join('<br>')}</div><div class="small dim">Stops in <span data-timer="cauldron"></span>; nothing more will be brewed.</div>`;
+  else
+    status = `<div class="brewName dim">The cauldron is empty</div><div class="small">Pick a recipe below. It takes its ingredients every hour and brews ` +
+      `for that hour, again and again, until you stop it. Put in more for a stronger brew.</div>`;
+  let html = `<div class="panel"><h2>Cauldron</h2><div class="potRow"><pre class="pot" id="potArt"></pre><div class="potStatus">${status}</div></div></div>`;
+  // the recipes: one line each; the one opened shows how much to put in
+  html += `<div class="panel"><h2>Recipes</h2><p class="dim small" style="margin-top:0">One brew at a time. Click a recipe to open it. ` +
+    `What each does is shown at its least amount (x1); more ingredients make it stronger, never longer.</p><div class="recipeList">` +
+    Object.entries(C.recipes).map(([id, x]) => {
+      const lockedBy = pot.locked[id], open = brewPick === id && !lockedBy.length && !visiting, current = pot.recipe === id;
+      return `<div class="recipeRow ${open ? 'open' : ''} ${lockedBy.length ? 'locked' : ''}" ${lockedBy.length || visiting ? '' : `data-brew-open="${id}"`}>` +
+        `<div class="recipeHead">${brewSwatch(x)}<span class="name" style="color:${esc(x.colour)}">${esc(x.name)}</span>` +
+        (current ? ` <span class="good small">${pot.brewing ? 'brewing' : 'set (cold)'}</span>` : '') +
+        `<span class="recipeWhat small">${x.text.map(esc).join(' &middot; ')}</span></div>` +
+        `<div class="small dim recipeCost">${lockedBy.length
+          ? 'Needs ' + lockedBy.map(k => `${esc(R[k])} (from ${esc(T[C.resource_tech[k]].name)})`).join(', ')
+          : 'Each hour at x1: ' + plain(x.ingredients)}</div>` +
+        (open ? brewDetail(id, x) : '') + `</div>`;
+    }).join('') + `</div></div>`;
+  setHTMLKeep($('cauldronBody'), html);
   drawPot();
 }
 // The pot is drawn on its own, so the bubbling never makes the rest of the tab be drawn again.
 function drawPot() {
   if (!view || !$('potArt')) return;
-  const active = Object.entries(view.cauldron.active).sort((a, b) => b[1].until - a[1].until);
-  const html = potArt(active.length ? view.defs.cauldron.recipes[active[0][0]].colour : POT_IDLE, active.length > 0, potFrame);
+  const pot = view.cauldron, id = pot.brewing && (pot.recipe || pot.stopped);
+  const html = potArt(id ? view.defs.cauldron.recipes[id].colour : POT_IDLE, !!id, potFrame);
   if ($('potArt')._pot !== html) { $('potArt').innerHTML = html; $('potArt')._pot = html; }
 }
 // The bubbles move while the tab is open.
@@ -3636,21 +3663,37 @@ setInterval(() => {
   drawPot();
 }, 700);
 $('cauldronBody').addEventListener('click', e => {
-  const b = e.target.closest('[data-brew], [data-brew-times], [data-brew-most]');
-  if (!b || visiting) return;
-  if (b.dataset.brewTimes) { brewTimes = Math.max(1, +b.dataset.brewTimes); renderCauldron(); return; }
+  if (visiting || e.target.closest('input')) return;
+  const b = e.target.closest('[data-brew-times], [data-brew-most], [data-brew-set], [data-brew-stop], [data-brew-open]');
+  if (!b) return;
+  const C = view.defs.cauldron, pot = view.cauldron;
+  if (b.dataset.brewTimes) { brewTimes = +b.dataset.brewTimes; renderCauldron(); return; }
   // worked out when clicked, not drawn on the button: the page then stays the same between updates
-  if (b.dataset.brewMost) { brewTimes = brewMost(view.defs.cauldron.recipes[b.dataset.brewMost]); renderCauldron(); return; }
-  const r = view.defs.cauldron.recipes[b.dataset.brew];
-  if (confirm(`Brew ${r.name} from ${plain(brewCost(r, brewTimes))}?`)) act('cauldron_brew', { recipe: b.dataset.brew, times: brewTimes });
+  if (b.dataset.brewMost) { brewTimes = brewMost(C.recipes[b.dataset.brewMost]); renderCauldron(); return; }
+  if ('brewStop' in b.dataset) {
+    if (confirm(`Stop brewing ${C.recipes[pot.recipe].name}? This hour's brew finishes; no more are made.`)) act('cauldron_stop');
+    return;
+  }
+  if (b.dataset.brewSet) {
+    const r = C.recipes[b.dataset.brewSet];
+    if (confirm(`Brew ${r.name} x${num(brewTimes)}? It takes ${plain(brewCost(r, brewTimes))} now and the same every hour until you stop it.`))
+      act('cauldron_set', { recipe: b.dataset.brewSet, times: brewTimes });
+    return;
+  }
+  if (e.target.closest('.brewDetail')) return;      // clicks inside the opened recipe do not close it
+  const id = b.dataset.brewOpen;
+  if (brewPick === id && !b.matches('button')) brewPick = null;      // a second click on the row closes it
+  else { brewPick = id; brewTimes = pot.recipe === id ? pot.times : 1; }
+  renderCauldron();
+  if (brewPick) { const row = $('cauldronBody').querySelector('.recipeRow.open'); if (row && b.matches('button')) row.scrollIntoView({ block: 'nearest' }); }
 });
+// Typing an amount: only the preview changes; the rest follows when the box is left.
 $('cauldronBody').addEventListener('input', e => {
-  if (!('brewBox' in e.target.dataset)) return;
-  const v = amount(e.target.value);
+  if (!('brewBox' in e.target.dataset) || !brewPick) return;
+  const v = amount(e.target.value.replace(/^x/i, ''));
   if (!(v >= 1)) return;
   brewTimes = v;
-  const [s, secs] = brewTerms(v);
-  $('brewLine').innerHTML = `A batch of <span class="hi">x${num(v)}</span> makes a brew <span class="hi">${s.toFixed(3)}x</span> as strong for <span class="hi">${duration(secs)}</span>.`;
+  $('brewPreview').innerHTML = brewPreview(view.defs.cauldron.recipes[brewPick], v);
 });
 $('cauldronBody').addEventListener('change', e => { if ('brewBox' in e.target.dataset) renderCauldron(); });
 function cursePanel(i, iv, own) {

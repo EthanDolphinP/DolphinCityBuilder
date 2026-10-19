@@ -823,7 +823,7 @@ def describe(eff):
         "explore_speed": lambda x: f"Expeditions travel {pct(x)} faster",
         "explore_cost": lambda x: f"Expeditions need {pct(x)} fewer supplies",
         "wildlife_speed": lambda x: f"Wild animals appear {pct(x)} more often",
-        "attracts": lambda x: f"{x:g} more {'arrival' if x == 1 else 'arrivals'} per meal",
+        "attracts": lambda x: f"{round(x, 1):g} more {'arrival' if round(x, 1) == 1 else 'arrivals'} per meal",
         "housing": lambda x: f"Houses {x:g} more people",
         "power": lambda x: f"Generators give {pct(x)} more power",
         "beast_xp": lambda x: f"Beast missions give {pct(x)} more experience",
