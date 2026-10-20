@@ -289,8 +289,13 @@
   .mobile .setGrid { grid-template-columns: 1fr; }
   .mobile .bar { gap: 6px; }
   .mobile #status { font-size: 12px; white-space: normal; }
+  /* Visiting another city is only looking: nothing that would change it is shown. */
   .visiting [data-rename], .visiting [data-build], .visiting [data-demolish], .visiting [data-add], .visiting [data-tame], .visiting [data-tame-all],
   .visiting [data-research], .visiting [data-send], .visiting #advance, .visiting #switch,
+  .visiting [data-priority], .visiting .staffing-controls, .visiting #tameHere, .visiting #tameEverywhere, .visiting [data-exp-cancel],
+  .visiting [data-trade], .visiting [data-trade-post], .visiting [data-egg-deliver-all], .visiting [data-choose-site], .visiting #buildTools,
+  .visiting [data-ideology-choose], .visiting [data-perk-take], .visiting [data-ritual-start], .visiting [data-curse-cast],
+  .visiting [data-breed-collect], .visiting [data-breed-start], .visiting [data-breed-stop] { display: none; }
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
   .beastTop, .eggTop { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
   .beastTop > div, .eggTop > div { flex: 1 1 200px; }
@@ -2531,8 +2536,9 @@ function renderExplore() {
 
   // ---- the two parts of the tab ----
   const queue = explore.queue || [];
-  const parts = { send: ['Send an expedition', trip ? 'one on its way' + (queue.length ? `, ${queue.length} waiting` : '') : `${sendable} you can afford`],
-                  areas: ['Your areas', `${view.areas.length}` + (attention ? `, <span class="bad">${attention} need attention</span>` : '')],
+  const parts = { send: visiting ? ['Expeditions', trip ? 'one on its way' : '']      // a visitor sends nothing
+                               : ['Send an expedition', trip ? 'one on its way' + (queue.length ? `, ${queue.length} waiting` : '') : `${sendable} you can afford`],
+                  areas: [visiting ? 'Areas' : 'Your areas', `${view.areas.length}` + (attention ? `, <span class="bad">${attention} need attention</span>` : '')],
                   all: ['Both', ''] };
   setHTML($('expViews'), Object.entries(parts).map(([k, [label, note]]) =>
     `<button data-exp-view="${k}" class="${expView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
@@ -2600,13 +2606,13 @@ function renderExplore() {
   fillKinds($('destKind'), destinations.map(d => d.env), 'Any land');
   const dkind = $('destKind').value;
   const dests = destinations.filter(d => !dkind || d.env === dkind);
-  const dfilters = { all: ['All', () => true], afford: ['I can afford', d => !d.problem && d.affordable] };
+  const dfilters = { all: ['All', () => true], ...(visiting ? {} : { afford: ['I can afford', d => !d.problem && d.affordable] }) };
   setHTML($('destFilters'), Object.entries(dfilters).map(([k, [label, test]]) =>
     `<button data-dest-filter="${k}" class="${destFilter === k ? 'on' : ''}">${label} (${dests.filter(test).length})</button>`).join(''));
   const supplies = d => Object.values(d.cost).reduce((a, b) => a + b, 0);
   const dorder = { closest: (a, b) => a.distance - b.distance || supplies(a) - supplies(b), cheapest: (a, b) => supplies(a) - supplies(b),
                    name: (a, b) => E[a.env].name.localeCompare(E[b.env].name) || a.distance - b.distance }[$('destSort').value];
-  const list = dests.filter(dfilters[destFilter][1]).sort(dorder);
+  const list = dests.filter((dfilters[destFilter] || dfilters.all)[1]).sort(dorder);   // "I can afford" is not offered while visiting
   setHTML($('explore'), !list.length ? `<p class="dim">No destinations match.</p>`
     : `<table><tr><th>Where</th><th>Land</th><th class="n">Distance</th><th>Supplies needed</th><th>Travel time</th><th></th></tr>` +
       list.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}${landHint(E[d.env])}</td>` +
