@@ -67,6 +67,8 @@ NEST_TIME = 48 * HOUR       # a Nesting Ground lays an egg this often (there is 
 SEXES = ("male", "female")  # every beast is one, chosen when its egg is found
 BREED_TIME = 12 * HOUR      # a breeding pair lays an egg this often
 BREED_MUTATION = 0.05       # a bred stat lands between its parents', then moves up to 5% either way
+BREED_QUEUE = 10            # most pairs that can wait in the breeding line
+BREED_EGGS_MAX = 50         # most eggs one pair can be set to lay before the next in line takes over
 NEST_WEIGHTS = {"common": 70, "uncommon": 25, "rare": 5}
 HOME_WEIGHT = 4             # a species is this many times likelier on an expedition into land it calls home
 WEATHER_EGG_CHANCE = 0.004  # chance, at each meal, that rare weather in an area turns up an egg there
@@ -644,6 +646,8 @@ def take(state, beast_id):
         return None, "That beast is waiting for a duel. Withdraw the duel first."
     if beast["id"] in _pair(state):
         return None, "That beast is in your breeding pair. Stop breeding first."
+    if beast["id"] in _in_line(state):
+        return None, "That beast is waiting in the breeding line. Take its pair out of the line first."
     state["beasts"].remove(beast)
     return beast, None
 
@@ -1022,12 +1026,50 @@ def _nest(state, now):
 # pen until the player collects it. Each of its stats lands somewhere between
 # its parents' and then moves a little either way (BREED_MUTATION), never past
 # what the species can have, so careful breeding can work up to an S.
-# state["breeding"] = {"male": id, "female": id, "next": time, "eggs": [{"stats", "parents"}]}
-# (the pair may be gone while laid eggs still wait).
+# state["breeding"] = {"male": id, "female": id, "next": time, "eggs": [{"stats", "parents"}],
+#                      "count": eggs it lays before handing over, "laid": eggs laid so far,
+#                      "queue": [{"male", "female", "count"}]}
+# (the pair may be gone while laid eggs still wait). The queue is the breeding line: when the pair breeding now has
+# laid its count, the first pair in the line takes over (one whose parents are gone is skipped). The last pair
+# keeps breeding after its count, so the pen is never left empty without the player saying so.
 
 def _pair(state):
     b = state.get("breeding") or {}
     return [b[k] for k in ("male", "female") if b.get(k)]
+
+
+def _in_line(state):
+    """Every beast breeding now or waiting in the breeding line."""
+    b = state.get("breeding") or {}
+    return set(_pair(state)) | {q[k] for q in b.get("queue", []) for k in ("male", "female")}
+
+
+def _pair_problem(state, male_id, female_id):
+    male, female = get(state, male_id), get(state, female_id)
+    if not male or not female:
+        return "Pick a male and a female from your beasts."
+    if male["stage"] == "egg" or female["stage"] == "egg":
+        return "Only hatched beasts can breed."
+    if male["species"] != female["species"]:
+        return "Both parents must be the same kind of beast."
+    if male.get("sex") != "male" or female.get("sex") != "female":
+        return "Pick one male and one female."
+    return None
+
+
+def _pair_name(state, male_id, female_id):
+    """A pair in words: "the Mossback Tortoises (father level 2, mother level 1)"."""
+    male, female = get(state, male_id), get(state, female_id)
+    return f"the {title(male)} pair (father level {male['level']}, mother level {female['level']})"
+
+
+def _count(count):
+    """How many eggs a pair is set to lay before the next takes over: a whole number, 1 to BREED_EGGS_MAX."""
+    if count is None:
+        return 2
+    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= BREED_EGGS_MAX:
+        return None
+    return count
 
 
 def bred_stats(species, one, two, rng):
@@ -1040,31 +1082,77 @@ def bred_stats(species, one, two, rng):
     return out
 
 
-def breed_set(state, now, male_id, female_id):
-    male, female = get(state, male_id), get(state, female_id)
-    if not male or not female:
-        return "Pick a male and a female from your beasts."
-    if male["stage"] == "egg" or female["stage"] == "egg":
-        return "Only hatched beasts can breed."
-    if male["species"] != female["species"]:
-        return "Both parents must be the same kind of beast."
-    if male.get("sex") != "male" or female.get("sex") != "female":
-        return "Pick one male and one female."
+def breed_set(state, now, male_id, female_id, count=None):
+    """Start these two breeding now (in place of any pair breeding now; the line behind stays)."""
+    problem = _pair_problem(state, male_id, female_id)
+    if problem:
+        return problem
+    count = _count(count)
+    if count is None:
+        return f"Say how many eggs, 1 to {BREED_EGGS_MAX}."
     old = state.get("breeding") or {}
     if (old.get("male"), old.get("female")) == (male_id, female_id):
-        return "Those two are already your breeding pair."
-    state["breeding"] = {"male": male_id, "female": female_id, "next": now + BREED_TIME, "eggs": old.get("eggs", [])}
-    game.log(state, now, f"{title(male)} and {title(female)} are now your breeding pair. "
+        old["count"] = count      # the same two: only how many eggs they lay changes
+        return None
+    male, female = get(state, male_id), get(state, female_id)
+    state["breeding"] = {"male": male_id, "female": female_id, "next": now + BREED_TIME, "eggs": old.get("eggs", []),
+                         "count": count, "laid": 0, "queue": old.get("queue", [])}
+    game.log(state, now, f"{_pair_name(state, male_id, female_id)[0].upper()}{_pair_name(state, male_id, female_id)[1:]} is now breeding. "
                          f"Their first egg will be ready in {BREED_TIME // HOUR} hours.")
     return None
 
 
+def breed_queue(state, now, male_id, female_id, count=None):
+    """Add a pair to the breeding line: it takes over when the pairs before it have laid their eggs."""
+    problem = _pair_problem(state, male_id, female_id)
+    if problem:
+        return problem
+    count = _count(count)
+    if count is None:
+        return f"Say how many eggs, 1 to {BREED_EGGS_MAX}."
+    b = state.get("breeding")
+    if not b or not _pair(state):          # nothing breeding: these two start now
+        return breed_set(state, now, male_id, female_id, count)
+    queue = b.setdefault("queue", [])
+    if len(queue) >= BREED_QUEUE:
+        return f"The breeding line is full ({BREED_QUEUE} pairs waiting)."
+    queue.append({"male": male_id, "female": female_id, "count": count})
+    game.log(state, now, f"Added {_pair_name(state, male_id, female_id)} to the breeding line ({len(queue)} in line).")
+    return None
+
+
+def breed_unqueue(state, now, index):
+    """Take a pair out of the breeding line."""
+    queue = (state.get("breeding") or {}).get("queue", [])
+    if not (isinstance(index, int) and not isinstance(index, bool) and 0 <= index < len(queue)):
+        return "That pair is not in the breeding line."
+    queue.pop(index)
+    return None
+
+
+def _next_in_line(state, now, when):
+    """The first pair in the line whose parents are both still here starts breeding at `when`. True if one did."""
+    b = state["breeding"]
+    while b.get("queue"):
+        q = b["queue"].pop(0)
+        if _pair_problem(state, q["male"], q["female"]):
+            game.log(state, when, "A pair in the breeding line was skipped: one of them is no longer here.")
+            continue
+        b.update(male=q["male"], female=q["female"], count=q["count"], laid=0, next=when + BREED_TIME)
+        game.log(state, when, f"{_pair_name(state, q['male'], q['female'])[0].upper()}{_pair_name(state, q['male'], q['female'])[1:]} has taken over in the breeding pen.")
+        return True
+    return False
+
+
 def breed_stop(state, now):
+    """Split the pair breeding now. The next pair in the line, if any, takes over at once."""
     b = state.get("breeding")
     if not b or not _pair(state):
         return "You have no breeding pair."
-    state["breeding"] = {"eggs": b.get("eggs", [])} if b.get("eggs") else None
     game.log(state, now, "The breeding pair has been split up.")
+    if _next_in_line(state, now, now):
+        return None
+    state["breeding"] = {"eggs": b.get("eggs", [])} if b.get("eggs") else None
     return None
 
 
@@ -1084,25 +1172,30 @@ def breed_collect(state, now):
 
 
 def _breed(state, now):
-    """Lay the eggs that are due, and split the pair up if either parent has gone (traded, say)."""
+    """Lay the eggs that are due, hand over to the next pair in the line when one has laid its count, and split the
+    pair up if either parent has gone (traded, say)."""
     b = state.get("breeding")
     if not b or not _pair(state):
         return
-    male, female = get(state, b["male"]), get(state, b["female"])
-    if not male or not female or male["stage"] == "egg" or female["stage"] == "egg":
-        state["breeding"] = {"eggs": b["eggs"]} if b.get("eggs") else None
-        game.log(state, now, "The breeding pair has been split up: one of them is no longer here.")
-        return
     rng = random.Random()
     laid = 0
-    while now >= b["next"]:
+    while b.get("male") and now >= b["next"]:
+        male, female = get(state, b["male"]), get(state, b["female"])
+        if not male or not female or male["stage"] == "egg" or female["stage"] == "egg":
+            game.log(state, now, "The breeding pair has been split up: one of them is no longer here.")
+            if not _next_in_line(state, now, now):
+                state["breeding"] = {"eggs": b["eggs"]} if b.get("eggs") else None
+            return
         b["eggs"].append({"species": male["species"], "stats": bred_stats(male["species"], male["stats"], female["stats"], rng),
                           "parents": [f"{title(male)} (level {male['level']})", f"{title(female)} (level {female['level']})"]})
-        b["next"] += BREED_TIME
+        when, b["next"] = b["next"], b["next"] + BREED_TIME
+        b["laid"] = b.get("laid", 0) + 1
         laid += 1
+        if b["laid"] >= b.get("count", 2) and b.get("queue"):      # done (a pair from before the line: 2): the next takes over
+            _next_in_line(state, now, when)
     if laid:
-        game.log(state, b["next"] - BREED_TIME, f"Your breeding pair has laid {'an egg' if laid == 1 else f'{laid} eggs'}. "
-                                                f"Collect it from the Breeding part of the Beast tab.")
+        game.log(state, now, f"Your breeding pen has {'a new egg' if laid == 1 else f'{laid} new eggs'}. "
+                             f"Collect them from Breeding on the Beast tab.")
 
 
 # ------------------------------------------------------------ expeditions --
@@ -1166,7 +1259,12 @@ def _breeding_view(state):
         ranges = {k: [max(lo, round(min(male["stats"][k], female["stats"][k]) * (1 - BREED_MUTATION))),
                       min(hi, round(max(male["stats"][k], female["stats"][k]) * (1 + BREED_MUTATION)))]
                   for k, (lo, hi) in stat_range(species).items()}
-        out.update(male=b["male"], female=b["female"], next=b["next"], species=species, ranges=ranges)
+        out.update(male=b["male"], female=b["female"], next=b["next"], species=species, ranges=ranges,
+                   count=b.get("count", 2), laid=b.get("laid", 0))
+    out["queue"] = [{"male": q["male"], "female": q["female"], "count": q["count"],
+                     "species": (get(state, q["male"]) or {}).get("species"),
+                     "ok": not _pair_problem(state, q["male"], q["female"])} for q in b.get("queue", [])]
+    out["queue_max"], out["eggs_max"] = BREED_QUEUE, BREED_EGGS_MAX
     return out
 
 

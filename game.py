@@ -4067,7 +4067,11 @@ def apply_action(state, now, action, data):
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":
-        return beasts.breed_set(state, now, data.get("male"), data.get("female"))
+        return beasts.breed_set(state, now, data.get("male"), data.get("female"), data.get("count"))
+    if action == "breed_queue":
+        return beasts.breed_queue(state, now, data.get("male"), data.get("female"), data.get("count"))
+    if action == "breed_unqueue":
+        return beasts.breed_unqueue(state, now, data.get("index"))
     if action == "breed_stop":
         return beasts.breed_stop(state, now)
     if action == "breed_collect":

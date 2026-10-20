@@ -315,7 +315,8 @@
   .visiting [data-priority], .visiting .staffing-controls, .visiting #tameHere, .visiting #tameEverywhere, .visiting [data-exp-cancel],
   .visiting [data-trade], .visiting [data-trade-post], .visiting [data-egg-deliver-all], .visiting [data-choose-site], .visiting #buildTools,
   .visiting [data-ideology-choose], .visiting [data-perk-take], .visiting [data-ritual-start], .visiting [data-curse-cast],
-  .visiting [data-breed-collect], .visiting [data-breed-start], .visiting [data-breed-stop] { display: none; }
+  .visiting [data-breed-collect], .visiting [data-breed-start], .visiting [data-breed-stop], .visiting [data-breed-queue], .visiting [data-breed-unqueue] { display: none; }
+  .queueRow button { min-height: 0; padding: 1px 8px; font-size: 12px; margin-left: 6px; }
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
   .guideText { margin-top: 2px; font-size: 14px; }
   .guideText p { margin: 0 0 6px; }
@@ -3090,7 +3091,7 @@ function fillDuels() {
 const sexMark = (sex, words) => !sex ? '' : `<span class="sex${sex === 'male' ? ' m' : ' f'}" title="${sex}">${sex === 'male' ? '&#9794;' : '&#9792;'}${words ? ' ' + sex : ''}</span>`;
 // The breeding panel: two parent slots with a heart between them, and below, the beasts of one kind to add.
 // The draft is what is in the slots; it starts as the pair breeding now.
-const breedDraft = { species: '', male: '', female: '', pair: '', sort: 'grade', sex: 'all' };
+const breedDraft = { species: '', male: '', female: '', pair: '', sort: 'grade', sex: 'all', count: '2' };
 // The heart: each line is [left half, crack, right half]. A half lights up when its slot is filled;
 // the crack lights up too when both are.
 const HEART = [
@@ -3113,7 +3114,7 @@ function renderBreeding() {
   $('breedPanel').hidden = !own || !beastShows('breeding');
   if (!own) return;
   const hatched = bv.beasts.filter(b => !b.egg), byId = id => hatched.find(b => String(b.id) === String(id));
-  $('breedCount').textContent = br.eggs.length ? `(${br.eggs.length} to collect)` : br.male ? '(breeding)' : '';
+  $('breedCount').textContent = br.eggs.length ? `(${br.eggs.length} to collect)` : br.male ? `(breeding${br.queue.length ? `, ${br.queue.length} in line` : ''})` : '';
 
   // the slots start as the pair breeding now, and follow it when it changes
   const pairKey = br.male ? `${br.male}-${br.female}` : '';
@@ -3133,22 +3134,43 @@ function renderBreeding() {
   const m = byId(breedDraft.male), f = byId(breedDraft.female);
   const same = br.male && String(br.male) === breedDraft.male && String(br.female) === breedDraft.female;
 
-  // ---- 1. eggs ready, and the pair now
-  let html = '';
+  const pairText = (male, female) => {
+    const a = byId(male), z = byId(female);
+    return a && z ? `<span style="color:${esc(a.color)}">${esc(a.name)}</span> ${sexMark('male')} <span class="dim">level ${a.level}</span> + ${sexMark('female')} <span class="dim">level ${z.level}</span>`
+                  : `<span class="bad">one of this pair is no longer here; it will be skipped</span>`;
+  };
+  const eggsWord = n => `${n} ${n === 1 ? 'egg' : 'eggs'}`;
+
+  // ---- 1. what breeding is, eggs ready, and the pair breeding now
+  let html = `<p class="dim small" style="margin-top:0">A male and a female of the same kind lay an egg every ${duration(bv.breed_time)}. ` +
+    `Each stat of the egg lands between its parents', give or take a little, so good parents make good eggs. ` +
+    `Line up more pairs: each takes over when the one before has laid its eggs.</p>`;
   if (br.eggs.length) html += `<div class="breedReady"><span class="big good">${br.eggs.length} ${br.eggs.length === 1 ? 'egg is' : 'eggs are'} ready</span> ` +
     `<button data-breed-collect>Collect ${br.eggs.length === 1 ? 'it' : 'all ' + br.eggs.length}</button>` +
     `<details class="fold" data-fold="breed:pen" ${isOpen('breed:pen', false) ? 'open' : ''}><summary>What is inside</summary>` + br.eggs.map(e =>
       `<div class="opt">${esc(e.name)} <span class="dim small">from ${esc(e.parents.join(' and '))}</span><br>${statLine(e.stats, e.species)}</div>`).join('') + `</details></div>`;
-  html += `<div class="opt">${br.male
-    ? `<span class="good">Breeding:</span> ${esc(byId(br.male) ? byId(br.male).name : '')} ${sexMark('male')} and ${sexMark('female')} - next egg in <span class="hi" data-timer="breed"></span>`
-    : `<span class="dim">No pair is breeding. Add a male and a female of the same kind below; every ${duration(bv.breed_time)} they lay an egg.</span>`}</div>`;
+  html += `<div class="cat">Breeding now</div>`;
+  if (br.male) {
+    html += `<div class="opt">${pairText(br.male, br.female)}</div>` +
+      `<div class="small">Next egg in <span class="hi" data-timer="breed"></span>. ` +
+      (br.queue.length ? `${br.laid} of ${eggsWord(br.count)} laid; then the next pair in line takes over.`
+                       : `${br.laid ? eggsWord(br.laid) + ' laid so far. ' : ''}It keeps going until you stop it, or line up another pair.`) + `</div>` +
+      `<div class="bar"><button data-breed-stop title="${br.queue.length ? 'The next pair in line takes over now' : 'Eggs already laid stay in the pen'}">` +
+      `${br.queue.length ? 'Stop: next pair now' : 'Stop breeding'}</button></div>`;
+  } else html += `<p class="dim">Nothing is breeding. Pick a father and a mother below.</p>`;
 
-  // ---- 2. the slots and the heart
+  // ---- 2. the line of pairs waiting their turn
+  if (br.queue.length) html += `<div class="cat">Next in line <span class="dim">(${br.queue.length} of ${br.queue_max})</span></div>` +
+    br.queue.map((q, i) => `<div class="opt queueRow"><span class="dim">${i + 1}.</span> ${pairText(q.male, q.female)} ` +
+      `<span class="dim small">lays ${eggsWord(q.count)}${i === br.queue.length - 1 ? ', then keeps going' : ''}</span> ` +
+      `<button data-breed-unqueue="${i}">Remove</button></div>`).join('');
+
+  // ---- 3. making a pair: the slots and the heart, what their eggs can be, and what to do with them
   const slot = (sex, b) => `<div class="breedSlot ${sex}${b ? ' full' : ''}"><div class="cat">${sexMark(sex)} ${sex === 'male' ? 'Father' : 'Mother'}</div>` +
     (b ? `<div><span class="big" style="color:${esc(b.color)}">${esc(b.name)}</span> <span class="dim">level ${b.level}</span></div>` +
          `<div class="small">${statLine(b.stats, b.species)}</div><div class="bar"><button data-breed-clear="${sex}">Remove</button></div>`
-       : `<p class="dim small">Empty. Add a ${sex} from the list below.</p>`) + `</div>`;
-  html += `<div class="breedRow">${slot('male', m)}${heartArt(!!m, !!f)}${slot('female', f)}</div>`;
+       : `<p class="dim small">Empty. Pick a ${sex} from the list below.</p>`) + `</div>`;
+  html += `<div class="cat">Make a pair</div><div class="breedRow">${slot('male', m)}${heartArt(!!m, !!f)}${slot('female', f)}</div>`;
   if (m && f) {
     // what an egg of these two can be: each stat between theirs, give or take the mutation, within the species
     const r = bv.species[m.species].range, mu = bv.breed_mutation;
@@ -3158,13 +3180,15 @@ function renderBreeding() {
       const [lo, hi] = ranges[k];
       return `<span class="dim">${esc(name)}</span> ${lo}${lo === hi ? '' : '-' + hi} <span class="dim">(${grade(statPlace(m.species, k, lo))}${lo === hi ? '' : ' to ' + grade(statPlace(m.species, k, hi))})</span>`;
     }).join(' &nbsp; ') + `</div>`;
-  }
-  html += `<div class="bar" style="justify-content:center">` +
-    (same ? `<span class="good">These two are breeding.</span> <button data-breed-stop>Stop breeding</button>`
-      : m && f ? `<button data-breed-start>${br.male ? 'Breed these two instead' : 'Start breeding'}</button>` +
-                 (br.male ? ` <span class="dim small">(starts the ${duration(bv.breed_time)} again; eggs already laid stay)</span>` : '')
-      : `<span class="dim">${m || f ? `Add a ${m ? 'mother' : 'father'} to start.` : 'Add a father and a mother to start.'}</span>`) +
-    (br.male && !same ? ` <button data-breed-stop>Stop breeding</button>` : '') + `</div>`;
+    const counts = [1, 2, 3, 5, 10, 20].filter(n => n <= br.eggs_max);
+    html += `<div class="bar" style="justify-content:center"><label class="dim">Lay <select data-bd="count">` +
+      counts.map(n => `<option value="${n}" ${String(n) === breedDraft.count ? 'selected' : ''}>${eggsWord(n)}</option>`).join('') +
+      `</select> before the next pair takes over</label></div><div class="bar" style="justify-content:center">` +
+      (same ? `<span class="good">These two are breeding now.</span> <button data-breed-start title="Change how many eggs they lay before the next pair">Set to ${eggsWord(+breedDraft.count)}</button>`
+        : !br.male ? `<button data-breed-start>Start breeding</button>`
+        : `<button data-breed-queue ${br.queue.length >= br.queue_max ? 'disabled' : ''}>Add to the line</button> ` +
+          `<button data-breed-start title="The pair breeding now stops; the line behind stays">Breed these now instead</button>`) + `</div>`;
+  } else html += `<p class="dim small" style="text-align:center">${m || f ? `Add a ${m ? 'mother' : 'father'} to make a pair.` : 'Add a father and a mother to make a pair.'}</p>`;
 
   // ---- 3. the kinds, then the beasts of the chosen kind
   if (!hatched.length) { setHTMLKeep($('beastBreeding'), html + `<p class="dim">No beast has hatched yet.</p>`); return; }
@@ -4470,7 +4494,12 @@ $('tab-beast').onclick = e => {
     }
   })();
   else if (e.target.dataset.beastActive) act('beast_active', { beast: +e.target.dataset.beastActive });
-  else if ('breedStart' in e.target.dataset) act('breed_set', { male: +breedDraft.male, female: +breedDraft.female });
+  else if ('breedStart' in e.target.dataset) act('breed_set', { male: +breedDraft.male, female: +breedDraft.female, count: +breedDraft.count });
+  else if ('breedQueue' in e.target.dataset) {
+    act('breed_queue', { male: +breedDraft.male, female: +breedDraft.female, count: +breedDraft.count });
+    Object.assign(breedDraft, { male: '', female: '' });      // the slots are free for the next pair
+  }
+  else if (e.target.dataset.breedUnqueue) act('breed_unqueue', { index: +e.target.dataset.breedUnqueue });
   else if (e.target.closest('[data-breed-kind]')) {
     const id = e.target.closest('[data-breed-kind]').dataset.breedKind;
     if (id !== breedDraft.species) Object.assign(breedDraft, { species: id, male: '', female: '' });
