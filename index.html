@@ -172,6 +172,15 @@
   .mobile #advancePanel.other-tab { display: none; }
   html:not(.mobile) #game:not([hidden]) { display: flex; align-items: flex-start; gap: 16px; }
   html:not(.mobile) #gameMain { flex: 1 1 auto; min-width: 0; }
+  /* Between a phone and a wide screen three columns leave the middle (where everything happens) cramped: the next
+     tech level goes under the resources instead, and the middle gets that width. */
+  @media (max-width: 1180px) {
+    html:not(.mobile) #game:not([hidden]) { display: grid; grid-template-columns: 220px minmax(0, 1fr);
+      grid-template-areas: "res main" "adv main"; grid-template-rows: auto 1fr; align-items: start; }
+    html:not(.mobile) #resourcePanel { grid-area: res; position: static; max-height: none; }   /* not pinned: it would slide over the panel below */
+    html:not(.mobile) #gameMain { grid-area: main; }
+    html:not(.mobile) #advancePanel { grid-area: adv; position: static; max-height: none; }
+  }
   html:not(.mobile) #resourcePanel { flex: 0 0 240px; position: sticky; top: calc(var(--topbar-h, 54px) + 12px);
     max-height: calc(100vh - var(--topbar-h, 54px) - 24px); overflow-y: auto; }
   html:not(.mobile) #resourcePanel .stats { grid-template-columns: 1fr; gap: 4px; }
@@ -205,6 +214,17 @@
   th.sortable { cursor: pointer; } th.sortable:hover, th.sorted { color: var(--accent); }
   td.n, th.n { text-align: right; }
   tr.me td { color: var(--bright); }
+  /* The leaderboard: a wide table in a box of its own height, so its scroll bars are always close by. The headings stay
+     at the top, and the city's name and its buttons (visit, message, ban) stay at the edges while the figures scroll. */
+  #board { max-height: min(72vh, 900px); overflow: auto; overscroll-behavior: contain; }
+  #board table { border-collapse: separate; border-spacing: 0; }
+  #board th { position: sticky; top: 0; z-index: 2; background: var(--panel); }
+  #board td:nth-child(2), #board th:nth-child(2) { position: sticky; left: 0; z-index: 1; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
+  #board td.acts, #board th:last-child { position: sticky; right: 0; z-index: 1; background: var(--panel); box-shadow: -1px 0 0 var(--line); }
+  #board td.acts { white-space: nowrap; padding: 2px 4px; }
+  #board td.acts button { min-height: 0; padding: 2px 7px; font-size: 12px; margin: 0 1px; }
+  #board th:nth-child(2), #board th:last-child { z-index: 3; }
+  #board tr.me td { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   [hidden] { display: none !important; }
   .meter { height: 16px; background: var(--inset); border: 1px solid var(--line); margin: 4px 0 2px; display: flex; }
   .meter div { height: 100%; background: var(--good); }
@@ -297,6 +317,8 @@
   .visiting [data-ideology-choose], .visiting [data-perk-take], .visiting [data-ritual-start], .visiting [data-curse-cast],
   .visiting [data-breed-collect], .visiting [data-breed-start], .visiting [data-breed-stop] { display: none; }
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
+  .guideText { margin-top: 2px; font-size: 14px; }
+  .guideText p { margin: 0 0 6px; }
   .beastTop, .eggTop { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
   .beastTop > div, .eggTop > div { flex: 1 1 200px; }
   .eggList { display: flex; flex-direction: column; }
@@ -828,28 +850,16 @@
       </details>
       <details class="panel" data-bst="overview">
         <summary class="cat">How beasts work</summary>
-        <p class="dim small" style="margin:0">Every egg has missions of its own, shown with the egg: one for common and uncommon eggs,
-          up to three (one after another) for legendary ones. It hatches once it has been kept warm long enough,
-          longer for rarer eggs, and its missions are done. Egg missions never run out, and you can do as many
-          as you have eggs: they are separate from beast missions. There is no limit on how many eggs you can have. Your active beast
-          sets the city one beast mission at a time, and a new one comes each day. Every completed beast
-          mission gives the beast experience; as it levels up, the bonus it gives the city grows. Rarer beasts
-          grow to higher levels (common to 10, legendary to 20) and set harder missions that give more experience.
-          What the bonus is depends on the kind of beast. Only the active beast sets missions and gives its
-          bonus, and you can change which hatched beast is active at any time. Expeditions sometimes bring back more
-          eggs, and rarer kinds are likelier the further from home they go. The Beast Den, Incubator,
-          Training Ground and Beast Sanctuary (each needs research) make all of this faster or stronger.
-          In the Arena you challenge another city to a duel. Each side bets goods on a beast without seeing
-          the other's bet; if the challenge is accepted the beasts fight, the winner's city takes both bets and
-          the winning beast gains a little experience. Each kind of beast likes one material, and betting
-          that on it raises its stats the most.
-          Every beast also has Health, Attack, Defense and Speed. They differ a little from one beast to the
-          next of the same kind, and they do not change anything in the city. Each is graded against the lowest
-          and highest its kind can have: F is the lowest, then E, D, C, B and A, and S is the best possible;
-          the overall grade averages all four. Every beast is male or female: on the Breeding part of this tab, a
-          male and a female of the same kind lay an egg every 12 hours, its stats a mix of their own. Any beast or egg except your
-          active beast can be offered to other cities with its Trade button, for a material or for a beast
-          of a kind and level you name.</p>
+        <p class="dim small" style="margin:0 0 6px">Every egg has missions of its own, shown with the egg: one for common and uncommon eggs, up to three (one after another) for legendary ones. It hatches once it has been kept warm long enough, longer for rarer eggs, and its missions are done.</p>
+        <p class="dim small" style="margin:0 0 6px">Egg missions never run out, and you can do as many as you have eggs: they are separate from beast missions. There is no limit on how many eggs you can have.</p>
+        <p class="dim small" style="margin:0 0 6px">Your active beast sets the city one beast mission at a time, and a new one comes each day. Every completed beast mission gives the beast experience; as it levels up, the bonus it gives the city grows.</p>
+        <p class="dim small" style="margin:0 0 6px">Rarer beasts grow to higher levels (common to 10, legendary to 20) and set harder missions that give more experience. What the bonus is depends on the kind of beast.</p>
+        <p class="dim small" style="margin:0 0 6px">Only the active beast sets missions and gives its bonus, and you can change which hatched beast is active at any time. Expeditions sometimes bring back more eggs, and rarer kinds are likelier the further from home they go.</p>
+        <p class="dim small" style="margin:0 0 6px">The Beast Den, Incubator, Training Ground and Beast Sanctuary (each needs research) make all of this faster or stronger. In the Arena you challenge another city to a duel.</p>
+        <p class="dim small" style="margin:0 0 6px">Each side bets goods on a beast without seeing the other's bet; if the challenge is accepted the beasts fight, the winner's city takes both bets and the winning beast gains a little experience. Each kind of beast likes one material, and betting that on it raises its stats the most.</p>
+        <p class="dim small" style="margin:0 0 6px">Every beast also has Health, Attack, Defense and Speed. They differ a little from one beast to the next of the same kind, and they do not change anything in the city.</p>
+        <p class="dim small" style="margin:0 0 6px">Each is graded against the lowest and highest its kind can have: F is the lowest, then E, D, C, B and A, and S is the best possible; the overall grade averages all four. Every beast is male or female: on the Breeding part of this tab, a male and a female of the same kind lay an egg every 12 hours, its stats a mix of their own.</p>
+        <p class="dim small" style="margin:0 0 6px">Any beast or egg except your active beast can be offered to other cities with its Trade button, for a material or for a beast of a kind and level you name.</p>
       </details>
     </div>
 
@@ -3598,7 +3608,7 @@ function renderEffects() {
     chips.push(`<span class="fx bad" data-fx="cauldron" title="Not enough ingredients for this hour">[~] Cauldron cold</span>`);
   // Always shown for your own city, even with nothing running, so the menus below never move when something starts or ends.
   $('effectsBar').hidden = !!visiting;
-  setHTML($('effectsBar'), `<span class="dim">Now:</span>` + (chips.join('') || `<span class="dim">nothing running (rituals, brews and hexes show here)</span>`));
+  setHTML($('effectsBar'), `<span class="dim">Now:</span>` + (chips.join('') || `<span class="dim" title="Rituals, Cauldron brews and hexes show here while they work">nothing running</span>`));
 }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -3925,6 +3935,13 @@ function renderPeople() {
 // The Guide. `opening` is true when the search or menus just changed: sections
 // with something to show are then opened, otherwise they are left as the player has them.
 let guideView = settings.guideView || 'howto';   // which part of the Guide shows (remembered)
+// Long text in short paragraphs of two sentences, so a topic reads as steps rather than one block.
+function paragraphs(text) {
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/);
+  const out = [];
+  for (let i = 0; i < sentences.length; i += 2) out.push(`<p>${esc(sentences.slice(i, i + 2).join(' '))}</p>`);
+  return out.join('');
+}
 function renderGuide(opening) {
   const { state, defs } = view, T = defs.terrains, B = defs.buildings;
   for (const [id, first, options] of [
@@ -3956,7 +3973,7 @@ function renderGuide(opening) {
   const topics = HOWTO.filter(([title, body]) => !buildingOnly && has(title + ' ' + body));
   setHTML($('guideHowto'), topics.map(([title, body]) =>
     `<details class="fold" data-fold="howto:${esc(title)}" ${words.length || isOpen('howto:' + title, false) ? 'open' : ''}>` +
-    `<summary><span class="hi">${esc(title)}</span></summary><div class="dim" style="margin-top:2px;font-size:14px">${esc(body)}</div></details>`).join(''));
+    `<summary><span class="hi">${esc(title)}</span></summary><div class="dim guideText">${paragraphs(body)}</div></details>`).join(''));
   $('gCountHowto').textContent = topics.length === HOWTO.length ? `(${HOWTO.length})` : `(${topics.length} of ${HOWTO.length})`;
   $('gSecHowto').hidden = !topics.length;
   let shown = topics.length + fill('Terrain', Object.keys(T).length, ['Tile', 'Height', 'Fertility', 'Fish', 'Notes'], terrains.map(t =>
@@ -4228,7 +4245,7 @@ function renderBoard() {
       `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}</td>` +
       cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
       (withIdeology ? `<td class="dim">${c.ideology ? esc(c.ideology) : '-'}</td>` : '') +
-      `<td>` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
+      `<td class="${c.name === city ? 'mine' : 'acts'}">` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
         (visiting ? '' : `<button data-board-msg="${esc(c.name)}">Message</button> ` + (banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
                                    : `<button data-ban="${esc(c.name)}">Ban</button>`))) +
       `</td></tr>`).join('') + `</table>` +
