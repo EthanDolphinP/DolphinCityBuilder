@@ -4626,9 +4626,13 @@ $('resourceToggle').onclick = () => {
 $('inspectorClose').onclick = () => { sel = null; render(); };
 // Keyboard shortcuts (listed in Settings): number keys change tab; on the City tab the arrow keys move
 // round the map, [ and ] change area, and Escape lets go of the selected tile.
+let typedAt = 0;      // when the player last typed in a box (see below)
+document.addEventListener('input', e => { if (e.target instanceof Element && e.target.matches('input, textarea')) typedAt = performance.now(); }, true);
 document.addEventListener('keydown', e => {
   if (!view || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.target instanceof Element && e.target.closest('input, select, textarea, [contenteditable]')) return;   // typing
+  if (e.target instanceof Element && e.target.closest('input, select, textarea, [contenteditable]')) { typedAt = performance.now(); return; }   // typing
+  // Just typed in a box that has since been redrawn (and lost the cursor): the rest of the number is not a shortcut.
+  if (performance.now() - typedAt < 2000) return;
   if (['away', 'report', 'present', 'ideologyPick'].some(id => !$(id).hidden)) return;
   const tabs = [...document.querySelectorAll('.tabs [data-tab]')].filter(b => b.offsetParent !== null);
   if (/^[0-9]$/.test(e.key)) {
@@ -4783,9 +4787,12 @@ for (const id of ['mktSearch', 'mktGives', 'mktWants']) $(id).oninput = () => { 
 function enhanceMarketQuantities() {
   document.querySelectorAll('#tab-market input[type="text"][inputmode="decimal"]').forEach(input => {
     if (input.closest('.quantity-stepper')) return;
+    // Moving a box takes the cursor out of it: put it back, where it was, if the player is typing there.
+    const typing = document.activeElement === input, from = input.selectionStart, to = input.selectionEnd;
     const wrap = document.createElement('span');
     wrap.className = 'quantity-stepper';
     input.before(wrap); wrap.append(input);
+    if (typing) { input.focus({ preventScroll: true }); try { input.setSelectionRange(from, to); } catch (_) {} }
     const arrows = document.createElement('span');
     arrows.className = 'quantity-arrows';
     arrows.innerHTML = '<button type="button" data-quantity-step="1" aria-label="Increase quantity">&#9650;</button><button type="button" data-quantity-step="-1" aria-label="Decrease quantity">&#9660;</button>';
