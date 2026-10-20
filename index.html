@@ -316,6 +316,8 @@
   .visiting [data-trade], .visiting [data-trade-post], .visiting [data-egg-deliver-all], .visiting [data-choose-site], .visiting #buildTools,
   .visiting [data-ideology-choose], .visiting [data-perk-take], .visiting [data-ritual-start], .visiting [data-curse-cast],
   .visiting [data-breed-collect], .visiting [data-breed-start], .visiting [data-breed-stop], .visiting [data-breed-queue], .visiting [data-breed-unqueue] { display: none; }
+  a.button { display: inline-block; padding: 6px 14px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
+  a.button:hover { background: var(--inset); }
   .queueRow button { min-height: 0; padding: 1px 8px; font-size: 12px; margin-left: 6px; }
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
   .guideText { margin-top: 2px; font-size: 14px; }
@@ -721,6 +723,8 @@
       <button>Enter</button>
     </form>
     <div id="loginMsg" class="bad"></div>
+    <p class="small" style="margin-bottom:0">Join the game's <a href="https://discord.gg/FCAb5uMp2K" target="_blank" rel="noopener">Discord server</a>
+      to hear about updates, events and presents, ask questions, and meet the other players.</p>
   </div>
 
   <div id="game" hidden>
@@ -1105,9 +1109,17 @@
           <span class="dim small">Other browsers signed in to this city will have to sign in again.</span>
         </form>
       </div>
+      <div class="panel" data-set="account" id="communityPanel">
+        <h2>Join the Discord</h2>
+        <p class="small" style="margin-top:0">The game has a Discord server. Join it if you would like to be told when the game is
+          updated, hear about events and presents first, ask questions, suggest ideas, and talk with the other players.
+          There you can also check the leaderboard or a city with commands such as /leaderboard and /city.</p>
+        <div class="bar" style="margin-top:0"><a class="button" href="https://discord.gg/FCAb5uMp2K" target="_blank" rel="noopener">Join the Discord</a>
+          <span class="dim small">discord.gg/FCAb5uMp2K</span></div>
+      </div>
       <div class="panel own" data-set="account" id="discordPanel" hidden>
-        <h2>Discord</h2>
-        <p class="small" style="margin-top:0">In the game's Discord server, type <span class="hi">/claim</span> with your city's name and
+        <h2>Land Owner role</h2>
+        <p class="small" style="margin-top:0">In the game's <a href="https://discord.gg/FCAb5uMp2K" target="_blank" rel="noopener">Discord server</a>, type <span class="hi">/claim</span> with your city's name and
           this code to get the <span class="hi">Land Owner</span> role. Keep it to yourself: it shows the city is yours.</p>
         <div class="bar" style="margin-top:0"><code id="discordCode" class="big hi"></code><button id="copyDiscord" type="button">Copy</button></div>
       </div>
@@ -1634,6 +1646,7 @@ const HOWTO = [
 
   ['Hexes, sabotage and rivals', 'Each ideology can also act against another city in its own way: The Old Faith lays Hexes, Progress commits Sabotage, Commerce sets Embargoes, Kinship with the Wild spreads Blights, The Wayfarers send Misfortunes and Community starts Feuds. Each has five, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can act against cities from one tech level below yours to two above, and each of yours can be on one city at a time; those from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Anything rivals have done to your city is shown on the Ideology tab and wears off by itself.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
+  ['Discord and updates', 'The game has a Discord server: https://discord.gg/FCAb5uMp2K. Join it if you would like to be told when the game is updated, and to hear about events and presents. You can ask questions there, suggest ideas and talk with other players, and the server can show the leaderboard and any city with /leaderboard and /city. Type /claim with the code on your Settings tab to get the Land Owner role for your city.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Stats', 'The Stats tab has everything about your city in numbers: people, every resource and what makes it, buildings, power, land, research, bonuses, time and weather, beasts, the market and your rank among other cities, and all-time counts of what the city has made, built and done since stats began. Pick a section along the top or search for any stat.'],
   ['Shortcuts', 'The number keys 1 to 0 open the tabs in order. On the City tab the arrow keys move round the map, [ and ] go to the previous or next area, and Escape lets go of the tile. When you pick an empty tile, the build list can be searched by name or by what a building makes, narrowed to one kind of building, and sorted; the kinds you built last are at the top, one click each. In Settings you can have the game open on whichever tab you left it on.'],
@@ -3963,7 +3976,8 @@ let guideView = settings.guideView || 'howto';   // which part of the Guide show
 function paragraphs(text) {
   const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/);
   const out = [];
-  for (let i = 0; i < sentences.length; i += 2) out.push(`<p>${esc(sentences.slice(i, i + 2).join(' '))}</p>`);
+  const link = s => esc(s).replace(/https:\/\/[^\s<]+?(?=[.,]?(\s|$))/g, url => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
+  for (let i = 0; i < sentences.length; i += 2) out.push(`<p>${link(sentences.slice(i, i + 2).join(' '))}</p>`);
   return out.join('');
 }
 function renderGuide(opening) {

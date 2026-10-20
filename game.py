@@ -2584,7 +2584,133 @@ ADDITIONS = {
         "cost": {"tools": 80, "electronics": 60}, "speed": 1.25, "power": 4,
         "desc": "25% faster, for 4 more power.",
     },
+    # ---- for buildings whose work is a city-wide effect ----
+    "map_room": {
+        "name": "Map Room", "for": ["expedition_camp", "explorers_guild", "lookout_tower"], "research": "cartography",
+        "cost": {"wood": 80, "stone": 40, "gold": 40}, "exp_queue": 1,
+        "desc": "Charts pinned to every wall: one more expedition can wait in the queue.",
+    },
+    "supply_depot": {
+        "name": "Supply Depot", "for": ["expedition_camp", "explorers_guild", "ferry_terminal", "airport"],
+        "cost": {"wood": 60, "stone": 30}, "explore_speed": 0.1,
+        "desc": "Packs ready to go: expeditions travel 10% faster.",
+    },
+    "satellite_mapping": {
+        "name": "Satellite Mapping", "for": ["orbital_mirror", "weather_control", "spaceport", "airport", "planetarium"],
+        "research": "aviation", "cost": {"tools": 40, "electronics": 40, "gold": 200}, "explore_speed": 0.15,
+        "desc": "Pictures of the land from far above: expeditions travel 15% faster.",
+    },
+    "reinforced_walls": {
+        "name": "Reinforced Walls", "for": ["storm_barrier", "desalination_plant", "tidal_array"],
+        "cost": {"stone": 300, "tools": 60}, "weather_shelter": 0.15,
+        "desc": "Thicker sea walls: bad weather slows the whole city 15% less.",
+    },
+    "aurora_lamps": {
+        "name": "Aurora Lamps", "for": ["weather_control", "orbital_mirror", "storm_barrier"], "research": "electricity",
+        "cost": {"tools": 40, "electronics": 20, "gold": 100}, "night_shelter": 0.1,
+        "desc": "Soft light over the streets all night: night slows the whole city 10% less.",
+    },
+    "focused_beam": {
+        "name": "Focused Beam", "for": ["orbital_mirror"],
+        "cost": {"electronics": 100, "gold": 500}, "night_shelter": 0.15,
+        "desc": "The mirrors turned to light the city alone: night slows it a further 15% less.",
+    },
+    "cloud_seeding": {
+        "name": "Cloud Seeding", "for": ["weather_control", "orbital_mirror", "waterworks", "well", "desalination_plant"],
+        "research": "meteorology", "cost": {"stone": 80, "tools": 20, "gold": 40}, "fertility_aura": 15,
+        "desc": "Rain where it is wanted: +15 fertility on the 8 tiles around it.",
+    },
+    "promenade": {
+        "name": "Promenade", "for": ["storm_barrier", "ferry_terminal", "lighthouse", "desalination_plant"],
+        "cost": {"stone": 120, "gold": 60}, "attracts": 1,
+        "desc": "A walk along the water, with benches and stalls: one more arrival per meal.",
+    },
+    "bird_hides": {
+        "name": "Bird Hides", "for": ["wetland_reserve", "lookout_tower", "salt_lick", "zoo"],
+        "cost": {"wood": 40, "stone": 10}, "wildlife_speed": 0.25,
+        "desc": "Quiet hides at the water's edge: wild animals appear 25% more often.",
+    },
+    "digester_tanks": {
+        "name": "Digester Tanks", "for": ["biogas_plant"], "research": "recycling",
+        "cost": {"stone": 120, "tools": 40}, "generates": 6,
+        "desc": "More tanks to catch the marsh gas: 6 more power.",
+    },
+    "spore_beds": {
+        "name": "Spore Beds", "for": ["mushroom_cave", "herb_fen"],
+        "cost": {"wood": 30, "food": 20}, "speed": 1.25,
+        "desc": "Racks of rich, damp beds: 25% faster.",
+    },
+    "kelp_gardens": {
+        "name": "Kelp Gardens", "for": ["ocean_habitat"], "research": "marine_habitats",
+        "cost": {"stone": 400, "electronics": 60}, "housing": 10,
+        "desc": "Gardens grown in the water around the domes: houses 10 more people.",
+    },
+    "lean_to": {
+        "name": "Lean-To", "for": ["hut", "cave_dwelling", "shepherds_hut"],
+        "cost": {"wood": 12}, "housing": 1,
+        "desc": "A sloping roof against one wall: houses 1 more person.",
+    },
+    "extra_sails": {
+        "name": "Extra Sails", "for": ["windmill"], "research": "mechanics",
+        "cost": {"wood": 60, "tools": 10}, "aura_bonus": 0.1,
+        "desc": "Longer sails catch more wind: the farms around it get a further 10% faster.",
+    },
+    "brighter_lamp": {
+        "name": "Brighter Lamp", "for": ["lighthouse"], "research": "glassmaking",
+        "cost": {"stone": 40, "ore": 10, "gold": 30}, "aura_bonus": 0.1,
+        "desc": "A bigger lens: the fishing and harbours around it get a further 10% faster.",
+    },
+    "pressure_locks": {
+        "name": "Pressure Locks", "for": ["ocean_habitat"],
+        "cost": {"stone": 300, "tools": 100}, "housing": 8,
+        "desc": "More doors to the sea, so more domes can join on: houses 8 more people.",
+    },
 }
+
+# Existing additions that also fit these buildings (the newer ones, and those that had few to choose from).
+ADDITIONS_MORE = {
+    "lanterns": ["eel_traps", "herb_fen", "leatherworks", "bog_iron", "chicken_coop", "forager_camp", "butcher", "kelp_gatherers"],
+    "work_lights": ["meat_packing", "livestock_complex", "stockyard", "bog_iron", "crystal_mine", "algae_bioreactor"],
+    "cold_frames": ["cranberry_bog", "herb_fen"],
+    "covered_pens": ["chicken_coop", "stockyard", "livestock_complex"],
+    "feeding_trough": ["chicken_coop", "stockyard", "livestock_complex", "ranch", "shepherds_hut"],
+    "sheepdogs": ["stockyard"],
+    "drying_racks": ["leatherworks", "herb_fen"],
+    "smokehouse": ["eel_traps"],
+    "ice_house": ["eel_traps", "meat_packing", "cranberry_bog"],
+    "tool_shed": ["eel_traps", "forager_camp"],
+    "support_beams": ["bog_iron", "crystal_mine"],
+    "compost_heap": ["cranberry_bog"],
+    "field_lights": ["cranberry_bog"],
+    "assembly_line": ["meat_packing", "leatherworks"],
+    "smart_meters": ["algae_bioreactor", "livestock_complex", "meat_packing", "biodome", "planetarium", "aquarium",
+                     "crystal_mine", "quantum_lab", "polar_station", "museum"],
+    "automation": ["meat_packing", "livestock_complex", "algae_bioreactor", "spaceport"],
+    "labour_saving": ["bog_iron", "leatherworks", "stockyard", "crystal_mine", "kelp_farm", "mushroom_cave", "ice_works", "biogas_plant"],
+    "transformer": ["biogas_plant", "water_mill", "steam_engine", "solar_farm", "offshore_wind", "tidal_array"],
+    "counting_house": ["leatherworks", "herb_fen", "pearl_divers", "night_market", "ice_works"],
+    "market_stalls": ["herb_fen", "cranberry_bog", "leatherworks", "ice_works", "night_market", "museum", "wetland_reserve"],
+    "advertising": ["wetland_reserve", "aquarium", "museum", "ski_resort", "spaceport"],
+    "food_court": ["museum", "aquarium", "spaceport", "ocean_habitat"],
+    "guest_rooms": ["ski_resort"],
+    "library": ["herb_fen", "museum", "planetarium", "weather_station", "polar_station"],
+    "clean_room": ["quantum_lab", "algae_bioreactor", "biodome", "polar_station", "crystal_mine"],
+    "extra_room": ["cave_dwelling", "shepherds_hut"],
+    "loft": ["cave_dwelling"],
+    "plumbing": ["hospital"],
+    "warm_bedding": ["nesting_ground"],
+    "heat_stones": ["nesting_ground"],
+    "nest_boxes": ["nesting_ground"],
+    "caravan_yard": ["expedition_camp", "explorers_guild", "ferry_terminal", "lookout_tower"],
+}
+# A third choice for the buildings that had two.
+for _aid, _more in {"market_stalls": ["apiary"], "drying_racks": ["bamboo_workshop"], "warm_bedding": ["beast_sanctuary"],
+                    "nest_boxes": ["beast_sanctuary"], "ice_house": ["mushroom_cave"], "advertising": ["maglev_hub"],
+                    "guest_rooms": ["theme_park"], "food_court": ["theme_park"],
+                    "labour_saving": ["coal_plant", "geothermal_plant", "hydro_dam", "tidal_generator", "bamboo_workshop"]}.items():
+    ADDITIONS_MORE[_aid] = ADDITIONS_MORE.get(_aid, []) + _more
+for _aid, _more in ADDITIONS_MORE.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
 # Kinds of area an expedition can find. Fields:
 #   weight   how common it is (0 = never found by exploring)
