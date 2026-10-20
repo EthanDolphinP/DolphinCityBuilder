@@ -458,10 +458,10 @@ BUILDINGS = {
     },
     "reed_cutter": {
         "name": "Reed Cutter", "glyph": "R", "tech": 0, "category": "materials",
-        "terrain": ["river", "lake"],
+        "terrain": ["river", "lake", "marsh", "swamp"],
         "cost": {"wood": 8}, "workers": 1, "time": 12 * MIN, "produces": {"wood": 2},
         "modifiers": ["open_water"],
-        "desc": "Cuts reeds and driftwood from fresh water: a source of wood without a forest.",
+        "desc": "Cuts reeds and driftwood from fresh water, marsh or swamp: a source of wood without a forest.",
     },
     # ---- Village ----
     "house": {
@@ -537,6 +537,52 @@ BUILDINGS = {
         "terrain": ["swamp"],
         "cost": {"wood": 20}, "workers": 2, "time": 12 * MIN, "produces": {"wood": 6},
         "desc": "Cuts and dries peat from a swamp. It burns like wood and is counted as wood.",
+    },
+    # ---- wetland: marsh and swamp, something for every tech level ----
+    "eel_traps": {
+        "name": "Eel Traps", "glyph": "\u00f0", "tech": 0, "category": "food",
+        "terrain": ["marsh", "swamp"],
+        "cost": {"wood": 10}, "workers": 1, "time": 12 * MIN, "produces": {"food": 5},
+        "desc": "Wicker traps sunk in the reeds. Eels, frogs and crayfish from land too wet to farm.",
+    },
+    "herb_fen": {
+        "name": "Herb Fen", "glyph": "\u00f1", "tech": 2, "category": "knowledge",
+        "terrain": ["marsh", "swamp"],
+        "cost": {"wood": 60, "stone": 30, "gold": 20}, "workers": 2, "time": 20 * MIN, "produces": {"knowledge": 6, "gold": 4},
+        "desc": "Healers gather and study the fen's herbs: knowledge, and remedies to sell.",
+    },
+    "bog_iron": {
+        "name": "Bog Iron Works", "glyph": "\u00f8", "tech": 3, "category": "materials", "research": "metallurgy",
+        "terrain": ["swamp", "marsh"],
+        "cost": {"wood": 80, "stone": 100, "tools": 20}, "workers": 3, "time": 20 * MIN, "produces": {"ore": 7, "tools": 1},
+        "desc": "Iron that settles in the bog, dredged up and smelted on the spot: ore, and a few tools.",
+    },
+    "cranberry_bog": {
+        "name": "Cranberry Bog", "glyph": "\u00a2", "tech": 3, "category": "food", "research": "botany",
+        "terrain": ["marsh"],
+        "cost": {"wood": 100, "stone": 60, "tools": 15}, "workers": 3, "time": 12 * MIN, "produces": {"food": 18, "gold": 4},
+        "modifiers": ["crop_temperature"],
+        "desc": "Flooded at harvest so the berries float to the top: food, and a little gold from the jam.",
+    },
+    "biogas_plant": {
+        "name": "Biogas Plant", "glyph": "\u00b1", "tech": 4, "category": "power", "research": "recycling",
+        "terrain": ["marsh", "swamp"],
+        "cost": {"stone": 200, "tools": 60, "gold": 80}, "workers": 2, "generates": 12,
+        "desc": "Domes over the rotting reeds catch the marsh gas and burn it: power with no fuel to buy.",
+    },
+    "wetland_reserve": {
+        "name": "Wetland Reserve", "glyph": "\u00e6", "tech": 4, "category": "trade",
+        "terrain": ["marsh", "swamp"],
+        "cost": {"wood": 200, "stone": 150, "gold": 250}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 26, "knowledge": 6}, "attracts": 1, "wildlife_speed": 0.3,
+        "desc": "Boardwalks, hides and a visitor centre: gold and knowledge, one more arrival per meal, and wild animals come more often.",
+    },
+    "algae_bioreactor": {
+        "name": "Algae Bioreactor", "glyph": "\u00fe", "tech": 5, "category": "food", "power": 4, "research": "hydroponics",
+        "terrain": ["marsh", "swamp"],
+        "cost": {"stone": 400, "tools": 150, "electronics": 80, "gold": 400}, "workers": 4, "time": 12 * MIN,
+        "produces": {"food": 48, "gold": 16},
+        "desc": "Clear tubes of green algae fed by the marsh water: a great deal of food, and gold from what is sold on.",
     },
     "terrace_farm": {
         "name": "Terrace Farm", "glyph": "z", "tech": 1, "category": "food", "research": "terracing",
@@ -2903,6 +2949,7 @@ def new_game(name, now, seed=None):
         "log": [],
     }
     state["banned"] = []     # cities that may not view this one or propose bills to it
+    state["priorities"] = PRIORITY_VERSION
     beasts.setup(state, now, rng)
     ideology.setup(state)
     _remember_seen(state, now)
@@ -2945,6 +2992,13 @@ def migrate(state, now):
                 if tile["terrain"] == "water":      # from before rivers, lakes and oceans
                     tile.update(terrain="lake", fish=50)
                 tile.setdefault("fish", 0)
+    if state.get("priorities", 1) < PRIORITY_VERSION:     # "first" was 1 before "high" came in; it is 2 now
+        for area in state["areas"]:
+            for row in area["tiles"]:
+                for tile in row:
+                    if tile.get("priority") == 1:
+                        tile["priority"] = 2
+        state["priorities"] = PRIORITY_VERSION
     beasts.migrate(state, now)
     ideology.setup(state)
     return state
@@ -3207,9 +3261,9 @@ def placement_problem(state, area, x, y, bid):
 def work_plan(state):
     """Hand out workers and time every building.
 
-    Workers go to buildings the player marked "first" (tile priority 1), then to
-    the rest, each group in map order: home first, then each area top-left
-    first. Buildings switched off (priority -1) get nobody.
+    Workers go to buildings the player marked "first" (tile priority 2), then
+    "high" (1), then the rest (0), each group in map order: home first, then
+    each area top-left first. Buildings switched off (priority -1) get nobody.
 
     Returns (jobs, housing, totals) where jobs is a list of working buildings.
     Inside reading() it is worked out once per city and handed out again (as copies) after that.
@@ -3537,12 +3591,16 @@ def demolish(state, now, area, x, y):
     return None
 
 
+PRIORITIES = {2: "first", 1: "high", 0: "normal", -1: "off"}   # who gets workers first; see work_plan
+PRIORITY_VERSION = 2          # saves from before "high" had first as 1: migrate() moves it to 2
+
+
 def set_priority(state, now, area, x, y, priority):
     """Choose how this building is staffed: 1 = first, 0 = normal, -1 = switched off."""
     tile = area["tiles"][y][x]
     if not tile["building"] or not BUILDINGS[tile["building"]].get("workers"):
         return "That building has no workers to assign."
-    if priority not in (-1, 0, 1):
+    if priority not in PRIORITIES or isinstance(priority, bool):
         return "Unknown priority."
     tile["priority"] = priority
     return None
@@ -4546,7 +4604,8 @@ def _city_stats(state, now, rates):
     # ---- buildings
     working = sum(1 for j in jobs if job_status(state, j, power) == "working")
     off = sum(1 for t in built if t.get("priority", 0) < 0)
-    first = sum(1 for t in built if t.get("priority", 0) > 0)
+    first = sum(1 for t in built if t.get("priority", 0) >= 2)
+    high = sum(1 for t in built if t.get("priority", 0) == 1)
     slots = len(built) * MAX_ADDITIONS
     attached = sum(len(t["additions"]) for t in built)
     kinds = {t["building"] for t in built}
@@ -4559,6 +4618,7 @@ def _city_stats(state, now, rates):
         ["Not working properly", len(jobs) - working, ""],
         ["Switched off", off, ""],
         ["Staffed first", first, ""],
+        ["Staffed high", high, "after First, before Normal"],
         ["Additions attached", attached, f"of {slots} slots ({MAX_ADDITIONS} per building)"],
         ["Kinds of addition used", len({a for t in built for a in t["additions"]}), f"of {len(ADDITIONS)} in the game"],
         ["One-of-a-kind buildings", sum(1 for k in kinds if BUILDINGS[k].get("unique")), ""],

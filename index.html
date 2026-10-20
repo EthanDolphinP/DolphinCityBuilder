@@ -1602,7 +1602,7 @@ const HOWTO = [
   ['The basics', 'Your city runs in real time, whether or not the game is open. Buildings work in cycles: each one takes its time, then pays out. Click a tile on the City tab to see the land and what can be built there. When you come back after a while, a window tells you what changed.'],
   ['First steps', 'Build a Lumber Camp on forest for Wood, something that makes Food (a Farm on plains, a Hunting Lodge in forest or a Fishing Dock on water), then a Hut so more people can move in. A Shaman Hut makes Knowledge for research. The Getting started list on the City tab walks through this.'],
   ['People and food', 'Everyone eats 1 Food at each meal, every 15 minutes. After a meal a new person arrives if there is a free bed and enough food left over for them. If food runs out nobody leaves, but every building that does not make food works at half speed. The People tab shows exactly what is holding growth back.'],
-  ['Workers', 'Every working building needs people. When there are not enough, some buildings stand idle. Click a building and set its priority to choose which ones are staffed first, or switch one off.'],
+  ['Workers', 'Every working building needs people. When there are not enough, some buildings stand idle. Click a building and set its staffing: First buildings get workers before everything else, then High, then Normal; Off gets nobody.'],
   ['Where to build', 'Each building lists the land it can stand on. Many work faster in the right spot: farms on fertile ground and next to fresh water, mines and quarries on higher hills, fisheries on water with more fish, shops next to homes. The tile panel shows every bonus and penalty a building would get before you build it.'],
   ['Additions', 'Click a finished building to attach additions to it. Each one improves that building: faster, more output, more beds. A building can hold two.'],
   ['Research', 'Knowledge buys research on the Research tab. Research unlocks buildings and additions, speeds buildings up, and lets you use difficult land. It costs more at every tech level. Important research (anything that opens a building, longer journeys, a bigger expedition queue and the like) also takes materials of its era: wood and stone early on, then ore and tools, then gold and electronics. Research about animals takes livestock too. Each tech level\'s research needs its research building standing in your city: Shaman Hut, School, University, Laboratory, Research Institute.'],
@@ -2412,9 +2412,9 @@ function renderTile() {
     if (info.power_in && status.power.supply < status.power.demand) html += `<div class="bad small">Short of power: ` +
       `the city generates ${num(status.power.supply)} of the ${num(status.power.demand)} it needs.</div>`;
     if (info.need && !visiting) html += `<div class="bar staffing-controls" style="margin-top:6px"><span class="dim">Staffing</span>` +
-      [[1, 'First'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) => {
+      [[2, 'First'], [1, 'High'], [0, 'Normal'], [-1, 'Off']].map(([p, label]) => {
         const button = `<button data-priority="${p}" aria-pressed="${info.priority === p}" class="${info.priority === p ? 'on' : ''}">${label}</button>`;
-        return p === -1 ? `<span class="staffing-off">${button}<span class="help-tip"><button type="button" aria-label="Staffing help" aria-expanded="false" aria-controls="staffingHelp">?</button><span class="help-popup" id="staffingHelp" hidden><span>First: gets workers before other buildings. Normal: gets workers after First. Off: gets none.</span></span></span></span>` : button;
+        return p === -1 ? `<span class="staffing-off">${button}<span class="help-tip"><button type="button" aria-label="Staffing help" aria-expanded="false" aria-controls="staffingHelp">?</button><span class="help-popup" id="staffingHelp" hidden><span>First: gets workers before every other building. High: next, before Normal. Normal: whatever is left. Off: gets none.</span></span></span></span>` : button;
       }).join('') + `</div>`;
     html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) + `</div></details>`;
 
