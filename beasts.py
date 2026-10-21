@@ -53,6 +53,7 @@ MISSION_XP = 10             # experience for a completed mission, before bonuses
 TECH_PAY = [1, 2, 4, 8, 15, 25]   # "bring me" missions ask for this many times more at each tech level
 INCOME_HOURS = 1.5          # ...and at least this many hours of what the city makes of it (more for rarer and higher beasts)
 TECH_EVENTS = 0.25          # "do something" missions marked "scales" ask for 25% more per tech level
+MISSION_PAY_VERSION = 2     # "bring me" missions from before 2 were sized on what the city made before using any
 EGG_CHANCE = 0.15           # chance an expedition finds an egg...
 EGG_CHANCE_PER_STEP = 0.05  # ...plus this for every step of distance from home
 EGG_CHANCE_MAX = 0.6
@@ -570,10 +571,15 @@ def _possible(state, kind):
 
 
 def _income(state, res):
-    """How much of `res` the city's buildings make in an hour, as staffed now."""
+    """How much of `res` the city gains in an hour, as staffed now: what its buildings make, less what they use and
+    (for food) what its people eat. Not what it makes before any is used: a big city makes a great deal of food
+    and eats nearly all of it, and a mission asking for hours of that would ask for millions."""
     jobs, _, _ = game.work_plan(state)
-    return sum(game.job_output(state, j).get(res, 0) * 3600 / j["cycle"] * j["ratio"]
-               for j in jobs if j["cycle"] and j["ratio"])
+    net = sum((game.job_output(state, j).get(res, 0) - j["b"].get("consumes", {}).get(res, 0)) * 3600 / j["cycle"] * j["ratio"]
+              for j in jobs if j["cycle"] and j["ratio"])
+    if res == "food":
+        net -= state["population"] * 3600 / game.MEAL_TIME
+    return max(0.0, net)
 
 
 def _make_mission(state, kind, level, rarity):
@@ -710,6 +716,23 @@ def setup(state, now, rng=None):
     tick(state, now)
 
 
+def _resize_pay_missions(state):
+    """Once: shrink "bring me" missions not done yet that were sized on what the city made before using any."""
+    if state.get("mission_pay", 1) >= MISSION_PAY_VERSION:
+        return
+    state["mission_pay"] = MISSION_PAY_VERSION
+    tasks = [(b["task"], 0, SPECIES[b["species"]]["rarity"]) for b in state.get("beasts", []) if b["stage"] == "egg" and b.get("task")]
+    mission, active = state.get("mission"), get(state, state.get("beast_active"))
+    if mission and active:
+        tasks.append((mission, active["level"], SPECIES[active["species"]]["rarity"]))
+    for task, level, rarity in tasks:
+        if task["complete"] or not task.get("pay") or task["kind"] not in MISSIONS:
+            continue
+        fresh = _make_mission(state, task["kind"], level, rarity)
+        if fresh["need"] < task["need"]:
+            task.update(need=fresh["need"], text=fresh["text"])
+
+
 def migrate(state, now):
     if "beasts" not in state:       # a city from before beasts
         setup(state, now)
@@ -739,6 +762,7 @@ def migrate(state, now):
             else:
                 beast["task"] = _egg_task(state, beast["species"], random.Random())
     _pick_active(state)
+    _resize_pay_missions(state)
 
 
 def _pick_active(state):
