@@ -1749,7 +1749,7 @@ RESEARCH = {
 # The costs above are the base; every research but the ritual ranks (already priced on their own) costs:
 #   its knowledge times RESEARCH_SCALE[its tech level];
 #   if it is important (opens a building, or is one of IMPORTANT_EFFECTS), materials of its era as well:
-#     RESEARCH_MATERIALS[tech level], each a share of that knowledge;
+#     RESEARCH_MATERIALS[tech level], each a share of that knowledge, but never one the buildings it opens make;
 #   if it is about animals (ANIMAL_RESEARCH), livestock: RESEARCH_LIVESTOCK[tech level].
 RESEARCH_SCALE = [2, 3, 4, 5, 6, 8]
 IMPORTANT_EFFECTS = ("explore_range", "explore_discount", "exp_queue", "taming", "surveying", "breeding", "forecast")
@@ -1772,6 +1772,12 @@ def _nice(x):
 
 def _price_research():
     opens = {b["research"] for b in BUILDINGS.values() if b.get("research")}
+    # what the buildings each research opens make: that research never costs it (Semiconductors opens the
+    # Electronics Plant, so asking for electronics to research it would leave a city no way to start)
+    makes = {}
+    for b in BUILDINGS.values():
+        if b.get("research"):
+            makes.setdefault(b["research"], set()).update(b.get("produces", {}), b.get("per_head", {}))
     for rid, r in RESEARCH.items():
         if r.get("ritual"):
             continue
@@ -1780,7 +1786,8 @@ def _price_research():
         cost = {"knowledge": knowledge}
         if rid in opens or any(r.get(k) for k in IMPORTANT_EFFECTS):
             for k, share in RESEARCH_MATERIALS[tech].items():
-                cost[k] = _nice(knowledge * share)
+                if k not in makes.get(rid, ()):
+                    cost[k] = _nice(knowledge * share)
         if rid in ANIMAL_RESEARCH:
             cost["livestock"] = RESEARCH_LIVESTOCK[tech]
         r["cost"] = cost
