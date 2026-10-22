@@ -51,9 +51,11 @@ LATE_LEVEL_SHARE = 0.25     # ...and past its rarity's max_level ("full growth")
 LATE_XP_GROWTH = 1.3        # ...and each level past full growth needs 30% more experience than the one before
 MISSION_XP = 10             # experience for a completed mission, before bonuses (times the rarity's xp)
 TECH_PAY = [1, 2, 4, 8, 15, 25]   # "bring me" missions ask for this many times more at each tech level
-INCOME_HOURS = 1.5          # ...and at least this many hours of what the city makes of it (more for rarer and higher beasts)
+INCOME_HOURS = 1.5          # ...and at least this many hours of what the city makes of it (more for rarer and higher beasts)...
+PAY_CAP = 20                # ...but never more than this many times the plain amount (by tech level, rarity and level):
+                            # an uncommon egg in a Megacity asks at most 16,000 Food, a legendary one 60,000
 TECH_EVENTS = 0.25          # "do something" missions marked "scales" ask for 25% more per tech level
-MISSION_PAY_VERSION = 2     # "bring me" missions from before 2 were sized on what the city made before using any
+MISSION_PAY_VERSION = 3     # "bring me" missions from before 2 were sized on what the city made before using any; before 3 had no top
 EGG_CHANCE = 0.15           # chance an expedition finds an egg...
 EGG_CHANCE_PER_STEP = 0.05  # ...plus this for every step of distance from home
 EGG_CHANCE_MAX = 0.6
@@ -586,8 +588,9 @@ def _make_mission(state, kind, level, rarity):
     """A mission of this kind for a beast of this level and rarity (an egg is level 0)."""
     m, r = MISSIONS[kind], RARITIES[rarity]
     if m.get("pay"):
-        need = m["base"] * (1 + m["grow"] * level) * r["pay"] * TECH_PAY[min(state["tech"], len(TECH_PAY) - 1)] ** m["tech"]
-        need = max(need, INCOME_HOURS * (1 + 0.15 * level) * r["pay"] ** 0.5 * _income(state, m["pay"]))
+        plain = m["base"] * (1 + m["grow"] * level) * r["pay"] * TECH_PAY[min(state["tech"], len(TECH_PAY) - 1)] ** m["tech"]
+        need = max(plain, INCOME_HOURS * (1 + 0.15 * level) * r["pay"] ** 0.5 * _income(state, m["pay"]))
+        need = min(need, plain * PAY_CAP)
         need = max(1, int(round(need, -1) if need >= 100 else round(need)))
     else:
         scale = 1 + TECH_EVENTS * state["tech"] if m.get("scales") else 1
