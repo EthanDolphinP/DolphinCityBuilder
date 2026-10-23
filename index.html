@@ -890,6 +890,7 @@
       <div class="panel">
         <h2>Explore</h2>
         <div id="expViews" class="bar" style="margin-top:0"></div>
+        <p id="exploreSpeed" class="small" style="margin:8px 0 0"></p>
       </div>
       <div id="trip"></div>
       <div class="panel" data-exp="areas">
@@ -1980,6 +1981,7 @@ async function act(action, extra) {
   if (data.auth) return signOut(data.error);
   if (data.state) {
     accept(data);
+    statsAsk = true;      // the Stats tab is out of date now: worked out again when it is next shown
     if (guesses.some(g => predict(g.action, g.extra))) render();     // ones still on their way, again
   } else refresh();
   if (data.error) say(data.error);
@@ -2255,6 +2257,20 @@ const kv = rows => rows.length ? `<div class="kv">` + rows.map(([k, v]) => `<div
 
 // The facts about a building as [label, value] rows. `live` is the tile's
 // current figures for a building that is standing; absent for a build option.
+// Buildings' expedition speed counts in full up to +100%; past that each doubling adds the same small step (as
+// game.explore_speed works it out). So a building's own figure is not what it adds once the city has a lot.
+function exploreCounted(x) {
+  const e = view.status.explore;
+  return x <= e.full ? x : e.full + e.step * Math.log2(x / e.full);
+}
+function exploreWords(own, built) {
+  const e = view.status.explore, now = built ? e.raw - own : e.raw;
+  const adds = exploreCounted(now + own) - exploreCounted(Math.max(0, now));
+  const pct = x => `${Math.round(x * 100)}%`;
+  if (Math.abs(adds - own) < 0.005) return `travel ${pct(own)} faster`;
+  return `travel ${pct(own)} faster on its own; ${built ? 'it adds' : 'one more would add'} <span class="hi">+${pct(adds)}</span> now ` +
+    `<span class="dim small">(past +${pct(e.full)} from buildings, each one counts for less)</span>`;
+}
 function buildingRows(b, cycle, produces, live) {
   const R = view.defs.resources, rows = [];
   const housing = live ? live.housing : b.housing;
@@ -2269,7 +2285,7 @@ function buildingRows(b, cycle, produces, live) {
   if (b.nest) rows.push(['Eggs', 'one is laid here every 2 days']);
   if (b.egg_chance) rows.push(['Eggs', `expeditions ${Math.round(b.egg_chance * 100)} points likelier to find one`]);
   if (b.mission_speed) rows.push(['Missions', `come ${Math.round(b.mission_speed * 100)}% more often`]);
-  if (b.explore_speed) rows.push(['Expeditions', `travel ${Math.round(b.explore_speed * 100)}% faster`]);
+  if (b.explore_speed) rows.push(['Expeditions', exploreWords(b.explore_speed, !!live)]);
   if (b.wildlife_speed) rows.push(['Wildlife', `appears ${Math.round(b.wildlife_speed * 100)}% more often`]);
   if (b.livestock_speed) rows.push(['Herd', `faster the more livestock you own (${Math.floor(view.state.resources.livestock)} now)`]);
   if (b.fertility_aura) rows.push(['Nearby', `+${b.fertility_aura} fertility on the 8 tiles around it`]);
@@ -2552,6 +2568,10 @@ let expView = settings.expView || 'send';   // which part of the Explore tab sho
 let areaFilter = 'all', destFilter = 'all';
 function renderExplore() {
   setHTML($('tameEverywhere'), tameAllButton(view.state.areas.map((a, n) => n), 'Tame all animals in every area'));
+  const ex = view.status.explore;
+  setHTML($('exploreSpeed'), `Expeditions travel at <span class="hi">${Math.round(ex.times * 100)}%</span> of normal speed. ` +
+    `<span class="dim">Buildings add +${Math.round(ex.raw * 100)}%` + (ex.raw > ex.full ? `, which counts as +${Math.round(ex.counted * 100)}%: past +${Math.round(ex.full * 100)}% each one adds less` : '') +
+    `. A team already on its way keeps the time it set out with.</span>`);
   const { defs, explore, state } = view, E = defs.environments, T = defs.terrains;
   const trip = explore.expedition;
   const destinations = explore.destinations.filter(d => !trip || d.rx !== trip.rx || d.ry !== trip.ry);
@@ -2613,7 +2633,8 @@ function renderExplore() {
     (gfx() ? `<div class="expedition-icon">${icon('pin')}</div>` : '') +
     `<div class="expedition-info"><div class="expedition-label">Expedition underway</div>` +
     `<div class="expedition-destination">${esc(E[trip.env].name)}</div><div>${esc(trip.where)} of home</div></div>` +
-    `<div class="expedition-arrival"><span class="small dim">Arrives in</span><strong data-timer="trip"></strong></div>` +
+    `<div class="expedition-arrival"><span class="small dim">Arrives in</span><strong data-timer="trip"></strong>` +
+    `<span class="small dim" title="Building or demolishing things now changes the next expedition's time, not this one's">set when it left</span></div>` +
     `<div class="expedition-route">Home<span aria-hidden="true"></span>Mapping new land ${gfxIcon('pin')}</div></section>` +
     // ---- the queue: teams packed and waiting to set off when the one before is back ----
     `<div class="panel" style="margin-top:12px"><div class="head"><h2 style="margin:0">Waiting to set off</h2>` +

@@ -4477,6 +4477,11 @@ def _view(state, ai, detail):
             "unpaused_rates": projected["rates"],
             "unpaused_power": projected["power"],
             "meal_time": MEAL_TIME,
+            # expedition speed: what buildings add before and after the step past FULL_EXPLORE_SPEED, and in all
+            "explore": {"raw": round(city_stat(state, "explore_speed"), 3), "counted": round(explore_speed(state), 3),
+                        "full": FULL_EXPLORE_SPEED, "step": EXPLORE_SPEED_STEP,
+                        "times": round((1 + explore_speed(state) + beasts.bonus(state, "explore_speed"))
+                                       * ideology.curse_factor(state, "explore"), 3)},
             "food_made": round(food_made, 1),
             "food_potential": round(food_potential, 1),
             "food_eaten": round(state["population"] * 3600 / MEAL_TIME, 1),
