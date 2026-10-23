@@ -728,12 +728,13 @@ def _resize_pay_missions(state):
     mission, active = state.get("mission"), get(state, state.get("beast_active"))
     if mission and active:
         tasks.append((mission, active["level"], SPECIES[active["species"]]["rarity"]))
-    for task, level, rarity in tasks:
-        if task["complete"] or not task.get("pay") or task["kind"] not in MISSIONS:
-            continue
-        fresh = _make_mission(state, task["kind"], level, rarity)
-        if fresh["need"] < task["need"]:
-            task.update(need=fresh["need"], text=fresh["text"])
+    with game.reading():        # the city's work plan once, not once for every mission
+        for task, level, rarity in tasks:
+            if task["complete"] or not task.get("pay") or task["kind"] not in MISSIONS:
+                continue
+            fresh = _make_mission(state, task["kind"], level, rarity)
+            if fresh["need"] < task["need"]:
+                task.update(need=fresh["need"], text=fresh["text"])
 
 
 def migrate(state, now):

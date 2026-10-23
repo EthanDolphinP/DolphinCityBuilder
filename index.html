@@ -29,6 +29,9 @@
   button { cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   button:disabled { color: var(--faint); cursor: not-allowed; }
+  /* pressed and waiting for the server: shown at once, so a click never looks ignored */
+  button.working { cursor: progress; border-color: var(--accent, currentColor); animation: working 0.8s ease-in-out infinite alternate; }
+  @keyframes working { from { opacity: 1; } to { opacity: 0.45; } }
   input[type=number] { width: 90px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }   /* auto-fit: each row is filled edge to edge */
   .stat { border: 1px solid var(--line); background: var(--inset); padding: 6px 9px; min-width: 0; }
@@ -1994,9 +1997,24 @@ function predict(action, extra) {
   return true;
 }
 
+// The button just pressed, so the action it starts can show it working until the server answers. A button
+// already working ignores more presses (a second click would do the same thing twice).
+let lastPress = null;
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button');
+  if (!b) return;
+  if (b.classList.contains('working')) { e.stopPropagation(); e.preventDefault(); return; }
+  lastPress = { b, t: performance.now() };
+}, true);
 async function act(action, extra) {
   if (visiting) return;
   if (action === 'add' && pendingActions) return;
+  const pressed = lastPress && performance.now() - lastPress.t < 400 ? lastPress.b : null;
+  lastPress = null;
+  if (pressed) pressed.classList.add('working');
+  try { return await doAct(action, extra); } finally { if (pressed) pressed.classList.remove('working'); }
+}
+async function doAct(action, extra) {
   actionRevision++;
   pendingActions++;
   const log = view ? view.state.log : [], last = log.length ? log[log.length - 1] : null;

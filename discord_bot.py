@@ -249,6 +249,8 @@ def _reply(embed, private=False):
 
 def _cities(server, now):
     """Every city's public summary (the leaderboard's row)."""
+    if hasattr(server, "leaderboard"):      # the running game: its leaderboard, worked out at most every few seconds
+        return server.leaderboard(now)
     import game
     return [game.summary(c) for c in (server.get_city(n, now) for n in server.all_city_names()) if c]
 

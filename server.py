@@ -68,6 +68,12 @@ SIGN_IN = {"error": "Sign in to this city first.", "auth": True}
 LOCK = threading.Lock()   # guards everything below
 CITIES = {}               # name -> state
 DIRTY = set()             # names changed since the last write to disk
+TOUCHED = set()           # names read or changed while answering the request in hand (an action saves just these)
+LAST_UPKEEP = 0.0         # when bills, the market's tidying and presents were last seen to
+UPKEEP_SECONDS = 3        # ...done at most this often, not before every request
+BOARD = {"at": 0.0, "rows": None}    # the leaderboard, worked out at most every BOARD_SECONDS
+BOARD_SECONDS = 15
+BOARD_BUDGET = 0.5        # seconds the leaderboard may spend bringing cities up to date; the rest show as last saved
 MARKET = None
 FAILED = {}               # name -> [wrong passwords in a row, locked until]
 ONLINE = {}               # name -> when its own player's page last asked for it (in use or not)
@@ -98,8 +104,8 @@ def _write(path, data):
     os.replace(tmp, path)
 
 
-def get_city(name, now, create=False):
-    """The city brought up to the present moment, or None if it doesn't exist."""
+def _loaded(name, now, create=False):
+    """The city in memory, loaded from its save if it isn't yet (not brought up to date), or None."""
     state = CITIES.get(name)
     if state is None:
         path = SAVES / f"{name}.json"
@@ -110,9 +116,39 @@ def get_city(name, now, create=False):
         else:
             return None
         CITIES[name] = state
+    return state
+
+
+def get_city(name, now, create=False):
+    """The city brought up to the present moment, or None if it doesn't exist."""
+    state = _loaded(name, now, create)
+    if state is None:
+        return None
     game.advance_time(state, now)
     DIRTY.add(name)
+    TOUCHED.add(name)
     return state
+
+
+def leaderboard(now):
+    """Every city's leaderboard row. Worked out at most every BOARD_SECONDS, and only reading: a city brought up to
+    date for it is not saved for that (its next save, or catching up again after a restart, covers it). Cities are
+    brought up to date for at most BOARD_BUDGET seconds a time, the ones in use first; the rest show as they were
+    when last brought up to date, and catch up on later rounds. So the board never holds up everyone else."""
+    if BOARD["rows"] is not None and now - BOARD["at"] < BOARD_SECONDS:
+        return BOARD["rows"]
+    start, rows = time.perf_counter(), []
+    names = all_city_names()
+    names.sort(key=lambda n: (n not in CITIES, -ONLINE.get(n, 0)))
+    for name in names:
+        state = _loaded(name, now)
+        if state is None:
+            continue
+        if time.perf_counter() - start < BOARD_BUDGET:
+            game.advance_time(state, now)
+        rows.append(game.summary(state))
+    BOARD.update(at=now, rows=sorted(rows, key=lambda r: r["name"]))
+    return BOARD["rows"]
 
 
 def _password_hash(password, salt):
@@ -173,7 +209,7 @@ def login(name, password, now):
     reply["token"] = secrets.token_urlsafe(24)
     state.setdefault("sessions", []).append(_token_hash(reply["token"]))
     del state["sessions"][:-MAX_SESSIONS]
-    flush()
+    flush(TOUCHED | {name})
     return 200, reply
 
 
@@ -279,13 +315,18 @@ def flagged_names(now):
     return out
 
 
-def flush():
+def flush(names=None):
+    """Write changed cities and the market to disk. With `names`, just those cities (the ones an action
+    touched): every other city waits for the next autosave, so a click doesn't rewrite every save."""
     global LAST_SAVE
-    LAST_SAVE = time.time()
     SAVES.mkdir(exist_ok=True)
-    for name in DIRTY:
-        _write(SAVES / f"{name}.json", CITIES[name])
-    DIRTY.clear()
+    if names is None:
+        LAST_SAVE = time.time()
+        names = set(DIRTY)
+    for name in set(names):
+        if name in CITIES:
+            _write(SAVES / f"{name}.json", CITIES[name])
+        DIRTY.discard(name)
     _write(MARKET_FILE, MARKET)
 
 
@@ -304,7 +345,11 @@ def startup():
 
 
 def run_bills(now):
-    """Market upkeep done before every request: bills that are due, empty offers to clear."""
+    """Market upkeep, every few seconds: bills that are due, empty offers to clear, presents sent from the console."""
+    global LAST_UPKEEP
+    if now - LAST_UPKEEP < UPKEEP_SECONDS:
+        return
+    LAST_UPKEEP = now
     market.run_bills(MARKET, now, lambda name: find_city(name, now))
     market.tidy(MARKET, now, lambda name: find_city(name, now))
     deliver_presents(now)
@@ -472,7 +517,7 @@ def _area(value):
 def handle_get(path, query, token, now):
     """Answer a GET. Returns (status, body) or (status, body, content type). Needs LOCK."""
     if path == "/api/leaderboard":
-        return 200, {"cities": [game.summary(get_city(n, now)) for n in all_city_names()]}
+        return 200, {"cities": leaderboard(now)}
 
     if path == "/api/state":
         name = query.get("city", [""])[0]
@@ -581,7 +626,7 @@ def handle_post(path, data, token, now):
         ONLINE.pop(name, None)
         ACTIVE.pop(name, None)
         state["sessions"].remove(_token_hash(token))
-        flush()
+        flush(TOUCHED)
         return 200, {"error": None}
     elif action == "offer_post":
         error = market.post(MARKET, state, now, data)
@@ -659,7 +704,9 @@ def handle_post(path, data, token, now):
             discord_bot.announce(f"\U0001F389 **{name}** is now a **{game.TECH_LEVELS[state['tech']]['name']}**!")
         if not error and state.get("ideology") and not belief:
             discord_bot.announce(f"\U0001F54A\uFE0F **{name}** has taken up **{game.ideology.IDEOLOGIES[state['ideology']]['name']}**.")
-    flush()
+    if action == "restart":
+        TOUCHED.add(name)
+    flush(TOUCHED)
     out = city_view(state, now, 0 if action == "restart" else data.get("area", 0), data.get("find"),
                     data.get("tile"), data.get("defs"), data.get("stats") is True)
     out["error"] = error
@@ -691,6 +738,7 @@ def respond(method, path, query="", token=None, body=b"", headers=None):
         if not isinstance(data, dict):
             method = None
     with LOCK:
+        TOUCHED.clear()
         if method in ("GET", "POST"):
             try:
                 run_bills(now)
