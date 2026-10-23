@@ -5038,9 +5038,13 @@ $('explore').onclick = e => {
   const [rx, ry] = e.target.dataset.send.split(',').map(Number);
   act('explore', { rx, ry });
 };
+// The Mastery panel sits above the research list, so its buttons need their own listener.
+$('mastery').onclick = e => {
+  const b = e.target.closest('[data-master]');
+  if (b && !visiting) act('mastery', { resource: b.dataset.master });
+};
 $('research').onclick = e => {
   if (e.target.dataset.research) act('research', { research: e.target.dataset.research });
-  else if (e.target.dataset.master) act('mastery', { resource: e.target.dataset.master });
 };
 $('research').addEventListener('toggle', e => {
   const key = e.target.dataset && e.target.dataset.fold;
