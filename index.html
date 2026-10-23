@@ -1958,7 +1958,41 @@ let pendingActions = 0, actionRevision = 0, refreshRevision = 0;
 const pendingTiles = new Set();     // "area:x,y" of tiles the page has changed ahead of the server
 const guesses = [];                 // [{id, action, extra}] waiting for the server's answer
 let guessId = 0;
+// Buttons away from the map answered at once too: research, mastery and the active beast.
+function predictOther(action, extra) {
+  const { state, defs } = view, have = state.resources;
+  const afford = cost => Object.entries(cost).every(([k, v]) => have[k] >= v);
+  const pay = cost => { for (const [k, v] of Object.entries(cost)) have[k] -= v; };
+  if (action === 'research') {
+    const r = (view.research || []).find(x => x.id === extra.research), d = defs.research && defs.research[extra.research];
+    if (!r || !d || r.done || r.problem || !afford(d.cost)) return false;
+    pay(d.cost);
+    r.done = true;
+    if (!state.research.includes(r.id)) state.research = [...state.research, r.id];
+    for (const x of view.research) if (!x.done && defs.research[x.id]) x.affordable = afford(defs.research[x.id].cost);
+    return true;
+  }
+  if (action === 'mastery') {
+    const m = view.mastery, x = m && m.tracks[extra.resource];
+    if (!x || !m.open || !afford(x.cost)) return false;
+    pay(x.cost);
+    x.level += 1;
+    x.bonus = Math.round((x.bonus + m.step) * 1000) / 1000;
+    for (const k of Object.keys(x.cost)) x.cost[k] = Math.round(x.cost[k] * m.growth);    // near enough until the answer
+    for (const t of Object.values(m.tracks)) t.affordable = afford(t.cost);
+    return true;
+  }
+  if (action === 'beast_active') {
+    const b = view.beast && view.beast.beasts.find(x => x.id === extra.beast);
+    if (!b || b.egg || b.active) return false;
+    for (const x of view.beast.beasts) x.active = x.id === b.id;
+    state.beast_active = b.id;
+    return true;
+  }
+  return false;
+}
 function predict(action, extra) {
+  if (view && !visiting && extra && !('x' in extra)) return predictOther(action, extra);
   if (!view || visiting || !extra || !('x' in extra)) return false;
   const { state, defs } = view, area = view.area;
   if (extra.area !== undefined && extra.area !== area) return false;

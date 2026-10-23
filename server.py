@@ -71,9 +71,9 @@ DIRTY = set()             # names changed since the last write to disk
 TOUCHED = set()           # names read or changed while answering the request in hand (an action saves just these)
 LAST_UPKEEP = 0.0         # when bills, the market's tidying and presents were last seen to
 UPKEEP_SECONDS = 3        # ...done at most this often, not before every request
-BOARD = {"at": 0.0, "rows": None}    # the leaderboard, worked out at most every BOARD_SECONDS
+BOARD = {"at": 0.0, "rows": {}, "done": {}}     # the leaderboard: name -> row, and when each row was worked out
 BOARD_SECONDS = 15
-BOARD_BUDGET = 0.5        # seconds the leaderboard may spend bringing cities up to date; the rest show as last saved
+BOARD_BUDGET = 0.08       # seconds a leaderboard request may spend on rows; the rest wait for later requests
 MARKET = None
 FAILED = {}               # name -> [wrong passwords in a row, locked until]
 ONLINE = {}               # name -> when its own player's page last asked for it (in use or not)
@@ -130,25 +130,37 @@ def get_city(name, now, create=False):
     return state
 
 
+def _board_row(name, now, catch_up):
+    state = _loaded(name, now)
+    if state is None:
+        BOARD["rows"].pop(name, None)
+        return
+    if catch_up:
+        game.advance_time(state, now)       # only reading: not saved for this (its next save covers it)
+    BOARD["rows"][name] = game.summary(state)
+    BOARD["done"][name] = now
+
+
 def leaderboard(now):
-    """Every city's leaderboard row. Worked out at most every BOARD_SECONDS, and only reading: a city brought up to
-    date for it is not saved for that (its next save, or catching up again after a restart, covers it). Cities are
-    brought up to date for at most BOARD_BUDGET seconds a time, the ones in use first; the rest show as they were
-    when last brought up to date, and catch up on later rounds. So the board never holds up everyone else."""
-    if BOARD["rows"] is not None and now - BOARD["at"] < BOARD_SECONDS:
-        return BOARD["rows"]
-    start, rows = time.perf_counter(), []
-    names = all_city_names()
-    names.sort(key=lambda n: (n not in CITIES, -ONLINE.get(n, 0)))
-    for name in names:
-        state = _loaded(name, now)
-        if state is None:
-            continue
-        if time.perf_counter() - start < BOARD_BUDGET:
-            game.advance_time(state, now)
-        rows.append(game.summary(state))
-    BOARD.update(at=now, rows=sorted(rows, key=lambda r: r["name"]))
-    return BOARD["rows"]
+    """Every city's leaderboard row. Rows are kept, and each request works out again only the oldest ones, for at
+    most BOARD_BUDGET seconds (the cities in use most often), so the board never holds up everyone else. A city
+    nobody has a row for yet is shown as last saved, and caught up on a later round."""
+    if now - BOARD["at"] >= BOARD_SECONDS:
+        BOARD["at"] = now
+        for gone in set(BOARD["rows"]) - set(all_city_names()):
+            BOARD["rows"].pop(gone, None)
+    start = time.perf_counter()
+    for name in all_city_names():   # a city not loaded yet (just after a restart) joins once it is: see warm_up()
+        if name not in BOARD["rows"] and (name in CITIES or time.perf_counter() - start < BOARD_BUDGET):
+            _board_row(name, now, catch_up=False)
+    start = time.perf_counter()
+    stale = sorted((n for n in BOARD["rows"] if now - BOARD["done"].get(n, 0) >= BOARD_SECONDS),
+                   key=lambda n: (n not in ONLINE, BOARD["done"].get(n, 0)))
+    for name in stale:
+        if time.perf_counter() - start >= BOARD_BUDGET:
+            break
+        _board_row(name, now, catch_up=True)
+    return [BOARD["rows"][n] for n in sorted(BOARD["rows"])]
 
 
 def _password_hash(password, salt):
@@ -220,11 +232,17 @@ def find_city(name, now):
     return get_city(name, now)
 
 
+DISK_NAMES = {"at": -1e9, "names": set()}    # the saves folder's list of cities, looked at every NAMES_SECONDS
+NAMES_SECONDS = 30
+
+
 def all_city_names():
-    names = set(CITIES)
-    if SAVES.exists():
-        names.update(p.stem for p in SAVES.glob("*.json"))
-    return sorted(names)
+    """Every city: those in memory (a new one is at once) and those saved. The folder is listed at most every
+    NAMES_SECONDS (every update sends the list, and listing a folder is slow on a web host's network disk)."""
+    clock = time.time()
+    if clock - DISK_NAMES["at"] >= NAMES_SECONDS:
+        DISK_NAMES.update(at=clock, names={p.stem for p in SAVES.glob("*.json")} if SAVES.exists() else set())
+    return sorted(set(CITIES) | DISK_NAMES["names"])
 
 
 def match_city(name):
@@ -273,6 +291,7 @@ def rename_city(old, new, now):
     DIRTY.discard(old)
     DIRTY.update(CITIES)
     flush()
+    DISK_NAMES["at"] = -1e9         # list the folder again: the old name is gone
     old_file = SAVES / f"{old}.json"
     if old_file.exists() and old.lower() != new.lower():
         old_file.unlink()          # its contents are in the new file now
@@ -299,6 +318,8 @@ def remove_city(name, now):
         book.pop(name, None)
     market.drop_city(MARKET, name)
     flush()
+    DISK_NAMES["at"] = -1e9
+    BOARD["rows"].pop(name, None)
     return name, None
 
 
@@ -330,8 +351,21 @@ def flush(names=None):
     _write(MARKET_FILE, MARKET)
 
 
+def warm_up():
+    """Just after a restart: load every city into memory one at a time, letting go of LOCK between them, so the
+    first player to open the leaderboard (or trade with a city nobody has opened yet) doesn't wait for all of them."""
+    for name in all_city_names():
+        with LOCK:
+            if name not in CITIES:
+                try:
+                    _loaded(name, time.time())
+                except Exception:
+                    traceback.print_exc()
+        time.sleep(0.02)
+
+
 def startup():
-    """Load the market. Call once before the first request."""
+    """Load the market, and start loading the cities. Call once before the first request."""
     global MARKET
     if MARKET is None:
         MARKET = (json.loads(MARKET_FILE.read_text(encoding="utf-8"))
@@ -342,6 +376,7 @@ def startup():
         MARKET.setdefault("duels", [])
         for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
             offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
+        threading.Thread(target=warm_up, daemon=True).start()
 
 
 def run_bills(now):
