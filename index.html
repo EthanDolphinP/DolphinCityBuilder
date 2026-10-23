@@ -315,9 +315,15 @@
   .visiting [data-priority], .visiting .staffing-controls, .visiting #tameHere, .visiting #tameEverywhere, .visiting [data-exp-cancel],
   .visiting [data-trade], .visiting [data-trade-post], .visiting [data-egg-deliver-all], .visiting [data-choose-site], .visiting #buildTools,
   .visiting [data-ideology-choose], .visiting [data-perk-take], .visiting [data-ritual-start], .visiting [data-curse-cast],
+  .visiting [data-art-craft], .visiting [data-art-enshrine], .visiting [data-art-buy], .visiting [data-art-sell],
   .visiting [data-breed-collect], .visiting [data-breed-start], .visiting [data-breed-stop], .visiting [data-breed-queue], .visiting [data-breed-unqueue] { display: none; }
   a.button { display: inline-block; padding: 6px 14px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
   a.button:hover { background: var(--inset); }
+  .artList { display: flex; flex-direction: column; }
+  .artRow { border-top: 1px solid var(--line); padding: 7px 4px; }
+  .artRow.on { background: var(--inset); }
+  .grade sub { font-size: 10px; margin-left: 1px; }
+  button.mini { min-height: 0; padding: 2px 8px; font-size: 12px; }
   .queueRow button { min-height: 0; padding: 1px 8px; font-size: 12px; margin-left: 6px; }
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
   .guideText { margin-top: 2px; font-size: 14px; }
@@ -1647,6 +1653,7 @@ const HOWTO = [
 
   ['Hexes, sabotage and rivals', 'Each ideology can also act against another city in its own way: The Old Faith lays Hexes, Progress commits Sabotage, Commerce sets Embargoes, Kinship with the Wild spreads Blights, The Wayfarers send Misfortunes and Community starts Feuds. Each has five, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can act against cities from one tech level below yours to two above, and each of yours can be on one city at a time; those from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Anything rivals have done to your city is shown on the Ideology tab and wears off by itself.'],
   ['Ideology', 'When your city becomes a Village it chooses an ideology: The Old Faith, Progress, Commerce, Kinship with the Wild, The Wayfarers or Community. Each gives a bonus straight away, to production, people, beasts or expeditions. Every tech level from Village up then earns a point to spend on one of its perks on the Ideology tab: the Old Faith\'s are blessings of the gods, Progress\'s are great breakthroughs, and so on. Points keep until you spend them. The choice of ideology is for good.'],
+  ['Artifacts', 'Once your city has an ideology, the Artifacts part of the Ideology tab crafts its five artifacts from resources alone (no tech level needed). Every artifact rolls three stats from 1 to 100: Potency sets the strength of its first buff, Resonance its second, and Purity makes both stronger. Stats roll very low: most are under 20, a stat of 90 or more is about 1 craft in 75, all three about 1 in 450,000, and a perfect artifact far rarer still. Craft in batches of up to 10,000: each batch keeps its best 3. Up to 3 artifacts work at once in your shrine, one of each kind, and your own ideology\'s work 25% stronger. Every artifact gives its own pair of buffs, and some buffs only come from one ideology, so the one you want may mean buying it from another city on the artifact market.'],
   ['Discord and updates', 'The game has a Discord server: https://discord.gg/FCAb5uMp2K. Join it if you would like to be told when the game is updated, and to hear about events and presents. You can ask questions there, suggest ideas and talk with other players, and the server can show the leaderboard and any city with /leaderboard and /city. Type /claim with the code on your Settings tab to get the Land Owner role for your city.'],
   ['Presents', 'Now and then the person running the game sends a present. It appears wrapped; press Open to see what is inside and add it to your stores.'],
   ['Stats', 'The Stats tab has everything about your city in numbers: people, every resource and what makes it, buildings, power, land, research, bonuses, time and weather, beasts, the market and your rank among other cities, and all-time counts of what the city has made, built and done since stats began. Pick a section along the top or search for any stat.'],
@@ -3475,6 +3482,7 @@ function renderIdeology() {
                                     : Object.keys(iv.curses.cursing).length ? `${Object.keys(iv.curses.cursing).length} on others` : ''],
                   rituals: [i.ritual_plural, Object.keys(iv.rituals.active).length ? `<span class="good">${Object.keys(iv.rituals.active).length} running</span>`
                                               : iv.rituals.rank ? `${iv.rituals.rank} of 5 open` : 'need research'],
+                  artifacts: ['Artifacts', `${(view.artifacts.shrine || []).length} of ${view.defs.artifacts.slots} enshrined`],
                   compare: ['Compare all six', ''], all: ['Everything', ''] };
   if (!parts[ideoView]) ideoView = 'mine';
   const show = part => ideoView === 'all' || ideoView === part;
@@ -3522,8 +3530,106 @@ function renderIdeology() {
 
   setHTMLKeep(box, header + (show('mine') ? mine : '') + (show('rituals') ? ritualPanel(i, iv, own) : '') +
     (show('curses') ? cursedPanel(iv) + cursePanel(i, iv, own) : (iv.curses.on_me.length && show('mine') ? cursedPanel(iv) : '')) +
-    (show('perks') ? perkPanel : '') + (show('compare') ? compare : ''));
+    (show('perks') ? perkPanel : '') + (show('artifacts') ? artifactPanel(i, iv, own) : '') + (show('compare') ? compare : ''));
 }
+// ---- artifacts: crafted from resources alone, three random stats, traded between any cities ----
+let artTimes = 100;                    // how many to craft in one go
+const artSell = { id: null, qty: '1000', res: 'gold' };   // the vault artifact being put up for sale, and its price
+let artFind = '';                      // the market's filter: a kind of artifact, '' for all
+const artGrade = (v, g) => `<span class="grade g${g}" title="${v} of 100">${v}<sub>${g}</sub></span>`;
+const artStats = a => Object.entries(view.defs.artifacts.stats).map(([k, name]) =>
+  `<span class="dim">${esc(name)}</span> ${artGrade(a.stats[k], a.grades[k])}`).join(' ');
+const artName = (kind, extra) => { const K = view.defs.artifacts.kinds[kind], I = view.defs.ideologies[K.ideology];
+  return `<span class="hi" style="color:${esc(I.color)}">${esc(K.name)}</span>${extra ? '' : ` <span class="dim small">${esc(I.name)}</span>`}`; };
+function artifactPanel(i, iv, own) {
+  const A = view.defs.artifacts, av = view.artifacts, R = view.defs.resources, state = view.state;
+  const vault = [...av.vault].sort((a, b) => (b.enshrined - a.enshrined) || (Object.values(b.stats).reduce((x, y) => x + y) - Object.values(a.stats).reduce((x, y) => x + y)));
+  let html = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Artifacts</h2>` +
+    `<p class="dim small" style="margin-top:0">Craft your ideology's five artifacts from resources, or buy any ideology's on the market below. ` +
+    `Each rolls three stats from 1 to 100: <span class="hi">Potency</span> sets its first buff, <span class="hi">Resonance</span> its second, ` +
+    `and <span class="hi">Purity</span> makes both stronger. High stats are very rare: most are under 20, and a perfect artifact may take ` +
+    `millions of crafts. Up to ${A.slots} work at once in your shrine (one of each kind), and your own ideology's work ${Math.round((A.attuned - 1) * 100)}% stronger.</p>`;
+  // ---- the shrine
+  const shrine = vault.filter(a => a.enshrined);
+  html += `<div class="cat">Shrine <span class="dim">(${shrine.length} of ${A.slots})</span></div>` +
+    (shrine.length ? shrine.map(a => `<div class="opt">${artName(a.kind)} &nbsp; ${artStats(a)}<br><span class="good small">${a.text.map(esc).join(', ')}</span>` +
+      (own ? ` <button class="mini" data-art-unenshrine="${a.id}">Take out</button>` : '') + `</div>`).join('') +
+      (av.total.length ? `<div class="small" style="margin-top:4px"><span class="dim">All together:</span> <span class="good">${av.total.map(esc).join(', ')}</span></div>` : '')
+      : `<p class="dim small">Nothing is enshrined. Enshrine an artifact from your vault below.</p>`);
+  // ---- crafting
+  if (own) {
+    const mine = Object.entries(A.kinds).filter(([, k]) => k.ideology === iv.id);
+    const set = n => `<button class="${artTimes === n ? 'on' : ''}" data-art-times="${n}">x${num(n)}</button>`;
+    html += `<div class="cat">Craft</div><div class="bar" style="margin-top:0"><span class="dim">How many</span>` +
+      `<input type="text" inputmode="numeric" autocomplete="off" data-art-box data-k="art-times" value="${artTimes}" style="width:90px" title="1 to ${num(A.max_batch)}">` +
+      [1, 100, 1000, 10000].map(set).join('') + `<span class="dim small">the best ${A.keep} of each batch are kept; the rest crumble to dust</span></div>` +
+      `<div class="ideoCards" style="margin-top:8px">` + mine.map(([kind, k]) => {
+        const cost = Object.fromEntries(Object.entries(k.cost).map(([r, v]) => [r, v * artTimes]));
+        const afford = Object.entries(cost).every(([r, v]) => state.resources[r] >= v);
+        return `<div class="ideoCard"><span class="name">${esc(k.name)}</span><span class="dim small">${esc(k.desc)}</span>` +
+          `<div class="small good">At best: ${k.full.map(esc).join(', ')}</div>` +
+          `<div class="small">Each takes ${goods(k.cost)}</div>` +
+          `<button data-art-craft="${kind}" ${afford ? '' : 'disabled'} title="${afford ? '' : 'You do not have enough'}">Craft ${num(artTimes)} <span class="dim small">(${goods(cost)})</span></button></div>`;
+      }).join('') + `</div>`;
+  }
+  // ---- the vault
+  html += `<div class="cat">Vault <span class="dim">(${vault.length} of ${A.vault})</span></div>` + (vault.length
+    ? `<div class="artList">` + vault.map(a => `<div class="artRow${a.enshrined ? ' on' : ''}"><div>${artName(a.kind)}${a.enshrined ? ' <span class="good small">enshrined</span>' : ''}</div>` +
+        `<div class="small">${artStats(a)}</div><div class="small good">${a.text.map(esc).join(', ')}</div>` +
+        (!own ? '' : `<div class="bar" style="margin-top:4px">` + (a.enshrined ? `<button class="mini" data-art-unenshrine="${a.id}">Take out</button>`
+          : `<button class="mini" data-art-enshrine="${a.id}">Enshrine</button><button class="mini" data-art-sell="${a.id}">Sell</button>` +
+            `<button class="mini" data-art-break="${a.id}" title="Destroy it to make room in the vault">Break up</button>`) + `</div>` +
+          (artSell.id === a.id ? `<div class="bar"><span class="dim">Sell for</span><input type="text" inputmode="decimal" autocomplete="off" data-art-qty data-k="art-qty" value="${esc(artSell.qty)}" style="width:100px">` +
+            `<select data-art-res>${view.defs.tradeable.map(r => `<option value="${r}" ${r === artSell.res ? 'selected' : ''}>${esc(R[r])}</option>`).join('')}</select>` +
+            `<button data-art-post="${a.id}">Put on the market</button><button class="mini" data-art-sell-close>Cancel</button></div>` : '')) + `</div>`).join('') + `</div>`
+    : `<p class="dim small">Your vault is empty.</p>`);
+  // ---- the market
+  const offers = (view.market.artifact_offers || []).filter(o => !artFind || o.artifact.kind === artFind);
+  const kinds = Object.entries(A.kinds).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  html += `<div class="cat">Artifact market <span class="dim">(${(view.market.artifact_offers || []).length})</span></div>` +
+    `<div class="bar" style="margin-top:0"><label class="dim">Show <select data-art-find><option value="">every artifact</option>` +
+    kinds.map(([k, x]) => `<option value="${k}" ${k === artFind ? 'selected' : ''}>${esc(x.name)} (${esc(x.full.join(', '))})</option>`).join('') + `</select></label></div>` +
+    (offers.length ? `<div class="artList">` + offers.sort((a, b) => a.qty - b.qty).map(o => {
+      const mine = o.city === state.name, ok = state.resources[o.res] >= o.qty;
+      return `<div class="artRow"><div>${artName(o.artifact.kind)} <span class="dim small">from ${esc(o.city)}${mine ? ' (you)' : ''}</span></div>` +
+        `<div class="small">${artStats(o.artifact)}</div><div class="small good">${o.artifact.text.map(esc).join(', ')}</div>` +
+        `<div class="bar" style="margin-top:4px"><span>${num(o.qty)} ${esc(R[o.res])}</span>` +
+        (!own ? '' : mine ? `<button class="mini" data-art-withdraw="${o.id}">Withdraw</button>`
+          : `<button class="mini" data-art-buy="${o.id}" ${ok ? '' : 'disabled'} title="${ok ? '' : 'You do not have enough'}">Buy</button>`) + `</div></div>`;
+    }).join('') + `</div>` : `<p class="dim small">${artFind ? 'None of those on the market.' : 'Nothing on the market yet.'}</p>`);
+  return html + `</div>`;
+}
+$('ideologyBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-art-times], [data-art-craft], [data-art-enshrine], [data-art-unenshrine], [data-art-sell], [data-art-sell-close], [data-art-post], [data-art-break], [data-art-buy], [data-art-withdraw]');
+  if (!b || visiting) return;
+  const d = b.dataset, A = view.defs.artifacts;
+  if (d.artTimes) { artTimes = +d.artTimes; renderIdeology(); }
+  else if (d.artCraft) act('artifact_craft', { kind: d.artCraft, times: artTimes });
+  else if (d.artEnshrine) act('artifact_enshrine', { artifact: +d.artEnshrine });
+  else if (d.artUnenshrine) act('artifact_unenshrine', { artifact: +d.artUnenshrine });
+  else if (d.artSell) { artSell.id = +d.artSell; renderIdeology(); }
+  else if ('artSellClose' in d) { artSell.id = null; renderIdeology(); }
+  else if (d.artPost) {
+    const qty = Math.round(amount(artSell.qty));
+    if (!(qty >= 1)) { say('Say how much you want for it, such as 500 or 2.5k.'); return; }
+    act('artifact_offer_post', { artifact: +d.artPost, res: artSell.res, qty });
+    artSell.id = null;
+  }
+  else if (d.artBreak) { if (confirm('Break this artifact up? It is gone for good.')) act('artifact_break', { artifact: +d.artBreak }); }
+  else if (d.artBuy) {
+    const o = view.market.artifact_offers.find(x => x.id === +d.artBuy);
+    if (o && confirm(`Buy this ${o.artifact.name} from ${o.city} for ${num(o.qty)} ${view.defs.resources[o.res]}?`)) act('artifact_offer_accept', { offer: o.id });
+  }
+  else if (d.artWithdraw) act('artifact_offer_cancel', { offer: +d.artWithdraw });
+});
+$('ideologyBody').addEventListener('input', e => {
+  const d = e.target.dataset;
+  if ('artBox' in d) { const v = Math.round(amount(e.target.value)); if (v >= 1) artTimes = Math.min(view.defs.artifacts.max_batch, v); }
+  else if ('artQty' in d) artSell.qty = e.target.value;
+  else if ('artRes' in d) artSell.res = e.target.value;
+  else if ('artFind' in d) { artFind = e.target.value; renderIdeology(); }
+});
+$('ideologyBody').addEventListener('change', e => { if ('artBox' in e.target.dataset) renderIdeology(); });
 // ---- rituals: gold given to the ideology buys a bonus for a while ----
 let ritualGift = null;     // the gold typed in the gift box (kept while the page redraws)
 const ritualPct = x => `${Math.round(x * 100)}%`;

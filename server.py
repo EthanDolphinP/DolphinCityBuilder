@@ -297,6 +297,7 @@ def startup():
                   if MARKET_FILE.exists() else market.new_market())
         MARKET.setdefault("bills", [])
         MARKET.setdefault("beast_offers", [])
+        MARKET.setdefault("artifact_offers", [])
         MARKET.setdefault("duels", [])
         for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
             offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
@@ -407,7 +408,8 @@ def _city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=F
         out["found"] = game.find(state, *find.split(":", 1), here=out["area"])
     out["state"] = _sent_state(state, out["area"])
     out["now"] = now
-    out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]))
+    out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]),
+                         artifact_offers=market.artifact_offers_view(MARKET))
     out["cities"] = all_city_names()
     out["online"] = sorted(n for n in ONLINE if presence(n, now) == "online")
     out["idle"] = sorted(n for n in ONLINE if presence(n, now) == "idle")
@@ -592,6 +594,12 @@ def handle_post(path, data, token, now):
     elif action == "market_seen":      # the player has read what sold while they were away
         state["sales"] = []
         error = None
+    elif action == "artifact_offer_post":
+        error = market.post_artifact(MARKET, state, now, data.get("artifact"), data.get("res"), data.get("qty"))
+    elif action == "artifact_offer_cancel":
+        error = market.cancel_artifact(MARKET, state, now, data.get("offer"))
+    elif action == "artifact_offer_accept":
+        error = market.accept_artifact(MARKET, state, now, data.get("offer"), lambda seller: find_city(seller, now))
     elif action == "beast_offer_post":
         error = market.post_beast(MARKET, state, now, data)
     elif action == "beast_offer_cancel":

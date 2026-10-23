@@ -33,6 +33,7 @@ import random
 from contextlib import contextmanager
 import re
 
+import artifacts
 import beasts
 import cauldron
 import ideology
@@ -3317,10 +3318,10 @@ def tile_cycle(state, area, x, y, bid):
     belief = ideology.speed_bonus(state, b.get("category"))
     if belief:
         factors.append(belief)
-    # Brews from the Cauldron.
-    brewed = cauldron.speed_bonus(state, b.get("category"))
-    if brewed:
-        factors.append(brewed)
+    # Brews from the Cauldron, and enshrined artifacts.
+    for extra in (cauldron.speed_bonus(state, b.get("category")), artifacts.speed_bonus(state, b.get("category"))):
+        if extra:
+            factors.append(extra)
     # Hexes, sabotage and the like other cities have done to this one.
     hexed = ideology.curse_speed(state, b.get("category"))
     if hexed:
@@ -4197,6 +4198,14 @@ def apply_action(state, now, action, data):
         return cauldron.set_recipe(state, now, data.get("recipe"), data.get("times", 1))
     if action == "cauldron_stop":
         return cauldron.stop(state, now)
+    if action == "artifact_craft":
+        return artifacts.craft(state, now, data.get("kind"), data.get("times", 1))
+    if action == "artifact_enshrine":
+        return artifacts.enshrine(state, now, data.get("artifact"))
+    if action == "artifact_unenshrine":
+        return artifacts.unenshrine(state, now, data.get("artifact"))
+    if action == "artifact_break":
+        return artifacts.break_up(state, now, data.get("artifact"))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":
@@ -4313,6 +4322,7 @@ def defs():
             "wildlife": WILDLIFE,
             "ideologies": ideology.defs(),
             "cauldron": cauldron.defs(),
+            "artifacts": artifacts.defs(),
             "weather": weather.defs(),
         }
     return DEFS
@@ -4500,6 +4510,7 @@ def _view(state, ai, detail):
         "beast": beasts.view(state, state["updated"]),
         "ideology": ideology.view(state),
         "cauldron": cauldron.view(state),
+        "artifacts": artifacts.view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -4648,7 +4659,7 @@ TALLIES = [
     ("missions", "Beast missions done"), ("beast_levels", "Beast levels gained"),
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
-    ("rituals", "Rituals held"), ("brews", "Brews from the Cauldron"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+    ("rituals", "Rituals held"), ("brews", "Brews from the Cauldron"), ("artifacts_crafted", "Artifacts crafted"), ("artifact_trades", "Artifacts traded"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
 ]
 
 
@@ -4840,7 +4851,8 @@ def _city_stats(state, now, rates):
     # ---- bonuses
     def factor(cat):
         out = 1.0
-        for bonus in (beasts.speed_bonus(state, cat), ideology.speed_bonus(state, cat), cauldron.speed_bonus(state, cat)):
+        for bonus in (beasts.speed_bonus(state, cat), ideology.speed_bonus(state, cat), cauldron.speed_bonus(state, cat),
+                      artifacts.speed_bonus(state, cat)):
             if bonus:
                 out *= bonus[0]
         return out

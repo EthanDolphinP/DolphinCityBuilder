@@ -544,10 +544,11 @@ def points(state):
 
 
 def effects(state):
-    """Everything the ideology, the perks taken, its rituals and the Cauldron's brews give, added up."""
+    """Everything the ideology, the perks taken, its rituals, the Cauldron's brews and the enshrined artifacts give."""
+    import artifacts
     import cauldron
     total = own_effects(state)
-    for key, value in cauldron.effects(state).items():
+    for key, value in list(cauldron.effects(state).items()) + list(artifacts.effects(state).items()):
         if key == "speed":
             for cat, x in value.items():
                 total["speed"][cat] = total["speed"].get(cat, 0) + x

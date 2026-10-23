@@ -35,12 +35,14 @@ either side can't pay, nothing changes hands that time.
 import math
 import random
 
+import artifacts
 import beasts
 import game
 import moderation
 
 MAX_OFFERS_PER_CITY = 10
 MAX_BEAST_OFFERS_PER_CITY = 5
+MAX_ARTIFACT_OFFERS_PER_CITY = 10
 MAX_DUELS_PER_CITY = 3
 MAX_QUANTITY = 1_000_000_000_000   # any amount a city could have (the page uses the same limit)
 HISTORY_LENGTH = 20
@@ -261,6 +263,7 @@ def drop_city(market, name):
     market["offers"] = [o for o in market["offers"] if o["city"] != name]
     market["bills"] = [b for b in market["bills"] if name not in (b["from"], b["to"])]
     market["beast_offers"] = [o for o in market.get("beast_offers", []) if o["city"] != name]
+    market["artifact_offers"] = [o for o in market.get("artifact_offers", []) if o["city"] != name]
     market["duels"] = [d for d in market.get("duels", []) if d["city"] != name]
 
 
@@ -493,6 +496,74 @@ def beast_offers_view(market):
     """Beast offers as other cities may see them."""
     return [{"id": o["id"], "city": o["city"], "posted": o["posted"], "beast": beasts.public(o["beast"]),
              "want": dict(o["want"], text=want_text(o["want"]))} for o in market.get("beast_offers", [])]
+
+
+# ---- Artifacts ----
+# A city offers an artifact for an amount of one material. Any city may take it, whatever its ideology: that is
+# how a city gets another ideology's artifacts. The artifact is held by the market until it is taken or withdrawn.
+
+def _artifact_offer(market, offer_id):
+    return next((o for o in market.get("artifact_offers", []) if o["id"] == offer_id), None)
+
+
+def post_artifact(market, state, now, art_id, res, qty):
+    if res not in game.RESOURCES or res in game.UNTRADEABLE:
+        return "Pick a material to ask for."
+    if not isinstance(qty, (int, float)) or isinstance(qty, bool) or qty != qty or not 1 <= qty <= MAX_QUANTITY:
+        return "Say how much you want for it."
+    qty = int(qty)
+    offers = market.setdefault("artifact_offers", [])
+    if sum(1 for o in offers if o["city"] == state["name"]) >= MAX_ARTIFACT_OFFERS_PER_CITY:
+        return f"You can have at most {MAX_ARTIFACT_OFFERS_PER_CITY} artifacts on offer."
+    art, error = artifacts.take(state, art_id)
+    if error:
+        return error
+    offers.append({"id": market["next_id"], "city": state["name"], "posted": now, "artifact": art, "res": res, "qty": qty})
+    market["next_id"] += 1
+    game.log(state, now, f"Offered a {artifacts.ARTIFACTS[art['kind']]['name']} for {qty:,} {game.RESOURCES[res]}.")
+    return None
+
+
+def cancel_artifact(market, state, now, offer_id):
+    offer = _artifact_offer(market, offer_id)
+    if not offer or offer["city"] != state["name"]:
+        return "That artifact is no longer on offer."
+    market["artifact_offers"].remove(offer)
+    artifacts.give(state, offer["artifact"])
+    game.log(state, now, f"Withdrew a {artifacts.ARTIFACTS[offer['artifact']['kind']]['name']} from the market.")
+    return None
+
+
+def accept_artifact(market, buyer, now, offer_id, get_city):
+    offer = _artifact_offer(market, offer_id)
+    if not offer:
+        return "That artifact is no longer on offer."
+    if offer["city"] == buyer["name"]:
+        return "That is your own offer."
+    seller = get_city(offer["city"])
+    if not seller:
+        market["artifact_offers"].remove(offer)
+        return "The city that offered it no longer exists."
+    res, qty, name = offer["res"], offer["qty"], artifacts.ARTIFACTS[offer["artifact"]["kind"]]["name"]
+    if buyer["resources"][res] < qty:
+        return f"You don't have {qty:,} {game.RESOURCES[res]} to pay."
+    buyer["resources"][res] -= qty
+    seller["resources"][res] += qty
+    market["artifact_offers"].remove(offer)
+    artifacts.give(buyer, offer["artifact"])
+    paid = f"{qty:,} {game.RESOURCES[res]}"
+    game.log(buyer, now, f"Bought a {name} from {offer['city']} for {paid}. See Artifacts on the Ideology tab.")
+    game.log(seller, now, f"{buyer['name']} bought your {name} for {paid}.")
+    game.tally(buyer, "artifact_trades")
+    game.tally(seller, "artifact_trades")
+    social(buyer, now, offer["city"], "trade", f"You bought their {name} for {paid}.")
+    social(seller, now, buyer["name"], "trade", f"They bought your {name} for {paid}.")
+    return None
+
+
+def artifact_offers_view(market):
+    return [{"id": o["id"], "city": o["city"], "posted": o["posted"], "artifact": artifacts.public(o["artifact"]),
+             "res": o["res"], "qty": o["qty"]} for o in market.get("artifact_offers", [])]
 
 
 # ---- Duels ----
