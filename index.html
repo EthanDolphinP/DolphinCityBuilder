@@ -684,6 +684,20 @@
   /* Parts that only the visual interface has. */
   html:not(.gfx) .resource-head, html:not(.gfx) #inspectorClose,
   html:not(.gfx) #logPanel > summary { display: none; }
+  /* On a phone the resources sat above every tab and filled most of the first screen. Now (in both styles) only the
+     main ones, and any running short, show until "All resources" is pressed; the people and power figures only on
+     the City tab; and the "Max pop" projections not at all (the Stats tab has them). */
+  html.mobile:not(.gfx) .resource-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  html.mobile:not(.gfx) .resource-head h2 { font-size: 13px; }
+  html.mobile #resourceToggle { display: block; font-size: 12px; min-height: 30px; }
+  html.mobile:not(.gfx) .resource-panel:not(.expanded) .resource-extra { display: none; }
+  html.mobile:not(.gfx) .resource-panel:not(.expanded) .resource-shortage { display: block; }
+  html.mobile body:not([data-shown="city"]) .resource-panel:not(.expanded) #people { display: none; }
+  html.mobile #resourcePanel .potential-rate { display: none; }
+  html.mobile:not(.gfx) #resources .stat { padding: 5px 8px; }
+  /* bigger targets for fingers */
+  html.mobile button.mini, html.mobile #board td.acts button, html.mobile .queueRow button { min-height: 34px; padding: 4px 11px; font-size: 13px; }
+  html.mobile .quantity-arrows button { min-width: 30px; min-height: 22px; }
   /* The building collection in the text interface: square corners, the building's letter for a picture. */
   html:not(.gfx) .building-card, html:not(.gfx) .building-art, html:not(.gfx) .owned-badge, html:not(.gfx) .state-badge { border-radius: 0; }
   html:not(.gfx) .building-art { height: 44px; font-size: 24px; font-weight: bold; }
@@ -2076,6 +2090,7 @@ function render() {
 
   $('title').textContent = `${state.name} - ${tech.name}`;
   document.body.classList.toggle('visiting', !!visiting);
+  document.body.dataset.shown = tab;      // lets the phone layout show some parts only on some tabs (not "data-tab": the tab buttons use that)
   $('visitBar').hidden = !visiting;
   $('visitName').textContent = visiting || '';
   $('status').textContent = `Tech level ${state.tech + 1} of ${defs.tech.length}  |  ` +
