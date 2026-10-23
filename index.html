@@ -324,6 +324,11 @@
   .artRow.on { background: var(--inset); }
   .grade sub { font-size: 10px; margin-left: 1px; }
   button.mini { min-height: 0; padding: 2px 8px; font-size: 12px; }
+  /* a dropdown with its name in front, so it says what it changes without hovering over it */
+  label.pick { display: inline-flex; align-items: center; gap: 6px; }
+  label.pick > span { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  html.mobile label.pick { flex: 1 1 140px; }
+  html.mobile label.pick select { flex: 1; min-width: 0; }
   .queueRow button { min-height: 0; padding: 1px 8px; font-size: 12px; margin-left: 6px; }
   .beastArt { margin: 0 0 6px; line-height: 1.15; font-size: 16px; }
   .guideText { margin-top: 2px; font-size: 14px; }
@@ -793,9 +798,9 @@
               <div class="cat">Build here <span id="buildCount" class="count"></span></div>
               <div class="bar" style="margin-top:6px">
                 <input id="buildSearch" type="search" placeholder="Find: a name, or what it makes" autocomplete="off" style="flex:1 1 150px">
-                <select id="buildSort" title="Order of the list">
+                <label class="pick"><span>Order</span><select id="buildSort" title="Order of the list">
                   <option value="newest">Newest first</option><option value="fastest">Fastest here</option>
-                  <option value="cheapest">Cheapest</option><option value="name">A to Z</option></select>
+                  <option value="cheapest">Cheapest</option><option value="name">A to Z</option></select></label>
               </div>
               <div id="buildCats" class="bar areaChips"></div>
               <div id="buildRecent" class="bar areaChips"></div>
@@ -845,11 +850,6 @@
       <details class="panel" id="breedPanel" open data-bst="breeding">
         <summary class="cat">Breeding <span id="breedCount" class="count"></span></summary>
         <div id="beastBreeding"></div>
-      </details>
-      <details class="panel" id="beastTradePanel" open data-bst="trades">
-        <summary class="cat">Trade market <span id="beastTradeCount" class="count"></span></summary>
-        <p class="dim small" style="margin:0 0 6px">To put one of yours up, press Trade on it under Your beasts or Eggs.</p>
-        <div id="beastTrades" class="scroll"></div>
       </details>
       <details class="panel" id="arenaPanel" open data-bst="arena">
         <summary class="cat">Arena <span id="duelCount" class="count"></span></summary>
@@ -917,11 +917,11 @@
         <h2>Your areas <span id="areasCount" class="count"></span></h2>
         <div class="bar" style="margin-top:0">
           <input id="areaSearch" type="search" placeholder="Search areas by name, land or direction" style="flex:1 1 200px">
-          <select id="areaKind" title="Kind of land"></select>
-          <select id="areaSort" title="Order">
+          <label class="pick"><span>Land</span><select id="areaKind" title="Kind of land"></select></label>
+          <label class="pick"><span>Order</span><select id="areaSort" title="Order">
             <option value="found">In the order found</option><option value="closest">Closest first</option>
-            <option value="buildings">Most buildings</option><option value="name">A to Z</option></select>
-          <select id="areaLook" title="How to show them"><option value="cards">Cards with maps</option><option value="list">Short list</option></select>
+            <option value="buildings">Most buildings</option><option value="name">A to Z</option></select></label>
+          <label class="pick"><span>Show as</span><select id="areaLook" title="How to show them"><option value="cards">Cards with maps</option><option value="list">Short list</option></select></label>
         </div>
         <div id="areaFilters" class="bar"></div>
         <div id="tameEverywhere" class="bar"></div>
@@ -933,9 +933,9 @@
           needs depend on the kind of land it is heading into and how far that is from home.
           People, materials and research are shared by all your areas.</p>
         <div class="bar">
-          <select id="destKind" title="Kind of land"></select>
-          <select id="destSort" title="Order">
-            <option value="closest">Closest first</option><option value="cheapest">Fewest supplies</option><option value="name">By kind of land</option></select>
+          <label class="pick"><span>Land</span><select id="destKind" title="Kind of land"></select></label>
+          <label class="pick"><span>Order</span><select id="destSort" title="Order">
+            <option value="closest">Closest first</option><option value="cheapest">Fewest supplies</option><option value="name">By kind of land</option></select></label>
           <span id="destFilters" class="bar" style="margin:0"></span>
         </div>
         <div id="explore" class="scroll" style="margin-top:10px"></div>
@@ -951,12 +951,12 @@
         <div id="resSummary" class="stats" style="margin-bottom:10px"></div>
         <div class="bar" style="margin-top:0">
           <input id="resSearch" type="search" placeholder="Search research, e.g. farm, power, livestock" style="flex:1 1 240px">
-          <select id="resKind" title="What the research gives">
+          <label class="pick"><span>Gives</span><select id="resKind" title="What the research gives">
             <option value="">Gives anything</option><option value="building">Gives a new building</option>
             <option value="addition">Gives a new addition</option><option value="boost">Makes buildings faster</option>
-            <option value="other">Something else</option></select>
-          <select id="resSort" title="Order">
-            <option value="level">By tech level</option><option value="cheapest">Cheapest first</option><option value="name">A to Z</option></select>
+            <option value="other">Something else</option></select></label>
+          <label class="pick"><span>Order</span><select id="resSort" title="Order">
+            <option value="level">By tech level</option><option value="cheapest">Cheapest first</option><option value="name">A to Z</option></select></label>
         </div>
         <div id="resFilters" class="bar"></div>
         <div id="research"></div>
@@ -983,12 +983,12 @@
         <summary class="cat"><span id="offersTitle">Open offers</span> <span id="offersCount" class="count"></span></summary>
         <div class="bar market-filters" style="margin-top:0">
           <input id="mktSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
-          <select id="mktGives"></select>
-          <select id="mktWants"></select>
-          <select id="mktSort" title="Order">
+          <label class="pick"><span>Selling</span><select id="mktGives"></select></label>
+          <label class="pick"><span>Asking for</span><select id="mktWants"></select></label>
+          <label class="pick"><span>Order</span><select id="mktSort" title="Order">
             <option value="auto">Auto: best price / newest</option>
             <option value="newest">Newest first</option><option value="cheapest">Cheapest for one first</option>
-            <option value="biggest">Biggest first</option><option value="oldest">Oldest first</option></select>
+            <option value="biggest">Biggest first</option><option value="oldest">Oldest first</option></select></label>
           <button type="button" id="mktClear" title="Show every offer again">Clear</button>
         </div>
         <div id="mktSelling" class="bar areaChips"></div>
@@ -1049,6 +1049,17 @@
           per-hour figures at the top.</p></details>
       </details>
 
+      <details class="panel" id="beastTradePanel" open data-mkt="beasts">
+        <summary class="cat">Beasts and eggs for trade <span id="beastTradeCount" class="count"></span></summary>
+        <p class="dim small" style="margin:0 0 6px">To put one of yours up, press Trade on it on the Beast tab (Your beasts, or Eggs).</p>
+        <div id="beastTrades" class="scroll"></div>
+      </details>
+      <details class="panel" id="artifactMarketPanel" open data-mkt="artifacts">
+        <summary class="cat">Artifacts for trade <span id="artifactMarketCount" class="count"></span></summary>
+        <p class="dim small" style="margin:0 0 6px">Any city can buy any ideology's artifacts here. To sell one of yours, press Sell on it
+          in Artifacts on the Ideology tab.</p>
+        <div id="artifactMarket"></div>
+      </details>
       <details class="panel" data-mkt="history">
         <summary class="cat">Recent trades <span id="tradesCount" class="count"></span></summary>
         <div class="bar" style="margin-top:0"><input id="tradesSearch" type="search" placeholder="Search by city or material" style="flex:1 1 200px">
@@ -1184,8 +1195,8 @@
         <h2>Guide</h2>
         <div class="bar" style="margin-top:0">
           <input id="guideSearch" type="search" placeholder="Search the guide, e.g. farm, water, gold, power" style="flex:1 1 240px">
-          <select id="guideTech"></select>
-          <select id="guideCat"></select>
+          <label class="pick"><span>Tech level</span><select id="guideTech"></select></label>
+          <label class="pick"><span>Kind</span><select id="guideCat"></select></label>
         </div>
         <div id="guideViews" class="bar"></div>
         <p id="guideNote" class="dim small" style="margin-bottom:0"></p>
@@ -1250,10 +1261,10 @@
       <details class="panel" open id="socHistPanel" data-soc="history">
         <summary class="cat">History <span id="socHistCount" class="count"></span></summary>
         <div class="bar" style="margin-top:0">
-          <select id="socCity"></select>
-          <select id="socKind">
+          <label class="pick"><span>City</span><select id="socCity"></select></label>
+          <label class="pick"><span>Kind</span><select id="socKind">
             <option value="">Every kind</option><option value="trade">Trades</option><option value="beast">Beast trades</option>
-            <option value="bill">Bills</option><option value="duel">Duels</option><option value="ban">Bans</option></select>
+            <option value="bill">Bills</option><option value="duel">Duels</option><option value="ban">Bans</option></select></label>
           <input id="socHistSearch" type="search" placeholder="Search the history, e.g. gold, won" style="flex:1 1 200px">
         </div>
         <div id="socHistory" style="margin-top:8px"></div>
@@ -1267,7 +1278,7 @@
         <div id="boardSummary" class="stats" style="margin-bottom:10px"></div>
         <div class="bar" style="margin-top:0">
           <input id="boardSearch" type="search" placeholder="Search for a city" style="flex:1 1 180px">
-          <select id="boardRank"></select>
+          <label class="pick"><span>Rank by</span><select id="boardRank"></select></label>
         </div>
         <div id="boardViews" class="bar"></div>
         <div id="boardWho" class="bar"></div>
@@ -2847,11 +2858,15 @@ function findChoices() {
   const known = ([, b]) => b.tech <= state.tech && (!b.research || state.research.includes(b.research));
   let options = null;
   if (finder.kind === 'buildings') options = [['', 'All buildings'], ...byName(Object.entries(defs.buildings).map(([k, b]) => [k, b.name]))];
-  if (finder.kind === 'sites') options = byName(Object.entries(defs.buildings).filter(known).map(([k, b]) => [k, b.name]));
+  if (finder.kind === 'sites') options = byName(Object.entries(defs.buildings).filter(known).map(([k, b]) => [k, b.name, defs.categories[b.category]]));
   if (finder.kind === 'terrain') options = byName(Object.entries(defs.terrains).map(([k, t]) => [k, t.name]));
   what.hidden = !options;
-  what.innerHTML = (options || []).map(([k, name]) => `<option value="${esc(k)}">${esc(name)}</option>`).join('');
-  finder.what = options ? options[0][0] : '';
+  // grouped (buildings by what they make), each group in A to Z order
+  const groups = {};
+  for (const [k, name, group] of options || []) (groups[group || ''] = groups[group || ''] || []).push([k, name]);
+  what.innerHTML = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0])).map(([group, list]) =>
+    (group ? `<optgroup label="${esc(group)}">` : '') + list.map(([k, name]) => `<option value="${esc(k)}">${esc(name)}</option>`).join('') + (group ? '</optgroup>' : '')).join('');
+  finder.what = options ? (what.options[0] || {}).value || '' : '';
 }
 
 const EGG_ART = '   .-"-.\n  /     \\\n |  . .  |\n  \\     /\n   `---\'';
@@ -2879,8 +2894,7 @@ function renderBeastViews() {
     eggs: ['Eggs', `${eggs.length}` + (own && canDeliver ? ` &middot; <span class="good">${canDeliver} ready</span>` : '')],
     beasts: ['Your beasts', `${hatched}`],
     ...(own ? { breeding: ['Breeding', bv.breeding.eggs.length ? `<span class="good">${bv.breeding.eggs.length} to collect</span>` : bv.breeding.male ? 'pair set' : ''] } : {}),
-    ...(own ? { trades: ['Trade market', `${(view.market.beast_offers || []).length}` + (mine ? `, ${mine} yours` : '')],
-                arena: ['Arena', forMe ? `<span class="hi">${forMe} for you</span>` : ''] } : {}),
+    ...(own ? { arena: ['Arena', forMe ? `<span class="hi">${forMe} for you</span>` : ''] } : {}),
     all: ['Everything', ''],
   };
   // what each view is for, in a line
@@ -2889,7 +2903,6 @@ function renderBeastViews() {
     eggs: 'Each egg hatches once it has been kept warm long enough and its own mission is done.',
     beasts: 'Every beast you have hatched. Make one active to change what your city gets, or trade it.',
     breeding: 'Put a male and a female of the same kind together and they lay an egg every few hours.',
-    trades: 'Beasts and eggs other cities are trading, and your own on offer.',
     arena: 'Bet goods on a beast against another city. The winner takes both bets.',
     all: 'Every part of the Beast tab at once.',
   };
@@ -2900,9 +2913,11 @@ function renderBeastViews() {
     bv.breeding.eggs.length && ['breeding', `${bv.breeding.eggs.length} bred ${bv.breeding.eggs.length === 1 ? 'egg' : 'eggs'} to collect`],
     forMe && ['arena', `${forMe} ${forMe === 1 ? 'challenge' : 'challenges'} to answer`],
   ].filter(Boolean);
-  if (!parts[beastView]) beastView = 'overview';
+  if (!parts[beastView]) beastView = 'overview';    // (the trade market, now on the Market tab, was a view here)
   setHTML($('beastViews'), Object.entries(parts).map(([k, [label, note]]) =>
-    `<button data-beast-view="${k}" class="${beastView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
+    `<button data-beast-view="${k}" class="${beastView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join('') +
+    (own ? `<button data-go-market="beasts" title="Beasts and eggs other cities are trading are on the Market tab">Beast market &gt;` +
+      ` <span class="dim small">${(view.market.beast_offers || []).length}${mine ? `, ${mine} yours` : ''}</span></button>` : ''));
   $('beastAbout').textContent = about[beastView] || '';
   setHTML($('beastTodo'), todo.length ? `<span class="dim small">Needs you:</span>` +
     todo.map(([k, text]) => `<button class="chip" data-beast-view="${k}">${esc(text)}</button>`).join('') : '');
@@ -2950,7 +2965,7 @@ function renderBeast() {
         : `<select data-td="species" data-k="td-species">${options(Object.entries(bv.species).map(([k, s]) => [k, `${s.name} (${s.rarity})`]), d.species)}</select> ` +
           `of level <input data-td="level" data-k="td-level" type="number" min="1" max="${bv.max_level}" step="1" style="width:70px"> or higher`) +
       ` <button data-trade-post="${b.id}">Post trade</button><button data-trade-close>Cancel</button></div>` +
-      `<div class="dim small">It leaves your city and is held until another city takes the trade or you cancel it. See Beast trades below.</div></div>`;
+      `<div class="dim small">It leaves your city and is held until another city takes the trade or you cancel it. See Beasts on the Market tab.</div></div>`;
   };
 
   // One egg in a line or two: what it is, whether it is warm yet, its mission, and the buttons.
@@ -3083,10 +3098,14 @@ function renderBeast() {
       `</table></div></details>`;
   }).join('') : `<p class="dim" style="margin:0">${hatched.length ? 'No beasts match.' : 'No beast has hatched yet.'}</p>`, fillTrade);
 
-  // ---- beasts other cities (and this one) have put up for trade ----
   renderArena();
   renderBreeding();
-  $('beastTradePanel').hidden = !own || !beastShows('trades');
+}
+// ---- beasts and eggs other cities (and this one) have put up for trade: on the Market tab ----
+function renderBeastTrades() {
+  const { state } = view, bv = view.beast, R = view.defs.resources, S = bv.stats, own = !visiting;
+  const hatched = bv.beasts.filter(b => !b.egg);
+  const options = (list, cur) => list.map(([v, n]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
   if (!own) return;
   const offers = view.market.beast_offers || [];
   $('beastTradeCount').textContent = `(${offers.length})`;
@@ -3598,11 +3617,19 @@ function artifactPanel(i, iv, own) {
             `<select data-art-res>${view.defs.tradeable.map(r => `<option value="${r}" ${r === artSell.res ? 'selected' : ''}>${esc(R[r])}</option>`).join('')}</select>` +
             `<button data-art-post="${a.id}">Put on the market</button><button class="mini" data-art-sell-close>Cancel</button></div>` : '')) + `</div>`).join('') + `</div>`
     : `<p class="dim small">Your vault is empty.</p>`);
+  if (own) html += `<div class="bar"><button data-go-market="artifacts">Artifact market &gt; <span class="dim small">` +
+    `${(view.market.artifact_offers || []).length} for sale</span></button><span class="dim small">buy any ideology's artifacts there</span></div>`;
+  return html + `</div>`;
+}
+// ---- the artifact market: on the Market tab ----
+function renderArtifactMarket() {
+  const A = view.defs.artifacts, R = view.defs.resources, state = view.state, own = !visiting;
+  $('artifactMarketCount').textContent = `(${(view.market.artifact_offers || []).length})`;
+  let html = '';
   // ---- the market
   const offers = (view.market.artifact_offers || []).filter(o => !artFind || o.artifact.kind === artFind);
   const kinds = Object.entries(A.kinds).sort((a, b) => a[1].name.localeCompare(b[1].name));
-  html += `<div class="cat">Artifact market <span class="dim">(${(view.market.artifact_offers || []).length})</span></div>` +
-    `<div class="bar" style="margin-top:0"><label class="dim">Show <select data-art-find><option value="">every artifact</option>` +
+  html += `<div class="bar" style="margin-top:0"><label class="dim">Show <select data-art-find><option value="">every artifact</option>` +
     kinds.map(([k, x]) => `<option value="${k}" ${k === artFind ? 'selected' : ''}>${esc(x.name)} (${esc(x.full.join(', '))})</option>`).join('') + `</select></label></div>` +
     (offers.length ? `<div class="artList">` + offers.sort((a, b) => a.qty - b.qty).map(o => {
       const mine = o.city === state.name, ok = state.resources[o.res] >= o.qty;
@@ -3612,8 +3639,17 @@ function artifactPanel(i, iv, own) {
         (!own ? '' : mine ? `<button class="mini" data-art-withdraw="${o.id}">Withdraw</button>`
           : `<button class="mini" data-art-buy="${o.id}" ${ok ? '' : 'disabled'} title="${ok ? '' : 'You do not have enough'}">Buy</button>`) + `</div></div>`;
     }).join('') + `</div>` : `<p class="dim small">${artFind ? 'None of those on the market.' : 'Nothing on the market yet.'}</p>`);
-  return html + `</div>`;
+  setHTMLKeep($('artifactMarket'), html);
 }
+$('artifactMarket').addEventListener('click', e => {
+  const b = e.target.closest('[data-art-buy], [data-art-withdraw]');
+  if (!b || visiting) return;
+  if (b.dataset.artBuy) {
+    const o = view.market.artifact_offers.find(x => x.id === +b.dataset.artBuy);
+    if (o && confirm(`Buy this ${o.artifact.name} from ${o.city} for ${num(o.qty)} ${view.defs.resources[o.res]}?`)) act('artifact_offer_accept', { offer: o.id });
+  } else act('artifact_offer_cancel', { offer: +b.dataset.artWithdraw });
+});
+$('artifactMarket').addEventListener('input', e => { if ('artFind' in e.target.dataset) { artFind = e.target.value; renderArtifactMarket(); } });
 $('ideologyBody').addEventListener('click', e => {
   const b = e.target.closest('[data-art-times], [data-art-craft], [data-art-enshrine], [data-art-unenshrine], [data-art-sell], [data-art-sell-close], [data-art-post], [data-art-break], [data-art-buy], [data-art-withdraw]');
   if (!b || visiting) return;
@@ -4233,10 +4269,12 @@ function renderMarket() {
   // ---- which part of the market shows ----
   const forMe = myBills.filter(b => b.status === 'proposed' && b.to === state.name).length;
   const parts = {
-    buy: ['Buy', `${market.offers.filter(o => !mine(o)).length} on sale`],
-    sell: ['Sell', `${market.offers.filter(mine).length} yours, ${(state.finished || []).length} finished`],
+    buy: ['Buy materials', `${market.offers.filter(o => !mine(o)).length} on sale`],
+    sell: ['Sell materials', `${market.offers.filter(mine).length} yours, ${(state.finished || []).length} finished`],
     bills: ['Bills', forMe ? `<span class="bad">${forMe} to answer</span>` : `${myBills.length}`],
     history: ['History', `${market.history.length}`],
+    beasts: ['Beasts', `${(market.beast_offers || []).length} for trade`],
+    artifacts: ['Artifacts', `${(market.artifact_offers || []).length} for sale`],
     all: ['Everything', ''],
   };
   setHTML($('mktViews'), Object.entries(parts).map(([k, [label, note]]) =>
@@ -4360,6 +4398,8 @@ function renderMarket() {
       `${qty(t.give_qty, t.give)} to ${esc(t.buyer)} for ${qty(t.want_qty, t.want)} <span class="dim">(${each(t.want_qty / t.give_qty)} each)</span></div>`;
   }).join('') + `<p class="dim">Trades your city took part in are shown in white.</p>`
     : `<span class="dim">${!market.history.length ? 'No trades yet.' : hwords.length ? 'No trades match.' : 'Your city has not traded recently.'}</span>`);
+  renderBeastTrades();
+  renderArtifactMarket();
 }
 
 async function loadBoard() {
@@ -4678,12 +4718,23 @@ $('tab-beast').onclick = e => {
     tradeFor = null;
     act('beast_offer_post', { beast: +e.target.dataset.tradePost, want });
   }
-  else if (e.target.dataset.btCancel) act('beast_offer_cancel', { offer: +e.target.dataset.btCancel });
+};
+$('beastTradePanel').addEventListener('click', e => {
+  if (visiting) return;
+  if (e.target.dataset.btCancel) act('beast_offer_cancel', { offer: +e.target.dataset.btCancel });
   else if (e.target.dataset.btAccept) {
     const id = +e.target.dataset.btAccept, pick = $('beastTrades').querySelector(`[data-bt-pay="${id}"]`);
     act('beast_offer_accept', { offer: id, pay: pick ? +pick.value : null });
   }
-};
+});
+$('beastTradePanel').addEventListener('input', e => { if (e.target.dataset.btPay) payPick.set(+e.target.dataset.btPay, +e.target.value); });
+// "Beast market" and "Artifact market" buttons elsewhere open that part of the Market tab
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-go-market]');
+  if (!b || visiting) return;
+  mktView = settings.mktView = b.dataset.goMarket; saveSettings();
+  tab = 'market'; render(); $('tab-market').scrollIntoView({ block: 'start' });
+});
 $('tab-beast').addEventListener('input', e => {
   const d = e.target.dataset;
   if (d.td) { tradeDraft[d.td] = e.target.value; if (e.target.tagName === 'SELECT') renderBeast(); }
