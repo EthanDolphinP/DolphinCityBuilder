@@ -3529,6 +3529,8 @@ def job_output(state, job):
                 out[k] = out.get(k, 0) + int(herd * v)
         if herd >= 2 and state["resources"]["livestock"] < job["herd_room"] and _researched(state, "breeding"):
             out["livestock"] = out.get("livestock", 0) + 1
+    if state.get("mastery"):        # a Megacity's mastery: more of each resource it has mastered
+        out = {k: round(v * (1 + mastery_bonus(state, k)), 2) for k, v in out.items()}
     return out
 
 
@@ -3828,6 +3830,65 @@ def research_problem(state, rid):
         if earlier and earlier not in state["research"]:
             return f"research {RESEARCH[earlier]['name']} first"
     return None
+
+
+# ---- Mastery: endless research for a Megacity ----
+# Once a city is a Megacity it can keep studying each resource for ever. Every level of a resource's mastery makes
+# everything the city's buildings make of it MASTERY_STEP more (+3%, +6%, ...), with no top. A level costs Knowledge
+# and the resource itself (Knowledge's own mastery costs Knowledge alone), MASTERY_GROWTH times as much as the level
+# before: it is where a Megacity's surplus goes, and the further it goes the slower it gets.
+MASTERY_TECH = 5
+MASTERY_STEP = 0.03
+MASTERY_GROWTH = 1.3
+MASTERY_COST = {      # level 1: (knowledge, the resource itself)
+    "food": (25_000, 150_000), "wood": (25_000, 60_000), "stone": (25_000, 60_000), "ore": (25_000, 40_000),
+    "tools": (25_000, 15_000), "gold": (25_000, 100_000), "electronics": (25_000, 4_000), "livestock": (25_000, 1_500),
+    "knowledge": (60_000, 0),
+}
+
+
+def mastery_level(state, res):
+    return state.get("mastery", {}).get(res, 0)
+
+
+def mastery_bonus(state, res):
+    """How much more of `res` the city's buildings make: 0.03 per level."""
+    return MASTERY_STEP * mastery_level(state, res)
+
+
+def mastery_cost(state, res):
+    """What the next level of this resource's mastery costs."""
+    know, own = MASTERY_COST[res]
+    f = MASTERY_GROWTH ** mastery_level(state, res)
+    cost = {"knowledge": int(round(know * f, -2))}
+    if own:
+        cost[res] = cost.get(res, 0) + int(round(own * f, -2 if own * f >= 1000 else 0))
+    return cost
+
+
+def master(state, now, res):
+    if res not in MASTERY_COST:
+        return "Pick a resource to master."
+    if state["tech"] < MASTERY_TECH:
+        return f"Mastery opens when your city is a {TECH_LEVELS[MASTERY_TECH]['name']}."
+    cost = mastery_cost(state, res)
+    short = _missing(state, cost)
+    if short:
+        return f"Not enough to master {RESOURCES[res]} further (need {fmt_goods(short)})."
+    _pay(state, cost)
+    state.setdefault("mastery", {})[res] = mastery_level(state, res) + 1
+    tally(state, "masteries")
+    log(state, now, f"Mastery of {RESOURCES[res]} is now level {mastery_level(state, res)}: buildings make "
+                    f"{round(mastery_bonus(state, res) * 100)}% more {RESOURCES[res]}. It cost {fmt_goods(cost)}.")
+    return None
+
+
+def mastery_view(state):
+    return {"open": state["tech"] >= MASTERY_TECH, "tech": TECH_LEVELS[MASTERY_TECH]["name"], "step": MASTERY_STEP,
+            "growth": MASTERY_GROWTH,
+            "tracks": {res: {"level": mastery_level(state, res), "bonus": round(mastery_bonus(state, res), 3),
+                             "cost": mastery_cost(state, res), "affordable": not _missing(state, mastery_cost(state, res))}
+                       for res in MASTERY_COST}}
 
 
 def research(state, now, rid):
@@ -4281,6 +4342,8 @@ def apply_action(state, now, action, data):
     if action == "present_close":
         state["presents"] = [p for p in state.get("presents", []) if p["id"] != data.get("present")]
         return None
+    if action == "mastery":
+        return master(state, now, data.get("resource"))
     if action == "research":
         return research(state, now, data.get("research"))
     if action == "explore":
@@ -4545,6 +4608,7 @@ def _view(state, ai, detail):
         "ideology": ideology.view(state),
         "cauldron": cauldron.view(state),
         "artifacts": artifacts.view(state),
+        "mastery": mastery_view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -4686,7 +4750,7 @@ def growth_checks(state, housing):
 TALLIES = [
     ("meals", "Meals eaten"), ("hungry_meals", "Meals with too little food"), ("eaten", "Food eaten"),
     ("arrivals", "People who have arrived"), ("built", "Buildings built"), ("demolished", "Buildings demolished"),
-    ("additions", "Additions attached"), ("researched", "Research done"), ("tech_ups", "Tech levels gained"),
+    ("additions", "Additions attached"), ("researched", "Research done"), ("masteries", "Mastery levels gained"), ("tech_ups", "Tech levels gained"),
     ("expeditions", "Expeditions completed"), ("tamed", "Wild animals tamed"), ("tamed_livestock", "Livestock from taming"),
     ("slaughtered", "Livestock slaughtered by hand"), ("rare_weather", "Spells of rare weather seen (area x meal)"),
     ("eggs", "Eggs found"), ("bred", "Eggs bred"), ("hatched", "Eggs hatched"), ("egg_missions", "Egg missions done"),
