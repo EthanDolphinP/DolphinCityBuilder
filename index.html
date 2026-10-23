@@ -219,7 +219,8 @@
   tr.me td { color: var(--bright); }
   /* The leaderboard: a wide table in a box of its own height, so its scroll bars are always close by. The headings stay
      at the top, and the city's name and its buttons (visit, message, ban) stay at the edges while the figures scroll. */
-  #board { max-height: min(72vh, 900px); overflow: auto; overscroll-behavior: contain; }
+  /* only sideways: the mouse wheel over the board scrolls the page (the buttons column stays on the right) */
+  #board { overflow-x: auto; overflow-y: hidden; }
   #board table { border-collapse: separate; border-spacing: 0; }
   #board th { position: sticky; top: 0; z-index: 2; background: var(--panel); }
   #board td:nth-child(2), #board th:nth-child(2) { position: sticky; left: 0; z-index: 1; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
