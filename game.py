@@ -333,7 +333,7 @@ TECH_LEVELS = [
     {"name": "Metropolis", "population": 700, "research": 50, "areas": 8,
      "cost": {"stone": 25000, "ore": 8000, "tools": 8000, "gold": 30000, "knowledge": 15000, "livestock": 150}},
     {"name": "Megacity", "population": 1600, "research": 70, "areas": 14,
-     "cost": {"food": 50000, "tools": 25000, "electronics": 10000, "gold": 120000, "knowledge": 60000, "livestock": 400}},
+     "cost": {"food": 50000, "tools": 25000, "electronics": 8000, "gold": 120000, "knowledge": 60000, "livestock": 400}},
 ]
 
 # Groups the build menu is divided into, in the order they are shown. Every
@@ -983,11 +983,39 @@ BUILDINGS = {
         "modifiers": ["fertility", "crop_temperature", "adjacent_water"],
         "desc": "Tractors, combines and fertiliser: a farm that feeds a district with three workers.",
     },
+    "open_pit_mine": {
+        "name": "Open-Pit Mine", "glyph": "\u00df", "tech": 4, "category": "materials", "power": 6,
+        "terrain": ["hill", "mountain", "mesa", "canyon", "foothills", "desert"],
+        "cost": {"stone": 400, "tools": 150, "gold": 200}, "workers": 5, "time": 20 * MIN,
+        "produces": {"ore": 30, "stone": 10},
+        "desc": "Giant diggers working a whole hillside at once: a great deal of ore, and stone as it comes out.",
+    },
+    "aggregate_plant": {
+        "name": "Aggregate Plant", "glyph": "\u00a9", "tech": 4, "category": "materials", "power": 5,
+        "terrain": ["hill", "mountain", "cliffs", "canyon", "foothills", "desert"],
+        "cost": {"stone": 300, "tools": 120, "gold": 150}, "workers": 4, "time": 15 * MIN,
+        "produces": {"stone": 36},
+        "desc": "Crushes rock into building stone by the trainload.",
+    },
+    "precision_works": {
+        "name": "Precision Works", "glyph": "\u00ae", "tech": 4, "category": "materials", "power": 8,
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 300, "tools": 150, "gold": 300}, "workers": 4, "time": 20 * MIN,
+        "consumes": {"ore": 10}, "produces": {"tools": 20},
+        "desc": "Machines that make machine parts: many more tools from the same ore.",
+    },
+    "deep_core_drill": {
+        "name": "Deep Core Drill", "glyph": "\u00b6", "tech": 5, "category": "materials", "power": 25,
+        "terrain": ["hill", "mountain", "mesa", "canyon", "foothills", "desert", "plains"],
+        "cost": {"stone": 800, "tools": 400, "electronics": 150, "gold": 800}, "workers": 4, "time": 20 * MIN,
+        "produces": {"ore": 60, "stone": 30},
+        "desc": "Drills miles down, to where the ore is purest: ore and stone in great amounts.",
+    },
     "electronics_plant": {
         "name": "Electronics Plant", "glyph": "\u039e", "tech": 4, "category": "materials", "power": 8, "research": "semiconductors",
         "terrain": ["plains", "desert"], "max_height": 2,
         "cost": {"stone": 250, "tools": 120, "gold": 250}, "workers": 6, "time": 20 * MIN,
-        "consumes": {"ore": 8, "tools": 2}, "produces": {"electronics": 4},
+        "consumes": {"ore": 8, "tools": 2}, "produces": {"electronics": 8},
         "desc": "Makes electronics from ore and tools. Everything in a Megacity is built with them.",
     },
     "recycling_centre": {
@@ -1759,7 +1787,7 @@ RESEARCH_MATERIALS = [{"wood": 1.0, "stone": 0.5},
                       {"stone": 0.6, "ore": 0.6, "tools": 0.2},
                       {"ore": 0.5, "tools": 0.5, "gold": 0.5},
                       {"tools": 0.6, "electronics": 0.2, "gold": 0.6},
-                      {"tools": 0.4, "electronics": 0.4, "gold": 0.8}]
+                      {"tools": 0.4, "electronics": 0.25, "gold": 0.8}]
 ANIMAL_RESEARCH = {"animal_husbandry", "dairying", "beast_lore", "selective_breeding", "draft_animals", "incubation",
                    "tanning", "beast_training", "beast_bonding", "canning", "mechanised_farming"}
 RESEARCH_LIVESTOCK = [2, 5, 10, 20, 40, 80]
@@ -2715,7 +2743,13 @@ ADDITIONS_MORE = {
 for _aid, _more in {"market_stalls": ["apiary"], "drying_racks": ["bamboo_workshop"], "warm_bedding": ["beast_sanctuary"],
                     "nest_boxes": ["beast_sanctuary"], "ice_house": ["mushroom_cave"], "advertising": ["maglev_hub"],
                     "guest_rooms": ["theme_park"], "food_court": ["theme_park"],
-                    "labour_saving": ["coal_plant", "geothermal_plant", "hydro_dam", "tidal_generator", "bamboo_workshop"]}.items():
+                    "labour_saving": ["coal_plant", "geothermal_plant", "hydro_dam", "tidal_generator", "bamboo_workshop",
+                                      "open_pit_mine", "aggregate_plant", "precision_works"],
+                    "support_beams": ["open_pit_mine", "deep_core_drill"],
+                    "work_lights": ["open_pit_mine", "aggregate_plant", "precision_works", "deep_core_drill"],
+                    "smart_meters": ["precision_works", "deep_core_drill", "aggregate_plant"],
+                    "automation": ["deep_core_drill", "precision_works"],
+                    "assembly_line": ["precision_works"], "clean_room": ["precision_works"]}.items():
     ADDITIONS_MORE[_aid] = ADDITIONS_MORE.get(_aid, []) + _more
 for _aid, _more in ADDITIONS_MORE.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
