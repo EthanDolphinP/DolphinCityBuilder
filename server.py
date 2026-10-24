@@ -116,6 +116,7 @@ def _loaded(name, now, create=False):
         else:
             return None
         CITIES[name] = state
+        SAVED_AT[name] = state["updated"]
     return state
 
 
@@ -347,11 +348,15 @@ def flush(names=None):
     for name in set(names):
         if name in CITIES:
             _write(SAVES / f"{name}.json", CITIES[name])
+            SAVED_AT[name] = CITIES[name]["updated"]
         DIRTY.discard(name)
     _write(MARKET_FILE, MARKET)
 
 
-WARM_BUDGET = 0.03     # seconds each request may spend loading cities not in memory yet, just after a restart
+WARM_BUDGET = 0.03     # seconds each request may spend loading cities, or bringing idle ones up to date
+CATCH_UP_STEP = 30 * 60      # an idle city is brought up to date this much game time at a time
+CATCH_UP_SAVE = 6 * 3600     # ...and saved when it is this far ahead of its save, so a restart doesn't undo it
+SAVED_AT = {}                # name -> the city's own clock when it was last read from or written to disk
 
 
 def warm_up(now):
@@ -360,6 +365,7 @@ def warm_up(now):
     doesn't wait for all of them at once. Done in the requests rather than a background thread: web hosts such as
     PythonAnywhere don't support threads in a web app, and one holding LOCK there could stall every request."""
     if DISK_NAMES.get("warm"):
+        keep_up(now)
         return
     start = time.perf_counter()
     for name in all_city_names():
@@ -372,6 +378,28 @@ def warm_up(now):
                 traceback.print_exc()
                 DISK_NAMES.setdefault("broken", set()).add(name)
     DISK_NAMES["warm"] = True       # every city is in memory
+
+
+def keep_up(now):
+    """Bring the cities nobody is playing up to date a little at a time (at most WARM_BUDGET seconds a request,
+    CATCH_UP_STEP of game time at a go), oldest first. A city is otherwise only brought up to date when it is
+    next asked for, and one left for days took several seconds, during which every other player waited: the
+    stalls seen on the web host. Now no city is ever far behind."""
+    start = time.perf_counter()
+    for name in sorted(CITIES, key=lambda n: CITIES[n]["updated"]):
+        state = CITIES[name]
+        if now - state["updated"] < 2 * CATCH_UP_STEP:
+            return                  # oldest first: every city from here on is nearly up to date
+        try:
+            while state["updated"] < now - CATCH_UP_STEP and time.perf_counter() - start < WARM_BUDGET:
+                game.advance_time(state, min(now, state["updated"] + CATCH_UP_STEP), coarse=True)
+        except Exception:
+            traceback.print_exc()
+            return
+        if state["updated"] - SAVED_AT.get(name, state["updated"]) > CATCH_UP_SAVE:
+            DIRTY.add(name)         # far ahead of its save: the next autosave keeps it
+        if time.perf_counter() - start >= WARM_BUDGET:
+            return
 
 
 def startup():

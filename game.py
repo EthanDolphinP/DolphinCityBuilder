@@ -4037,8 +4037,9 @@ def next_arrivals(state, housing):
     return _arrivals(pop, food - pop, housing, 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]))
 
 
-def advance_time(state, now):
-    """Simulate everything that happened between the last update and `now`."""
+def advance_time(state, now, coarse=False):
+    """Simulate everything that happened between the last update and `now`. `coarse`: in LONG_STEP steps all the
+    way (the server catching up a city nobody is playing, a slice at a time), not SIM_STEP for the last hours."""
     remaining = now - state["updated"]
     if remaining <= 0:
         return
@@ -4053,7 +4054,7 @@ def advance_time(state, now):
                    + cauldron.ends(state) if start < t < now], default=now)
         state["ritual_now"] = start
         with _stats_cached():     # buildings and ideology don't change within a stretch
-            _advance(state, end, end - start)
+            _advance(state, end, end - start, coarse)
         start = end
         if end >= now:
             break
@@ -4073,7 +4074,7 @@ def advance_time(state, now):
     beasts.tick(state, now)
 
 
-def _advance(state, now, remaining):
+def _advance(state, now, remaining, coarse=False):
     res = state["resources"]
     totals = state.setdefault("totals", {})
     jobs, housing, _ = work_plan(state)
@@ -4081,7 +4082,7 @@ def _advance(state, now, remaining):
     rng = random.Random()
 
     while remaining > 0:
-        dt = min(LONG_STEP if remaining > LONG_CATCH_UP else SIM_STEP, remaining)
+        dt = min(LONG_STEP if coarse or remaining > LONG_CATCH_UP else SIM_STEP, remaining)
         env = weather.job_factors(state, jobs, now - remaining)    # day or night and the weather as this step starts
         remaining -= dt
         power = power_status(state, jobs, env)[2]
