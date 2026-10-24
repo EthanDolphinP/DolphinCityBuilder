@@ -190,7 +190,7 @@ TERRAINS = {
     "hot_springs": {"name": "Hot Springs", "glyph": "\u00a7", "color": "#f09a6a",
                     "spread_from": ["hill"], "near": ["mountain", "volcanic"], "need": 1, "chance": 0.3,
                     "height": (4, 7), "fertility": (20, 40), "temp": 12,
-                    "desc": "Steaming pools heated from below. A Bath House draws visitors here, and later a Geothermal Plant draws power."},
+                    "desc": "Steaming pools heated from below. Only here: a Bath House and Spring Shrine early on, then a Thermal Fountain, heated greenhouses and fish farms, a Drying House and Spa Hotel, and at last a Deep Geothermal Well."},
     "ancient_grove": {"name": "Ancient Grove", "glyph": "\u2663", "color": "#57c27a",
                       "spread_from": ["forest", "dense_forest"], "near": ["dense_forest"], "need": 1, "chance": 0.3,
                       "groups": ["forest"],
@@ -1317,6 +1317,404 @@ BUILDINGS = {
         "cost": {"stone": 500, "tools": 200, "electronics": 300, "gold": 800}, "workers": 4, "time": 20 * MIN,
         "produces": {"knowledge": 260}, "modifiers": ["cooling"],
         "desc": "Machines that think in many directions at once. Runs best on a cold tile.",
+    },
+    # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
+    # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
+    # Hot springs
+    "spring_shrine": {
+        "name": "Spring Shrine", "glyph": "\u00c5", "tech": 1, "category": "knowledge", "research": "masonry",
+        "terrain": ["hot_springs"], "cost": {"wood": 40, "stone": 40}, "workers": 1, "time": 20 * MIN,
+        "produces": {"knowledge": 3, "gold": 2},
+        "speed_aura": {"for": ["bath_house", "thermal_spa_hotel", "geothermal_greenhouse", "thermal_fish_farm"], "bonus": 0.25},
+        "desc": "A shrine to the spirits of the spring, honoured since the first bathers came. Knowledge and gold, and the bath houses, greenhouses, fish farms and spa hotels around it work 25% faster.",
+    },
+    "thermal_fountain": {
+        "name": "Thermal Fountain", "glyph": "\u00ba", "tech": 2, "category": "support",
+        "terrain": ["hot_springs"], "cost": {"stone": 120, "gold": 60}, "attracts": 1, "fertility_aura": 15,
+        "desc": "A carved fountain and public footbaths of hot mineral water in the town square. One extra arrival per meal, and the mineral water makes the 8 tiles around it richer. No workers needed.",
+    },
+    "geothermal_greenhouse": {
+        "name": "Geothermal Greenhouse", "glyph": "\u00db", "tech": 3, "category": "food", "research": "botany",
+        "terrain": ["hot_springs"], "cost": {"stone": 120, "tools": 30, "gold": 60}, "workers": 3, "time": 12 * MIN,
+        "produces": {"food": 26, "gold": 3}, "sheltered": True,
+        "desc": "Glass houses heated by spring water piped under the floor: tropical fruit and flowers all year, whatever the weather or hour, and no power needed.",
+    },
+    "thermal_fish_farm": {
+        "name": "Thermal Fish Farm", "glyph": "\u00c6", "tech": 3, "category": "food", "research": "marine_biology",
+        "terrain": ["hot_springs"], "cost": {"wood": 80, "stone": 100, "tools": 20}, "workers": 3, "time": 10 * MIN,
+        "produces": {"food": 22}, "sheltered": True,
+        "desc": "Warm raceways and pools fed by the spring, raising prawns and tilapia that grow fast in the heat. Never troubled by night, cold or weather.",
+    },
+    "drying_house": {
+        "name": "Drying House", "glyph": "\u00d0", "tech": 4, "category": "trade",
+        "terrain": ["hot_springs"], "cost": {"stone": 250, "tools": 80, "gold": 150}, "workers": 3, "time": 15 * MIN,
+        "consumes": {"food": 40, "wood": 20}, "produces": {"gold": 60, "tools": 8},
+        "desc": "Dries timber, fruit and milk powder with the spring's dry heat: spare food and wood become gold and tools, with no fuel and no power.",
+    },
+    "thermal_spa_hotel": {
+        "name": "Thermal Spa Hotel", "glyph": "\u00d5", "tech": 4, "category": "housing", "power": 3,
+        "terrain": ["hot_springs"], "cost": {"stone": 300, "tools": 80, "gold": 250}, "workers": 4, "time": 20 * MIN,
+        "produces": {"gold": 30}, "housing": 12, "attracts": 2,
+        "desc": "A grand hotel built round healing pools. Earns gold, has rooms for 12, and its fame brings two extra arrivals per meal.",
+    },
+    "deep_geothermal_well": {
+        "name": "Deep Geothermal Well", "glyph": "\u00d8", "tech": 5, "category": "power",
+        "terrain": ["hot_springs"], "cost": {"stone": 600, "tools": 250, "electronics": 100, "gold": 600}, "workers": 2, "generates": 90,
+        "desc": "Bored miles down beneath the springs to rock hotter than any furnace: a great deal of power, with no fuel.",
+    },
+    # Coral reef
+    "reef_fishers": {
+        "name": "Reef Fishers", "glyph": "\u00aa", "tech": 0, "category": "food",
+        "terrain": ["coral_reef"], "cost": {"wood": 15}, "workers": 1, "time": 12 * MIN,
+        "produces": {"food": 4}, "modifiers": ["fish"],
+        "desc": "Canoes and spears over the reef, where the fish are thick. Faster with more fish.",
+    },
+    "reef_research_station": {
+        "name": "Reef Research Station", "glyph": "\u00d2", "tech": 3, "category": "knowledge", "power": 2, "research": "marine_biology",
+        "terrain": ["coral_reef"], "cost": {"stone": 120, "tools": 30, "gold": 60}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 22, "gold": 5},
+        "desc": "Divers and scientists studying the reef, the richest life in the sea: knowledge, and gold from what they find.",
+    },
+    "dive_resort": {
+        "name": "Dive Resort", "glyph": "\u00f5", "tech": 4, "category": "trade", "power": 3,
+        "terrain": ["coral_reef"], "cost": {"stone": 250, "tools": 60, "gold": 250}, "workers": 4, "time": 20 * MIN,
+        "produces": {"gold": 50}, "housing": 6, "attracts": 1,
+        "desc": "Cabins on stilts over the reef and boats out to the best dives. Earns gold, has rooms for 6, and brings one extra arrival per meal.",
+    },
+    "reef_biolab": {
+        "name": "Reef Biolab", "glyph": "\u00d3", "tech": 5, "category": "knowledge", "power": 12,
+        "terrain": ["coral_reef"], "cost": {"stone": 500, "tools": 200, "electronics": 200, "gold": 700}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 90, "electronics": 3},
+        "desc": "Finds medicines and new materials in the reef's corals and sponges: a great deal of knowledge, and electronics from reef-grown materials.",
+    },
+    # Crystal cavern
+    "crystal_grotto": {
+        "name": "Crystal Grotto", "glyph": "\u00c3", "tech": 1, "category": "knowledge", "research": "caving",
+        "terrain": ["crystal_cavern"], "cost": {"wood": 30, "stone": 20}, "workers": 1, "time": 20 * MIN,
+        "produces": {"knowledge": 4, "gold": 1}, "sheltered": True,
+        "desc": "Seers meditate among glowing crystals. Knowledge, and a little gold from pilgrims. Sheltered from all weather.",
+    },
+    "lens_grinders": {
+        "name": "Lens Grinders", "glyph": "\u00d4", "tech": 2, "category": "knowledge", "research": "glassmaking",
+        "terrain": ["crystal_cavern"], "cost": {"wood": 40, "stone": 60, "gold": 30}, "workers": 2, "time": 20 * MIN,
+        "produces": {"knowledge": 8, "gold": 6}, "sheltered": True,
+        "desc": "Grinds clear crystal into lenses for spectacles and telescopes: knowledge, and gold from the lenses sold.",
+    },
+    "resonance_lab": {
+        "name": "Resonance Lab", "glyph": "\u00de", "tech": 4, "category": "materials", "power": 6, "research": "semiconductors",
+        "terrain": ["crystal_cavern"], "cost": {"stone": 250, "tools": 100, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"electronics": 5, "knowledge": 15}, "sheltered": True,
+        "desc": "Cuts natural crystal into oscillators that keep every circuit in time: electronics without ore or tools, and knowledge.",
+    },
+    "crystal_lattice_core": {
+        "name": "Crystal Lattice Core", "glyph": "\u00c4", "tech": 5, "category": "knowledge", "power": 20, "research": "quantum_computing",
+        "terrain": ["crystal_cavern"], "cost": {"stone": 500, "tools": 200, "electronics": 300, "gold": 800}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 300}, "sheltered": True,
+        "desc": "A quantum computer grown inside a flawless crystal, cold and still in the cavern: more knowledge than any lab on open ground.",
+    },
+    # Volcanic plain and lava field
+    "ash_vineyard": {
+        "name": "Ash Vineyard", "glyph": "\u00e0", "tech": 1, "category": "food",
+        "terrain": ["volcanic"], "cost": {"wood": 30}, "workers": 2, "time": 15 * MIN,
+        "produces": {"food": 7, "gold": 4},
+        "desc": "Vines in rich volcanic ash: food, and wine to sell.",
+    },
+    "basalt_quarry": {
+        "name": "Basalt Quarry", "glyph": "\u00e1", "tech": 1, "category": "materials",
+        "terrain": ["volcanic", "lava_field"], "cost": {"wood": 30}, "workers": 2, "time": 12 * MIN,
+        "produces": {"stone": 9},
+        "desc": "Splits old lava into neat columns of hard black stone.",
+    },
+    "obsidian_workshop": {
+        "name": "Obsidian Workshop", "glyph": "\u00e2", "tech": 2, "category": "materials",
+        "terrain": ["volcanic", "lava_field"], "cost": {"wood": 50, "stone": 40}, "workers": 2, "time": 15 * MIN,
+        "consumes": {"stone": 6}, "produces": {"tools": 6, "gold": 4},
+        "desc": "Knaps volcanic glass into blades sharper than steel: tools, and gold from the finest pieces.",
+    },
+    "volcano_observatory": {
+        "name": "Volcano Observatory", "glyph": "\u00e3", "tech": 3, "category": "knowledge", "power": 2,
+        "terrain": ["volcanic", "lava_field"], "cost": {"stone": 150, "tools": 30, "gold": 60}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 20, "gold": 4},
+        "desc": "Watches the mountain breathe: knowledge, and gold from the visitors who come to see.",
+    },
+    "sulphur_works": {
+        "name": "Sulphur Works", "glyph": "\u00e4", "tech": 3, "category": "materials", "research": "metallurgy",
+        "terrain": ["volcanic", "lava_field"], "cost": {"stone": 150, "tools": 30}, "workers": 3, "time": 20 * MIN,
+        "produces": {"ore": 12, "gold": 16},
+        "desc": "Gathers the yellow sulphur round the vents, and the metals that come up with it: ore and gold.",
+    },
+    "magma_forge": {
+        "name": "Magma Forge", "glyph": "\u00e5", "tech": 4, "category": "materials", "research": "steelmaking",
+        "terrain": ["volcanic", "lava_field"], "cost": {"stone": 300, "tools": 100, "gold": 150}, "workers": 3, "time": 15 * MIN,
+        "consumes": {"ore": 12}, "produces": {"tools": 24},
+        "desc": "Smelts ore in the heat of the earth itself: a great many tools, with no fuel and no power.",
+    },
+    "magma_tap": {
+        "name": "Magma Tap", "glyph": "\u00c0", "tech": 5, "category": "power",
+        "terrain": ["lava_field"], "cost": {"stone": 800, "tools": 300, "electronics": 150, "gold": 1000}, "workers": 3, "generates": 160,
+        "desc": "Draws heat straight from the magma under a lava field: more power than anything but a fusion plant.",
+    },
+    # Cave
+    "cheese_cave": {
+        "name": "Cheese Cave", "glyph": "\u00e8", "tech": 2, "category": "trade", "research": "dairying",
+        "terrain": ["cave"], "cost": {"wood": 50, "stone": 30}, "workers": 2, "time": 20 * MIN,
+        "consumes": {"food": 8}, "produces": {"gold": 22}, "sheltered": True,
+        "desc": "Wheels of cheese ripening in the cool, steady dark: food turned into gold.",
+    },
+    "cave_archive": {
+        "name": "Cave Archive", "glyph": "\u00e9", "tech": 3, "category": "knowledge", "research": "public_education",
+        "terrain": ["cave"], "cost": {"stone": 120, "tools": 20, "gold": 50}, "workers": 2, "time": 20 * MIN,
+        "produces": {"knowledge": 14}, "sheltered": True,
+        "desc": "Books and records kept safe from fire, flood and damp deep underground.",
+    },
+    "cave_data_vault": {
+        "name": "Cave Data Vault", "glyph": "\u00ea", "tech": 4, "category": "knowledge", "power": 8, "research": "computing",
+        "terrain": ["cave"], "cost": {"stone": 250, "tools": 100, "electronics": 40, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 40}, "modifiers": ["cooling"], "sheltered": True,
+        "desc": "Racks of computers kept cool by the rock. Runs best where the cave is cold.",
+    },
+    "undercity": {
+        "name": "Undercity", "glyph": "\u00eb", "tech": 5, "category": "housing",
+        "terrain": ["cave"], "cost": {"stone": 900, "tools": 250, "gold": 500}, "housing": 70,
+        "desc": "Streets and homes carved out of the cave: houses 70, and needs no electronics to build.",
+    },
+    # Oasis
+    "date_palm_grove": {
+        "name": "Date Palm Grove", "glyph": "\u00ec", "tech": 1, "category": "food",
+        "terrain": ["oasis"], "cost": {"wood": 30}, "workers": 2, "time": 15 * MIN,
+        "produces": {"food": 9, "gold": 3},
+        "desc": "Palms heavy with dates round the water: food, and dates to sell.",
+    },
+    "oasis_bazaar": {
+        "name": "Oasis Bazaar", "glyph": "\u00ed", "tech": 2, "category": "trade", "research": "bookkeeping",
+        "terrain": ["oasis"], "cost": {"wood": 60, "stone": 40, "gold": 20}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 20}, "attracts": 1,
+        "desc": "Every caravan in the desert stops to water here, and trade. Gold, and one extra arrival per meal.",
+    },
+    "desert_botanic_garden": {
+        "name": "Desert Botanic Garden", "glyph": "\u00ee", "tech": 4, "category": "knowledge", "power": 3,
+        "terrain": ["oasis"], "cost": {"stone": 250, "tools": 80, "gold": 200}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 25, "food": 20, "gold": 10},
+        "desc": "Plants from every dry land on earth, grown and studied round the spring: knowledge, food and gold.",
+    },
+    "oasis_waterworks": {
+        "name": "Oasis Waterworks", "glyph": "\u00ef", "tech": 5, "category": "food", "power": 6, "research": "desalination",
+        "terrain": ["oasis"], "cost": {"stone": 500, "tools": 200, "electronics": 60, "gold": 400}, "workers": 3, "time": 12 * MIN,
+        "produces": {"food": 80}, "fertility_aura": 40,
+        "desc": "Pumps and pipes that spread the oasis far into the sand: a great deal of food, and the 8 tiles around it much richer.",
+    },
+    # Glacier
+    "cryo_vault": {
+        "name": "Cryo Vault", "glyph": "\u00f2", "tech": 5, "category": "knowledge", "power": 15, "research": "machine_learning",
+        "terrain": ["glacier"], "cost": {"stone": 500, "tools": 200, "electronics": 200, "gold": 600}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 120}, "modifiers": ["cooling"],
+        "desc": "Computers buried in the ice, which keeps them colder than any machine could: a great deal of knowledge. Faster the colder it is.",
+    },
+    # Ancient grove
+    "druid_circle": {
+        "name": "Druid Circle", "glyph": "\u00f3", "tech": 1, "category": "knowledge", "research": "pathfinding",
+        "terrain": ["ancient_grove"], "cost": {"wood": 20, "stone": 30}, "workers": 1, "time": 20 * MIN,
+        "produces": {"knowledge": 4, "gold": 1}, "wildlife_speed": 0.1,
+        "desc": "A ring of stones among the oldest trees. Knowledge, and wild animals come 10% more often.",
+    },
+    "heartwood_loggers": {
+        "name": "Heartwood Loggers", "glyph": "\u00f4", "tech": 3, "category": "materials", "research": "forestry",
+        "terrain": ["ancient_grove"], "cost": {"wood": 80, "stone": 60, "tools": 30}, "workers": 3, "time": 15 * MIN,
+        "produces": {"wood": 36}, "modifiers": ["deep_forest"],
+        "desc": "Takes only fallen giants and single great trees, each worth a forest of saplings. Faster deeper in the woods.",
+    },
+    "elder_tree_sanctuary": {
+        "name": "Elder Tree Sanctuary", "glyph": "\u00f6", "tech": 4, "category": "support", "research": "beast_training", "unique": True,
+        "terrain": ["ancient_grove"], "cost": {"wood": 300, "stone": 200, "gold": 300}, "workers": 2, "time": 20 * MIN,
+        "produces": {"knowledge": 20}, "mission_speed": 0.25, "beast_xp": 0.15,
+        "desc": "Beasts rest and train beneath the oldest tree in the land: missions go 25% faster, beasts grow 15% faster, and the keepers gather knowledge. A city can have one.",
+    },
+    "living_spire": {
+        "name": "Living Spire", "glyph": "\u00f9", "tech": 5, "category": "housing", "research": "hydroponics",
+        "terrain": ["ancient_grove"], "cost": {"wood": 1200, "stone": 400, "tools": 200, "gold": 600}, "housing": 55, "attracts": 1,
+        "desc": "Homes grown into and around a living giant tree. Houses 55, and so many come to see it that one extra arrives per meal.",
+    },
+    # Dense forest
+    "charcoal_kilns": {
+        "name": "Charcoal Kilns", "glyph": "\u00fa", "tech": 1, "category": "materials",
+        "terrain": ["dense_forest"], "cost": {"wood": 30, "stone": 20}, "workers": 2, "time": 15 * MIN,
+        "consumes": {"wood": 10}, "produces": {"tools": 5, "gold": 5},
+        "desc": "Slow-burns wood into charcoal for the smiths: tools, and gold from the charcoal sold.",
+    },
+    "canopy_walkway": {
+        "name": "Canopy Walkway", "glyph": "\u00fb", "tech": 3, "category": "trade", "power": 1,
+        "terrain": ["dense_forest"], "cost": {"wood": 200, "tools": 30, "gold": 80}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 24}, "attracts": 1,
+        "desc": "Rope bridges high in the treetops. Earns gold, and brings one extra arrival per meal.",
+    },
+    "biomass_plant": {
+        "name": "Biomass Plant", "glyph": "\u00fc", "tech": 4, "category": "power", "research": "recycling",
+        "terrain": ["dense_forest"], "cost": {"stone": 200, "tools": 80, "gold": 100}, "workers": 2, "time": 15 * MIN,
+        "consumes": {"wood": 8}, "generates": 36,
+        "desc": "Burns the forest's deadwood and brush for power, a little wood at a time.",
+    },
+    # Mangrove
+    "crab_traps": {
+        "name": "Crab Traps", "glyph": "\u00fd", "tech": 0, "category": "food",
+        "terrain": ["mangrove"], "cost": {"wood": 12}, "workers": 1, "time": 12 * MIN,
+        "produces": {"food": 4}, "modifiers": ["fish"],
+        "desc": "Pots set among the mangrove roots, where crabs and shrimp hide. Faster with more fish.",
+    },
+    "mangrove_nursery": {
+        "name": "Mangrove Nursery", "glyph": "\u00ff", "tech": 2, "category": "food",
+        "terrain": ["mangrove"], "cost": {"wood": 40, "stone": 20}, "workers": 2, "time": 20 * MIN,
+        "produces": {"wood": 10, "food": 6}, "fertility_aura": 10,
+        "desc": "Grows new mangroves, which feed the fish and build up the mud: wood and food, and the 8 tiles around it a little richer.",
+    },
+    "blue_carbon_reserve": {
+        "name": "Blue Carbon Reserve", "glyph": "\u00c1", "tech": 4, "category": "trade",
+        "terrain": ["mangrove"], "cost": {"wood": 300, "stone": 100, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 30, "knowledge": 12}, "wildlife_speed": 0.15,
+        "desc": "Protected mangrove that locks away carbon, paid for by the world: gold and knowledge, and wild animals come 15% more often.",
+    },
+    # Kelp forest
+    "kelp_biorefinery": {
+        "name": "Kelp Biorefinery", "glyph": "\u00c2", "tech": 4, "category": "power", "research": "recycling",
+        "terrain": ["kelp_forest"], "cost": {"stone": 200, "tools": 100, "gold": 100}, "workers": 2, "generates": 30,
+        "desc": "Turns fast-growing kelp into fuel as quickly as it grows back: steady power with nothing to feed it.",
+    },
+    # Beach
+    "beachcombers": {
+        "name": "Beachcombers", "glyph": "\u00c7", "tech": 0, "category": "food",
+        "terrain": ["beach"], "cost": {"wood": 10}, "workers": 1, "time": 15 * MIN,
+        "produces": {"wood": 3, "food": 2, "gold": 1},
+        "desc": "Walks the tide line for driftwood, shellfish and whatever the sea brings in.",
+    },
+    "boatyard": {
+        "name": "Boatyard", "glyph": "\u00c8", "tech": 2, "category": "trade", "research": "navigation",
+        "terrain": ["beach"], "cost": {"wood": 60, "stone": 30}, "workers": 2, "time": 20 * MIN,
+        "consumes": {"wood": 12}, "produces": {"gold": 22}, "explore_speed": 0.05,
+        "desc": "Builds boats on the open sand: wood turned into gold, and expeditions are 5% faster.",
+    },
+    # Salt flat
+    "salt_curing_house": {
+        "name": "Salt Curing House", "glyph": "\u00c9", "tech": 3, "category": "trade", "research": "canning",
+        "terrain": ["salt_flat"], "cost": {"wood": 80, "stone": 80, "tools": 20}, "workers": 2, "time": 20 * MIN,
+        "consumes": {"food": 20}, "produces": {"gold": 36},
+        "desc": "Salts fish and meat to keep for years: food turned into gold.",
+    },
+    "speed_trials_track": {
+        "name": "Speed Trials Track", "glyph": "\u00ca", "tech": 4, "category": "trade", "power": 2,
+        "terrain": ["salt_flat"], "cost": {"stone": 200, "tools": 80, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 44}, "attracts": 1,
+        "desc": "The flattest ground on earth, where record-breaking cars race. Gold, and one extra arrival per meal.",
+    },
+    "lithium_brine_works": {
+        "name": "Lithium Brine Works", "glyph": "\u00cb", "tech": 5, "category": "materials", "power": 8,
+        "terrain": ["salt_flat"], "cost": {"stone": 400, "tools": 200, "gold": 500}, "workers": 3, "time": 20 * MIN,
+        "produces": {"electronics": 12, "gold": 20},
+        "desc": "Draws lithium from the brine under the salt for batteries: electronics without ore or tools, and gold.",
+    },
+    # Canyon
+    "cliff_dwellings": {
+        "name": "Cliff Dwellings", "glyph": "\u00cc", "tech": 1, "category": "housing", "research": "masonry",
+        "terrain": ["canyon"], "cost": {"wood": 20, "stone": 30}, "housing": 7,
+        "desc": "Rooms built into the canyon walls, cool in summer and safe all year. Houses 7.",
+    },
+    "fossil_dig": {
+        "name": "Fossil Dig", "glyph": "\u00cd", "tech": 3, "category": "knowledge",
+        "terrain": ["canyon"], "cost": {"wood": 60, "stone": 60, "tools": 20}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 18, "gold": 6},
+        "desc": "Digs ancient bones out of the canyon's layers of rock: knowledge, and gold from museums.",
+    },
+    "canyon_skywalk": {
+        "name": "Canyon Skywalk", "glyph": "\u00ce", "tech": 4, "category": "trade", "power": 2,
+        "terrain": ["canyon"], "cost": {"stone": 200, "tools": 100, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 44}, "attracts": 1,
+        "desc": "A glass walkway out over the drop. Gold, and one extra arrival per meal.",
+    },
+    # Mesa
+    "mesa_pueblo": {
+        "name": "Mesa Pueblo", "glyph": "\u00cf", "tech": 2, "category": "housing",
+        "terrain": ["mesa"], "cost": {"wood": 40, "stone": 80}, "housing": 12,
+        "desc": "Terraced adobe homes on the flat top of a mesa. Houses 12.",
+    },
+    "mesa_solar_array": {
+        "name": "Mesa Solar Array", "glyph": "\u00d1", "tech": 4, "category": "power", "research": "photovoltaics",
+        "terrain": ["mesa"], "cost": {"stone": 150, "tools": 100, "gold": 150}, "workers": 1, "generates": 36,
+        "generates_modifiers": ["sunlight"],
+        "desc": "Panels on the high, clear top of a mesa, above the dust and the haze: more power than a solar farm. Less at night and under cloud.",
+    },
+    # Bamboo grove
+    "bamboo_cutters": {
+        "name": "Bamboo Cutters", "glyph": "\u00d9", "tech": 0, "category": "materials",
+        "terrain": ["bamboo"], "cost": {"wood": 8}, "workers": 1, "time": 12 * MIN,
+        "produces": {"wood": 5},
+        "desc": "Bamboo grows back almost as fast as it is cut.",
+    },
+    "bamboo_scaffolders": {
+        "name": "Bamboo Scaffolders", "glyph": "\u00da", "tech": 3, "category": "materials",
+        "terrain": ["bamboo"], "cost": {"wood": 100, "stone": 40, "tools": 20}, "workers": 3, "time": 15 * MIN,
+        "produces": {"wood": 18, "tools": 5},
+        "desc": "Lashes bamboo into scaffolds and frames: wood, and tools.",
+    },
+    "bamboo_towers": {
+        "name": "Bamboo Towers", "glyph": "\u00dc", "tech": 5, "category": "housing",
+        "terrain": ["bamboo"], "cost": {"wood": 900, "stone": 300, "tools": 150, "gold": 400}, "housing": 45,
+        "desc": "Light, strong towers of engineered bamboo. Houses 45, and needs no electronics to build.",
+    },
+    # Sand dunes
+    "dune_caravan_camp": {
+        "name": "Dune Caravan Camp", "glyph": "\u00dd", "tech": 1, "category": "trade",
+        "terrain": ["sand_dunes"], "cost": {"wood": 30}, "workers": 2, "time": 20 * MIN,
+        "produces": {"gold": 8}, "explore_speed": 0.05,
+        "desc": "Camels and guides who know the dunes: gold from the caravans, and expeditions are 5% faster.",
+    },
+    "sand_glassworks": {
+        "name": "Sand Glassworks", "glyph": "\u00b2", "tech": 3, "category": "trade", "power": 2, "research": "glassmaking",
+        "terrain": ["sand_dunes"], "cost": {"stone": 120, "tools": 30, "gold": 40}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 22, "knowledge": 3},
+        "desc": "The finest glass sand there is, melted into windows and bottles: gold.",
+    },
+    "dune_solar_field": {
+        "name": "Dune Solar Field", "glyph": "\u00b3", "tech": 5, "category": "power", "research": "photovoltaics",
+        "terrain": ["sand_dunes"], "cost": {"stone": 300, "tools": 150, "electronics": 60, "gold": 300}, "workers": 1, "generates": 70,
+        "generates_modifiers": ["sunlight"],
+        "desc": "Miles of panels across the sand, under the strongest sun on earth. Less at night and under cloud.",
+    },
+    # Floodplain
+    "silt_farm": {
+        "name": "Silt Farm", "glyph": "\u00b9", "tech": 1, "category": "food", "research": "drainage",
+        "terrain": ["floodplain"], "cost": {"wood": 20}, "workers": 2, "time": 12 * MIN,
+        "produces": {"food": 10}, "modifiers": ["fertility"],
+        "desc": "Fields renewed by every flood's fresh silt: more food than any farm. Faster on richer soil.",
+    },
+    "silt_brickworks": {
+        "name": "Silt Brickworks", "glyph": "\u00a4", "tech": 2, "category": "materials",
+        "terrain": ["floodplain"], "cost": {"wood": 40, "stone": 20}, "workers": 2, "time": 15 * MIN,
+        "produces": {"stone": 12},
+        "desc": "Fires the river's mud into bricks, as good as stone.",
+    },
+    # Sea cliffs
+    "seabird_egg_gatherers": {
+        "name": "Seabird Egg Gatherers", "glyph": "\u00a6", "tech": 0, "category": "food",
+        "terrain": ["cliffs"], "cost": {"wood": 10}, "workers": 1, "time": 15 * MIN,
+        "produces": {"food": 5},
+        "desc": "Climbs the cliffs on ropes for the eggs of the seabirds nesting there.",
+    },
+    "cliffside_hotel": {
+        "name": "Cliffside Hotel", "glyph": "\u00ab", "tech": 3, "category": "trade", "power": 2,
+        "terrain": ["cliffs"], "cost": {"stone": 150, "tools": 30, "gold": 100}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 28}, "housing": 4, "attracts": 1,
+        "desc": "Rooms with a view over the sea. Earns gold, has rooms for 4, and brings one extra arrival per meal.",
+    },
+    # Heath and foothills
+    "heather_distillery": {
+        "name": "Heather Distillery", "glyph": "\u00bb", "tech": 2, "category": "trade",
+        "terrain": ["heath"], "cost": {"wood": 50, "stone": 40}, "workers": 2, "time": 20 * MIN,
+        "produces": {"gold": 14},
+        "desc": "Heather honey and spirits made on the open moor, sold far and wide.",
+    },
+    "hillside_vineyard": {
+        "name": "Hillside Vineyard", "glyph": "\u00bf", "tech": 2, "category": "food", "research": "grafting",
+        "terrain": ["foothills"], "cost": {"wood": 50, "stone": 30}, "workers": 2, "time": 20 * MIN,
+        "produces": {"food": 8, "gold": 8},
+        "desc": "Terraced vines on sunny slopes: food, and wine to sell.",
     },
     # ---- the expedition queue ----
     "expedition_camp": {
