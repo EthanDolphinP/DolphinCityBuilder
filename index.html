@@ -1655,8 +1655,9 @@ function sboxEnhance(sel) {
   box.addEventListener('input', () => sboxOpen(box, box.value));
   box.addEventListener('blur', () => setTimeout(() => {
     if (document.activeElement === box) return;
-    if (sboxActive && sboxActive.box === box) sboxActive = null;
-    sboxList.hidden = true; sboxSync(sel);
+    // a box swapped for a new one when its panel was drawn again: the new one is in use, leave its list open
+    if (!sboxActive || sboxActive.box === box) { sboxActive = null; sboxList.hidden = true; }
+    sboxSync(sel);
   }, 120));
   box.addEventListener('keydown', e => {
     const opts = [...sboxList.querySelectorAll('.opt')];
