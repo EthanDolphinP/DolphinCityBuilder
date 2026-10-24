@@ -4594,7 +4594,8 @@ def _view(state, ai, detail):
             "food_eaten": round(state["population"] * 3600 / MEAL_TIME, 1),
             "housing_from": housing_sources(state),
             "growth": growth_checks(state, housing),
-            "arrivals_max": 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]),
+            # whole people: _arrivals lets one more in while fewer than this have come, so a fraction counts as one more
+            "arrivals_max": math.ceil(1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]) - 1e-9),
             "advance": advance_view(state),
             "arrivals_next": next_arrivals(state, housing),
         },

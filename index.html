@@ -2331,11 +2331,11 @@ function render() {
   const short = status.power.supply < status.power.demand;
   const free = status.housing - pop, growth = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
   setHTML($('people'),
-    stat('Population', `${pop} / ${status.housing}`,
+    stat('Population', `${pop} / ${num(status.housing)}`,
       free <= 0 ? '<span class="bad">housing full</span>' : `${free} ${free === 1 ? 'place' : 'places'} free` +
-        ` &middot; <span class="good" title="With enough food for ${status.arrivals_max} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal">${rateText(growth)}</span>`) +
-    stat('Workers', `${working} / ${status.jobs} jobs`,
-      unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${status.idle} idle` : 'all filled') +
+        ` &middot; <span class="good" title="With enough food for ${num(status.arrivals_max)} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal">${rateText(growth)}</span>`) +
+    stat('Workers', `${working} / ${num(status.jobs)} jobs`,
+      unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${num(status.idle)} idle` : 'all filled') +
     (status.power.supply || status.power.demand || status.unpaused_power?.demand || status.unpaused_power?.supply ? stat('Power', powerCoverage(status.power),
       (short ? '<span class="bad">not enough</span>' : '') +
       (status.unpaused_power && (status.unpaused_power.supply !== status.power.supply || status.unpaused_power.demand !== status.power.demand)
@@ -2513,7 +2513,7 @@ function buildingRows(b, cycle, produces, live) {
   const R = view.defs.resources, rows = [];
   const housing = live ? live.housing : b.housing;
   if (housing) rows.push(['Houses', `${housing} people`]);
-  if (b.attracts) rows.push(['Attracts', `${b.attracts} extra arrival per meal`]);
+  if (b.attracts) rows.push(['Attracts', `${num(b.attracts)} extra arrival per meal`]);
   if (b.generates) rows.push(['Generates', `<span class="good">${num(live ? live.power_out : b.generates)} power</span>`]);
   if (b.power) rows.push(['Needs', `${live ? live.power_in : b.power} power`]);
   if (b.unique) rows.push(['Limit', 'one per city']);
@@ -2535,14 +2535,14 @@ function buildingRows(b, cycle, produces, live) {
     const made = Object.keys(produces || {}).length ? `<span class="good">+${plain(produces)}</span>` : 'nothing yet';
     rows.push(['Makes', made + (b.consumes ? ` from ${plain(b.consumes)}` : '')]);
   }
-  if (b.herd) rows.push(['Livestock', (live ? `holds ${live.herd} of ${live.herd_room}; ` : `holds up to ${b.herd}; `) +
+  if (b.herd) rows.push(['Livestock', (live ? `holds ${num(live.herd)} of ${num(live.herd_room)}; ` : `holds up to ${b.herd}; `) +
     `each adds ${Object.entries(b.per_head).map(([k, v]) => `${v} ${esc(R[k])}`).join(', ')} per cycle`]);
   if (cycle && b.generates && b.consumes) rows.push(['Burns', `${plain(b.consumes)} every ${duration(cycle)}`]);
   else if (cycle) rows.push(['Every', `<span class="hi">${duration(cycle)}</span>` +
     (cycle !== b.time ? ` <span class="dim">(normally ${duration(b.time)})</span>` : '') +
     // as things are right now: the time of day, the weather, staff and power
     (live && live.speed && Math.abs(live.speed - 1) > 0.01 ? `<br><span class="dim">right now ${duration(cycle / live.speed)}</span>` : '')]);
-  if (b.workers) rows.push(['Workers', live ? `${live.staff} of ${live.need}` : `${b.workers}`]);
+  if (b.workers) rows.push(['Workers', live ? `${live.staff} of ${num(live.need)}` : `${b.workers}`]);
   return rows;
 }
 
@@ -2626,9 +2626,9 @@ function renderBuildList(info) {
       ` every <span class="${o.cycle < b.time ? 'good' : o.cycle > b.time ? 'bad' : ''}">${duration(o.cycle)}</span>`);
     if (b.herd) bits.push(`keeps ${b.herd} livestock`);
     if (b.housing) bits.push(`houses ${b.housing}`);
-    if (b.generates) bits.push(`<span class="good">${b.generates} power</span>`);
-    if (b.attracts) bits.push(`+${b.attracts} ${b.attracts === 1 ? 'arrival' : 'arrivals'} per meal`);
-    if (b.power) bits.push(`needs ${b.power} power`);
+    if (b.generates) bits.push(`<span class="good">${num(b.generates)} power</span>`);
+    if (b.attracts) bits.push(`+${num(b.attracts)} ${b.attracts === 1 ? 'arrival' : 'arrivals'} per meal`);
+    if (b.power) bits.push(`needs ${num(b.power)} power`);
     if (b.workers) bits.push(`${b.workers} workers`);
     if (!bits.length) bits.push(esc(b.desc.split('. ')[0]));
     return bits.join(' &middot; ');
@@ -2665,9 +2665,9 @@ function renderTile() {
   // ---- the ground ----
   let html = `<div class="terrain-summary"><span class="big" style="color:${esc(terr.color)}">${esc(terr.name)}</span>` +
     (gfx()
-      ? `<div class="tile-facts"><span title="Height">${icon('hill')}${t.height}</span><span title="Temperature">${t.temp}&deg;C</span><span>${icon(water ? 'water' : 'food')}${water ? t.fish : info.fertility}% ${water ? 'fish' : 'fertility'}</span></div></div>` +
+      ? `<div class="tile-facts"><span title="Height">${icon('hill')}${t.height}</span><span title="Temperature">${num(t.temp)}&deg;C</span><span>${icon(water ? 'water' : 'food')}${water ? t.fish : info.fertility}% ${water ? 'fish' : 'fertility'}</span></div></div>` +
         (terr.desc ? fold('terrain', 'Terrain details', [esc(terr.desc)]) : '')
-      : `</div>` + kv([['Height', t.height], ['Temperature', `${t.temp}C`],
+      : `</div>` + kv([['Height', t.height], ['Temperature', `${num(t.temp)}C`],
             water ? ['Fish', `${t.fish}%`]
                   : ['Fertility', `${info.fertility}%` + (info.fertility !== t.fertility ? ` <span class="good">(${t.fertility}% before nearby buildings)</span>` : '')]]) +
         (terr.desc ? `<div class="dim small">${esc(terr.desc)}</div>` : '')) +
@@ -2678,7 +2678,7 @@ function renderTile() {
     const w = defs.wildlife[t.animal], tame = info.tame;
     html += section('wildlife', 'Wildlife', true) + `<div class="card"><div class="head"><span class="animal">${esc(w.name)}</span>` +
       `<button data-tame ${tame.problem || !tame.affordable ? 'disabled' : ''}>Tame</button></div>` +
-      kv([['Worth', `<span class="good">+${w.livestock} Livestock</span>`], ['Bait', goods(tame.cost)]]) +
+      kv([['Worth', `<span class="good">+${num(w.livestock)} Livestock</span>`], ['Bait', goods(tame.cost)]]) +
       (tame.problem ? `<div class="bad small">${esc(tame.problem)}</div>` : '') +
       `<div class="desc">Building on this tile drives them away.</div></div></details>`;
   }
@@ -3200,7 +3200,7 @@ function renderBeast() {
     const mission = done ? `<span class="good">done</span>`
       : !t ? `<span class="dim">coming</span>`
       : `<span class="hi">${esc(t.text)}</span>` + (b.tasks_needed > 1 ? ` <span class="dim">(${b.missions + 1} of ${b.tasks_needed})</span>` : '') +
-        (t.pay ? ` <span class="${ok ? 'dim' : 'bad'} small">you have ${num(have)}</span>` : ` <span class="dim small">${t.done} of ${t.need}, counts up by itself</span>`);
+        (t.pay ? ` <span class="${ok ? 'dim' : 'bad'} small">you have ${num(have)}</span>` : ` <span class="dim small">${t.done} of ${num(t.need)}, counts up by itself</span>`);
     const buttons = !own ? '' : (t && !t.complete && t.pay ? `<button data-egg-deliver="${b.id}" ${ok ? '' : 'disabled'}>Deliver ${num(t.need)} ${esc(R[t.pay])}</button>` : '') +
       (tradeFor === b.id ? '' : `<button data-trade="${b.id}">Trade</button>`);
     return `<div class="eggRow"><div class="eggName"><span style="color:${esc(b.color)}">${esc(b.name)}</span> ${what}</div>` +
@@ -3219,13 +3219,13 @@ function renderBeast() {
       `<div class="desc">${esc(mine.desc)}</div></div></div>` +
       `<div class="cat">Gives your city</div>` + mine.bonus.map(x => `<div class="opt good">${esc(x)}</div>`).join('') +
       (mine.max_level ? `<div class="good small">As far as a beast can go.</div>`
-        : `<div class="small" style="margin-top:8px">Level ${mine.level}: experience ${mine.xp} of ${mine.xp_needed} ` +
-          `<span class="dim">(each mission gives ${mine.xp_per_mission})</span></div>` + meter(mine.xp, mine.xp_needed) +
+        : `<div class="small" style="margin-top:8px">Level ${mine.level}: experience ${num(mine.xp)} of ${num(mine.xp_needed)} ` +
+          `<span class="dim">(each mission gives ${num(mine.xp_per_mission)})</span></div>` + meter(mine.xp, mine.xp_needed) +
           `<div class="small dim">At level ${mine.level + 1}: ${mine.next_bonus.map(esc).join(', ')}</div>`) +
       `<details class="fold" data-fold="beast:details" ${isOpen('beast:details', false) ? 'open' : ''}><summary>Stats and details</summary>` +
       `<div class="opt">${statLine(mine.stats, mine.species)}</div>` +
       `<div class="opt dim small">Grades show how good each stat is for a ${esc(mine.name)}: F is the lowest it can roll, A near the top, S the best possible.</div>` +
-      kv([['Nature', esc(mine.nature)], ['Grows', `fully grown at level ${mine.cap}${mine.grown ? ' (it is: each level now takes 30% more experience and adds less)' : ''}`],
+      kv([['Nature', esc(mine.nature)], ['Grows', `fully grown at level ${num(mine.cap)}${mine.grown ? ' (it is: each level now takes 30% more experience and adds less)' : ''}`],
           ['Likes', `${esc(R[mine.likes])} <span class="dim small">(bet it on this beast in the Arena to make it fight harder)</span>`],
           ...(mine.home && mine.home.length ? [['Eggs found in', esc(mine.home.join(', '))]] : [])]) + `</details>`
     : `<span class="dim">${eggs.length ? 'No beast has hatched yet. See Eggs: each one hatches once it is warm and its mission is done.' : 'You have no beast yet. Expeditions sometimes bring back eggs.'}</span>`);
@@ -3242,10 +3242,10 @@ function renderBeast() {
     if (m.complete) html += `<p class="good">Completed.</p>`;
     else if (m.pay) {
       const have = Math.floor(state.resources[m.pay]), ok = have >= m.need;
-      html += `<div class="small" style="margin-top:8px">You have ${have} of ${m.need} ${esc(R[m.pay])}</div>` + meter(Math.min(have, m.need), m.need, ok ? '' : 'alt') +
-        `<div class="bar"><button data-deliver ${ok ? '' : 'disabled'}>Deliver ${m.need} ${esc(R[m.pay])}</button></div>`;
+      html += `<div class="small" style="margin-top:8px">You have ${have} of ${num(m.need)} ${esc(R[m.pay])}</div>` + meter(Math.min(have, m.need), m.need, ok ? '' : 'alt') +
+        `<div class="bar"><button data-deliver ${ok ? '' : 'disabled'}>Deliver ${num(m.need)} ${esc(R[m.pay])}</button></div>`;
     } else {
-      html += `<div class="small" style="margin-top:8px">${m.done} of ${m.need} done</div>` + meter(m.done, m.need, 'alt') +
+      html += `<div class="small" style="margin-top:8px">${m.done} of ${num(m.need)} done</div>` + meter(m.done, m.need, 'alt') +
         `<p class="dim small">This counts up by itself as you do it.</p>`;
     }
   }
@@ -3566,7 +3566,7 @@ function renderArena() {
     const side = s => `<span style="color:${esc(s.color)}">${esc(s.name)}</span> <span class="dim small">${esc(s.city)}, bet ${esc(s.bet)}, ${boostText(s.boost)}: ${stats(s.stats)}</span>`;
     return `<details class="fold" data-fold="duel:${r.id}" ${isOpen('duel:' + r.id, false) ? 'open' : ''}><summary>` +
       `<span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> against ${esc(foe.city)}'s ${esc(foe.name)} ` +
-      `<span class="dim">[${clock(r.t)}]</span> - ${r.won ? 'you took ' + esc(r.prize) + (r.xp ? ` and ${esc(me.name)} gained ${r.xp} experience` : '') : 'you lost ' + esc(me.bet)}</summary>` +
+      `<span class="dim">[${clock(r.t)}]</span> - ${r.won ? 'you took ' + esc(r.prize) + (r.xp ? ` and ${esc(me.name)} gained ${num(r.xp)} experience` : '') : 'you lost ' + esc(me.bet)}</summary>` +
       `<div><div>${side(me)}</div><div>${side(foe)}</div>` +
       r.rounds.map(h => `<div class="${h.by ? 'dim' : ''}">${esc(who[h.by].name)} ` +
         (h.dmg ? `hits for ${h.dmg}. ${esc(who[1 - h.by].name)} has ${h.left} health left.` : 'misses.') + `</div>`).join('') +
@@ -3725,7 +3725,7 @@ function renderIdeology() {
     setHTML(box, `<div class="panel"><h2>Ideology</h2><p class="dim">` + (state.tech < 1
         ? `A city chooses its ideology when it becomes a Village. These are the choices.`
         : visiting ? `This city has not chosen an ideology yet.`
-        : `Your city has not chosen an ideology yet. Choose one below; you will have ${iv.points} ${iv.points === 1 ? 'point' : 'points'} to spend on its perks.`) +
+        : `Your city has not chosen an ideology yet. Choose one below; you will have ${num(iv.points)} ${iv.points === 1 ? 'point' : 'points'} to spend on its perks.`) +
       `</p>${ideologyCards(own && state.tech >= 1)}</div>` + cursedPanel(iv));
     return;
   }
@@ -3735,7 +3735,7 @@ function renderIdeology() {
   const pfilters = { all: ['All', () => true], can: ['Can take now', can], yours: ['Yours', ([id]) => iv.perks.includes(id)],
                      later: ['Not open yet', ([, p]) => p.tier > state.tech] };
   if (!pfilters[perkFilter]) perkFilter = 'all';
-  const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && iv.points ? `<span class="good">${iv.points} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
+  const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && iv.points ? `<span class="good">${num(iv.points)} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
                   curses: [i.curse_plural, iv.curses.on_me.length ? `<span class="bad">${iv.curses.on_me.length} against you</span>`
                                     : Object.keys(iv.curses.cursing).length ? `${Object.keys(iv.curses.cursing).length} on others` : ''],
                   rituals: [i.ritual_plural, Object.keys(iv.rituals.active).length ? `<span class="good">${Object.keys(iv.rituals.active).length} running</span>`
@@ -3747,7 +3747,7 @@ function renderIdeology() {
 
   const header = `<div class="panel ideology-hero" style="--ideo:${esc(i.color)}">` + `<div class="ideology-identity">${ideologyArt(iv.id, i.art)}<div class="ideology-intro"><h2>Your city's ideology</h2>` +
       `<div class="ideology-title">${esc(i.name)}</div><div class="ideology-description">${esc(i.desc)}</div></div>` +
-      (own ? `<div class="ideology-points"><strong>${iv.points}</strong><span>${iv.points === 1 ? 'point' : 'points'} to spend</span></div>` : '') + `</div>` +
+      (own ? `<div class="ideology-points"><strong>${num(iv.points)}</strong><span>${iv.points === 1 ? 'point' : 'points'} to spend</span></div>` : '') + `</div>` +
     `<div class="bar">` + Object.entries(parts).map(([k, [label, note]]) =>
       `<button data-ideo-view="${k}" class="${ideoView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join('') + `</div></div>`;
 
@@ -4298,10 +4298,10 @@ function renderPeople() {
     const free = status.housing - pop, gap = Math.max(0, status.jobs - (pop - status.idle));
     const parts = {
       all: ['Overview', ''],
-      growth: ['Growth', growing ? `<span class="good">+${status.arrivals_next} next meal</span>` : '<span class="bad">not growing</span>'],
+      growth: ['Growth', growing ? `<span class="good">+${num(status.arrivals_next)} next meal</span>` : '<span class="bad">not growing</span>'],
       food: ['Food', `<span class="${net >= 0 ? 'good' : 'bad'}">${net >= 0 ? '+' : ''}${num(net)} / hour</span>`],
       housing: ['Housing', free > 0 ? `${free} free` : '<span class="bad">full</span>'],
-      work: ['Work', gap ? `<span class="bad">${gap} jobs empty</span>` : status.idle ? `${status.idle} idle` : '<span class="good">all filled</span>'],
+      work: ['Work', gap ? `<span class="bad">${gap} jobs empty</span>` : status.idle ? `${num(status.idle)} idle` : '<span class="good">all filled</span>'],
     };
     setHTML($('pplViews'), Object.entries(parts).map(([k, [label, note]]) =>
       `<button data-ppl-view="${k}" class="${pplView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join(''));
@@ -4315,11 +4315,11 @@ function renderPeople() {
   const ready = status.growth.every(g => g.ok);
   setHTML($('pplGrowth'),
     `<p class="big ${ready ? 'good' : 'bad'}">` + (state.hungry ? 'Hungry - the city cannot grow'
-      : ready ? `+${status.arrivals_next} ${status.arrivals_next === 1 ? 'person' : 'people'} at the next meal` : 'Not growing') +
+      : ready ? `+${num(status.arrivals_next)} ${status.arrivals_next === 1 ? 'person' : 'people'} at the next meal` : 'Not growing') +
     ` <span class="dim">(next meal in <span data-timer="meal"></span>)</span></p>` +
     `<p class="dim">A meal happens every ${duration(status.meal_time)}. At each meal everyone eats 1 food, ` +
     `and if both things below are true one new person joins - so at best ${num(perHour * status.arrivals_max)} people per hour.` +
-    (status.arrivals_max > 1 ? ` Your taverns let up to <span class="hi">${status.arrivals_max}</span> arrive per meal; each extra arrival needs ` +
+    (status.arrivals_max > 1 ? ` Your taverns let up to <span class="hi">${num(status.arrivals_max)}</span> arrive per meal; each extra arrival needs ` +
       `its own free place to live and enough food in store to cover one more mouth.` :` A Tavern (Village) lets one more arrive per meal.`) + `</p>` +
     status.growth.map(g => `<div class="opt"><span class="${g.ok ? 'good' : 'bad'}">[${g.ok ? 'x' : ' '}]</span> ${esc(g.text)}` +
       (g.ok ? '' : `<br><span class="hi">What to do:</span> ${esc(g.fix)}`) + `</div>`).join('') +
@@ -4339,7 +4339,7 @@ function renderPeople() {
     `<span class="dim">(${pop} people x 1 food x ${num(perHour)} meals)</span>` +
     meter([[status.food_eaten, status.food_eaten > status.food_made ? 'warn' : 'alt']], top) +
     `Eaten per hour at full housing: <span class="${fullHousingFood > status.food_made ? 'bad' : 'hi'}">${num(fullHousingFood)}</span> ` +
-    `<span class="dim">(${status.housing} people x 1 food x ${num(perHour)} meals)</span>` +
+    `<span class="dim">(${num(status.housing)} people x 1 food x ${num(perHour)} meals)</span>` +
     meter([[fullHousingFood, fullHousingFood > status.food_made ? 'warn' : 'alt']], top) +
     `<p>Each hour your store ${net >= 0 ? 'grows' : 'shrinks'} by <span class="${net >= 0 ? 'good' : 'bad'}">${num(Math.abs(net))}</span> food.</p>` +
     `<p>In store: <span class="hi">${food}</span> food = <span class="hi">${meals}</span> ${meals === 1 ? 'meal' : 'meals'}` +
@@ -4348,11 +4348,11 @@ function renderPeople() {
   const herd = Math.floor(state.resources.livestock);
   $('slaughterForm').hidden = herd < 1;
   $('slaughterN').max = herd;
-  $('slaughterNote').textContent = `You have ${herd}. Each gives ${view.defs.slaughter_food} food straight away; a Butcher gets more from each animal.`;
+  $('slaughterNote').textContent = `You have ${herd}. Each gives ${num(view.defs.slaughter_food)} food straight away; a Butcher gets more from each animal.`;
 
   // Housing
   setHTML($('pplHousing'),
-    `<span class="hi">${pop}</span> people in housing for <span class="hi">${status.housing}</span>` +
+    `<span class="hi">${pop}</span> people in housing for <span class="hi">${num(status.housing)}</span>` +
     meter([[Math.min(pop, status.housing), pop >= status.housing ? 'warn' : '']], Math.max(status.housing, pop)) +
     `<p class="${pop >= status.housing ? 'bad' : 'dim'}">` + (pop >= status.housing ? 'Full. Nobody new can move in until you build more.'
       : `${status.housing - pop} free ${status.housing - pop === 1 ? 'place' : 'places'}.`) + `</p>` +
@@ -4361,12 +4361,12 @@ function renderPeople() {
   // Work
   const staffed = pop - status.idle, short = Math.max(0, status.jobs - staffed);
   setHTML($('pplWork'),
-    `<span class="hi">${staffed}</span> of ${pop} people working, <span class="hi">${status.jobs}</span> jobs in total` +
+    `<span class="hi">${staffed}</span> of ${pop} people working, <span class="hi">${num(status.jobs)}</span> jobs in total` +
     meter([[staffed], [status.idle, 'alt'], [short, 'empty']], Math.max(pop, status.jobs)) +
     `<p class="dim"><span class="good">Green</span>: working. <span style="color:var(--accent)">Yellow</span>: idle people. Empty: jobs with nobody to do them.</p>` +
     `<p>` + (short ? `<span class="bad">${short} ${short === 1 ? 'job has' : 'jobs have'} nobody to do ${short === 1 ? 'it' : 'them'}.</span> ` +
         `Grow the population, or select a building and use its Staffing buttons to choose which ones get workers first.`
-      : status.idle ? `${status.idle} ${status.idle === 1 ? 'person has' : 'people have'} nothing to do. They still eat, so build something for them to work in.`
+      : status.idle ? `${num(status.idle)} ${status.idle === 1 ? 'person has' : 'people have'} nothing to do. They still eat, so build something for them to work in.`
       : 'Everyone has a job and every job is filled.') + `</p>` +
     (short || view.areas.some(a => a.problems) ? `<div class="bar"><button data-ppl-problems>Show buildings that need attention on the map</button></div>` : ''));
 }
@@ -4422,7 +4422,7 @@ function renderGuide(opening) {
     `<td ${wrap}>${esc(t.desc || '')}${t.from ? ' Rare; found more often far from home.' : ''}` +
     (t.research ? ` Needs research before building on it: ${esc(defs.research[t.research].name)}.` : '') + `</td></tr>`));
 
-  const facts = b => (b.generates ? ` Generates ${b.generates} power.` : '') + (b.power ? ` Needs ${b.power} power.` : '') +
+  const facts = b => (b.generates ? ` Generates ${num(b.generates)} power.` : '') + (b.power ? ` Needs ${num(b.power)} power.` : '') +
     (b.research ? ` Needs research: ${defs.research[b.research].name}.` : '');
   const buildings = Object.values(B).filter(b =>
     (!cat || b.category === cat) && (!tech || (tech === 'mine' ? known(b) : b.tech === +tech)) &&
@@ -4442,7 +4442,7 @@ function renderGuide(opening) {
   const animals = Object.values(defs.wildlife).filter(w => !buildingOnly && has(`${w.name} ${land(w.terrain)} livestock`));
   shown += fill('Wildlife', Object.keys(defs.wildlife).length, ['Animal', 'Found on', 'Livestock when tamed'], animals.map(w =>
     `<tr><td><span class="glyph animal">${esc(w.glyph)}</span> ${esc(w.name)}</td>` +
-    `<td>${esc(land(w.terrain))}</td><td>${w.livestock}</td></tr>`));
+    `<td>${esc(land(w.terrain))}</td><td>${num(w.livestock)}</td></tr>`));
 
   // ---- one section at a time (or all), each button saying how many entries match ----
   const counts = { howto: topics.length, Terrain: terrains.length, Buildings: buildings.length,
@@ -5031,7 +5031,7 @@ $('duels').onclick = async e => {
       foldState.set('duel:' + last.id, true);
       for (const m of [duelQty, duelRes, duelPick]) m.delete(id);
       const foe = last.sides[1];
-      say(`${foe.city} had bet ${foe.bet}. ` + (last.won ? `Your ${last.sides[0].name} won. You took ${last.prize}.` : `Your ${last.sides[0].name} lost.`), true);
+      say(`${foe.city} had bet ${foe.bet}. ` + (last.won ? `Your ${last.sides[0].name} won. You took ${num(last.prize)}.` : `Your ${last.sides[0].name} lost.`), true);
       renderBeast();
     }
   }
