@@ -785,6 +785,22 @@ def handle_post(path, data, token, now):
     return 200, out
 
 
+PAGE = {"stamp": None}
+
+
+def page():
+    """index.html, gzipped and fingerprinted once each time the file changes, not on every request: each open
+    page checks for a new version every minute, and reading and gzipping 450 KB each time was work for nothing."""
+    path = ROOT / "index.html"
+    st = path.stat()
+    stamp = (st.st_mtime_ns, st.st_size)
+    if PAGE["stamp"] != stamp:
+        raw = path.read_bytes()
+        PAGE.update(stamp=stamp, raw=raw, gz=gzip.compress(raw, compresslevel=6),
+                    version=hashlib.sha1(raw).hexdigest()[:12])
+    return PAGE
+
+
 def respond(method, path, query="", token=None, body=b"", headers=None):
     """Answer one HTTP request, however it arrived.
 
@@ -792,7 +808,9 @@ def respond(method, path, query="", token=None, body=b"", headers=None):
     """
     now = time.time()
     if method == "GET" and path == "/":
-        return 200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8"
+        return 200, page()["raw"], "text/html; charset=utf-8"
+    if method == "GET" and path == "/version":    # what open pages check each minute, instead of the whole page
+        return 200, json.dumps({"version": page()["version"]}).encode("utf-8"), "application/json"
     if method == "POST" and path == "/api/discord":     # a slash command from Discord (see discord_bot.py)
         with LOCK:
             try:
@@ -834,7 +852,8 @@ def compress(body, accept_encoding):
     """Gzip a reply if the browser accepts it: a city's update shrinks to about a tenth.
     Returns (body, extra headers)."""
     if len(body) > 1024 and "gzip" in (accept_encoding or ""):
-        return gzip.compress(body, compresslevel=5), [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]
+        packed = PAGE["gz"] if body is PAGE.get("raw") else gzip.compress(body, compresslevel=5)    # the page: gzipped once
+        return packed, [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]
     return body, []
 
 

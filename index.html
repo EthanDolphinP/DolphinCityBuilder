@@ -5806,11 +5806,16 @@ if (saved.city && saved.token) { token = saved.token; enter(saved.city); } else 
   // Compare only our own assets, not those unrelated additions.
   const assets = doc => ['gameStyles', 'gameScript'].map(id => doc.getElementById(id)?.textContent || '').join('\n');
   const loadedAssets = assets(document);
-  let previousSource = null, checking = false, reloading = false;
+  let previousSource = null, checking = false, reloading = false, knownVersion = null;
   async function checkForUpdate() {
     if (document.hidden || checking || reloading) return;
     checking = true;
     try {
+      // The server's fingerprint of the page first (a few bytes): the whole page is fetched only when that changes,
+      // or when there is no fingerprint to ask for (an older server, or a preview that has only the page).
+      const v = await fetch('/version', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+      const version = v && v.version;
+      if (version && version === knownVersion) return;      // nothing new: no need for the whole page
       const response = await fetch(location.pathname, { cache: 'no-store' });
       if (!response.ok) return;
       const source = await response.text();
@@ -5822,6 +5827,7 @@ if (saved.city && saved.token) { token = saved.token; enter(saved.city); } else 
         location.reload();
       }
       previousSource = source;
+      knownVersion = version || null;     // this version has been checked in full
     } catch (_) {
       // A temporary connection failure is not a new version.
     } finally { checking = false; }
