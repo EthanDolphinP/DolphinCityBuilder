@@ -351,17 +351,27 @@ def flush(names=None):
     _write(MARKET_FILE, MARKET)
 
 
-def warm_up():
-    """Just after a restart: load every city into memory one at a time, letting go of LOCK between them, so the
-    first player to open the leaderboard (or trade with a city nobody has opened yet) doesn't wait for all of them."""
+WARM_BUDGET = 0.03     # seconds each request may spend loading cities not in memory yet, just after a restart
+
+
+def warm_up(now):
+    """Just after a restart, a few cities at a time are loaded into memory at the end of each request (at most
+    WARM_BUDGET seconds), so the first player to open the leaderboard (or trade with a city nobody has opened yet)
+    doesn't wait for all of them at once. Done in the requests rather than a background thread: web hosts such as
+    PythonAnywhere don't support threads in a web app, and one holding LOCK there could stall every request."""
+    if DISK_NAMES.get("warm"):
+        return
+    start = time.perf_counter()
     for name in all_city_names():
-        with LOCK:
-            if name not in CITIES:
-                try:
-                    _loaded(name, time.time())
-                except Exception:
-                    traceback.print_exc()
-        time.sleep(0.02)
+        if time.perf_counter() - start >= WARM_BUDGET:
+            return
+        if name not in CITIES and name not in DISK_NAMES.get("broken", ()):     # a save that won't load is tried once
+            try:
+                _loaded(name, now)
+            except Exception:
+                traceback.print_exc()
+                DISK_NAMES.setdefault("broken", set()).add(name)
+    DISK_NAMES["warm"] = True       # every city is in memory
 
 
 def startup():
@@ -376,7 +386,6 @@ def startup():
         MARKET.setdefault("duels", [])
         for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
             offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
-        threading.Thread(target=warm_up, daemon=True).start()
 
 
 def run_bills(now):
@@ -787,6 +796,7 @@ def respond(method, path, query="", token=None, body=b"", headers=None):
                 status, reply = 500, {"error": "Something went wrong on the server. Try again; if it keeps happening, tell the admin."}
             if DIRTY and now - LAST_SAVE >= AUTOSAVE_SECONDS:
                 flush()
+            warm_up(now)
         else:
             status, reply = 400, {"error": "Bad request."}
         return status, json.dumps(reply, separators=(",", ":")).encode("utf-8"), "application/json"

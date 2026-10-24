@@ -111,13 +111,17 @@ for example Hetzner (about 4 euros a month) or DigitalOcean (about 6 dollars).
    game as a service that restarts by itself and saves on shutdown, gets an
    HTTPS certificate, turns on a firewall, and backs the game up every night.
 5. **Bring the cities across** from PythonAnywhere: in a PythonAnywhere Bash
-   console run `cd ~/DolphinCityBuilder && tar -czf cities.tar.gz saves market.json`,
+   console run `cd ~/DolphinCityBuilder && tar -czf cities.tar.gz --ignore-failed-read saves market.json discord.json blocked_words.json removed`
+   (the cities, the market, the Discord bot's keys, the blocked words and removed cities),
    download `cities.tar.gz` from the Files tab, copy it to the server
    (`scp cities.tar.gz root@your-server-ip:`), and there run
    `dolphincity restore cities.tar.gz`. Do this last thing before telling
    players about the move, so nothing played on PythonAnywhere afterwards is
    lost.
-6. **Point the apps at the new address**: change the address at the top of
+6. **Point Discord at the new address**: in the Discord Developer Portal, under your
+   application's General Information, change the Interactions Endpoint URL to
+   `https://play.yourdomain.com/api/discord`, then run `dolphincity discord register`.
+7. **Point the apps at the new address**: change the address at the top of
    `desktop-app/main.js` (and `desktop/Launcher.cs`), raise the version in
    `desktop-app/package.json`, and rebuild them. Players of the old app need
    the new one; you could leave a present or a message on PythonAnywhere
