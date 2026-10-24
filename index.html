@@ -1689,14 +1689,23 @@ function sboxOpen(box, typed) {
   const sel = box._sel, words = typed.toLowerCase().split(/\s+/).filter(Boolean);
   sboxActive = { key: sboxKey(sel), typed, box };
   sboxList._box = box;
-  let html = '', group = null, n = 0;
+  // The best match is the one Enter picks: the whole name typed, then a name starting with it, then a word in it.
+  const whole = typed.trim().toLowerCase();
+  const score = text => { const s = text.toLowerCase();
+    return s === whole ? 0 : s.startsWith(whole) ? 1 : s.split(/[^a-z0-9]+/).some(p => p.startsWith(words[0] || '')) ? 2 : 3; };
+  let best = null, bestScore = 9;
+  if (words.length) for (const o of sel.options) {
+    const text = o.textContent.trim(), g = o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '';
+    if ((o.disabled && !o.selected) || !words.every(w => (text + ' ' + g).toLowerCase().includes(w))) continue;
+    if (score(text) < bestScore) { best = o; bestScore = score(text); }
+  }
+  let html = '', group = null;
   for (const o of sel.options) {
     if (o.disabled && !o.selected) continue;
     const text = o.textContent.trim(), g = o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '';
     if (!words.every(w => (text + ' ' + g).toLowerCase().includes(w))) continue;
     if (g !== group) { group = g; if (g) html += `<div class="grp">${esc(g)}</div>`; }
-    html += `<div class="opt ${o.selected ? 'on' : ''} ${n === 0 && words.length ? 'hi' : ''}" data-v="${esc(o.value)}">${esc(text)}</div>`;
-    n++;
+    html += `<div class="opt ${o.selected ? 'on' : ''} ${o === best ? 'hi' : ''}" data-v="${esc(o.value)}">${esc(text)}</div>`;
   }
   sboxList.innerHTML = html || `<div class="none">Nothing matches "${esc(typed)}"</div>`;
   const r = box.getBoundingClientRect(), below = innerHeight - r.bottom;
@@ -1706,7 +1715,8 @@ function sboxOpen(box, typed) {
   if (below < 200 && r.top > below) { sboxList.style.top = ''; sboxList.style.bottom = (innerHeight - r.top + 2) + 'px'; }
   else { sboxList.style.bottom = ''; sboxList.style.top = (r.bottom + 2) + 'px'; }
   sboxList.hidden = false;
-  if (!words.length) { const on = sboxList.querySelector('.opt.on'); if (on) on.scrollIntoView({ block: 'nearest' }); }
+  const mark = sboxList.querySelector(words.length ? '.opt.hi' : '.opt.on');
+  if (mark) mark.scrollIntoView({ block: 'nearest' });
 }
 function sboxPick(box, value) {
   const sel = box._sel;
@@ -5165,7 +5175,7 @@ document.addEventListener('keydown', e => {
     showArea((view.area + (e.key === ']' ? 1 : view.areas.length - 1)) % view.areas.length);
   }
 });
-$('buildSearch').oninput = () => { buildState.q = $('buildSearch').value; if (view) renderTile(); };
+$('buildSearch').oninput = () => { buildState.q = $('buildSearch').value; buildState.cat = 'all'; if (view) renderTile(); };
 $('buildSort').onchange = () => { settings.buildSort = $('buildSort').value; saveSettings(); if (view) renderTile(); };
 $('buildSort').value = settings.buildSort || 'newest';
 $('map').onclick = e => {
