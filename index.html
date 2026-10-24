@@ -726,6 +726,36 @@
   html:not(.gfx) .building-art { height: 44px; font-size: 24px; font-weight: bold; }
   html:not(.gfx) .building-card .cost { font-size: 12px; }
   html:not(.gfx) #inspector > .head { display: block; }
+  /* ---- Map views beyond the original two: each draws the same tiles its own way, and every tile stays a .tile
+     with data-x / data-y, so clicking, the keyboard and Find work the same in all of them. ---- */
+  #mapStyles { margin: 0 0 10px; gap: 6px; }
+  #mapStyles .chip.on { border-color: var(--accent); color: var(--bright); }
+  html #map.ms { display: block; padding: 0; background: none; border-radius: 0; }
+  #map.ms .tile { outline: none; filter: none; min-height: 0; min-width: 0; }
+  #map.ms .tile i { z-index: 0; }
+  #map.ms .tile .ui-icon { margin: 0; filter: none; }     /* the icons look's tile rules are for its own square tiles */
+  /* building names show here as on the icons map (the text map has no room for them) */
+  #map.ms .tile-name { position: absolute; z-index: 1; font: 600 9px/1.2 system-ui; color: #fff; text-align: center; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; pointer-events: none; -webkit-text-stroke: .6px #080c0a; paint-order: stroke fill; }
+
+  /* Atlas: an old explorer's chart on parchment */
+  #map.ms-atlas .atlas { position: relative; user-select: none; border-radius: 6px; overflow: hidden; box-shadow: 0 6px 22px #0007; }
+  #map.ms-atlas svg { display: block; }
+  #map.ms-atlas .atlas-hit { position: absolute; display: grid; }
+  #map.ms-atlas .atlas-hit .tile { width: auto; height: auto; aspect-ratio: 1; background: transparent; border: 0; border-radius: 0; color: transparent; box-shadow: none; }
+  #map.ms-atlas .atlas-hit .tile:hover { background: #5a3d1a1f; box-shadow: inset 0 0 0 1px #5a3d1a80; }
+  #map.ms-atlas .atlas-hit .tile:focus-visible { box-shadow: inset 0 0 0 2px #a3271b; }
+  #map.ms-atlas .atlas-hit .tile.pending { opacity: 1; background: repeating-linear-gradient(45deg, #5a3d1a33 0 3px, transparent 3px 7px); }
+  #map.ms-atlas .atlas-hit .tile i { background: #6b4a1f; opacity: .16; box-shadow: none; }
+  #map.ms-atlas .atlas-hit .tile i.stuck { background: #a3271b; }
+  #map.ms-atlas .atlas-hit .tile-name { top: 1px; left: 1px; right: 1px; width: fit-content; max-width: calc(100% - 2px); margin: 0 auto; padding: 0 2px; border-radius: 3px; box-sizing: border-box;
+    background: #1d1409d9; color: #fff; -webkit-text-stroke: 0; font: italic 600 7.5px/1.25 Georgia, serif; }
+  #map.ms-atlas .atlas-hit .tile u { top: auto; bottom: 1px; right: 2px; padding: 0 2px; border-radius: 3px; background: #1d1409d9;
+    color: #fff; font: bold 9px/1 Georgia, serif; letter-spacing: -1px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #map.ms *, #map.ms .tile { animation-duration: 0s !important; animation-iteration-count: 1 !important; }
+  }
 </style>
 </head>
 <body>
@@ -786,6 +816,7 @@
       <div class="cols">
         <div class="panel" id="mapPanel">
           <h2>Map</h2>
+          <div id="mapStyles" class="bar" role="group" aria-label="Map view"></div>
           <div id="areas" style="margin:0 0 10px"></div>
           <div id="weatherBar" class="small"></div>
           <div class="scroll"><div id="map"></div></div>
@@ -1106,6 +1137,8 @@
           <label><span class="k">Highlight colour</span><select data-setting="accent"></select></label>
           <label><span class="k">Visuals</span><select data-setting="visuals">
             <option value="text">Text (the original)</option><option value="icons">Icons and cards</option></select></label>
+          <label><span class="k">Map view</span><select data-setting="mapStyle">
+            <option value="classic">Text or icons (follows Visuals)</option><option value="atlas">Atlas</option></select></label>
           <label><span class="k">Font</span><select data-setting="font"></select></label>
           <label><span class="k">Size of everything: <span id="zoomLabel"></span></span>
             <input data-setting="zoom" type="range" min="70" max="160" step="5"></label>
@@ -1382,15 +1415,15 @@ const FONTS = {
 };
 const DEFAULT_SETTINGS = { visuals: 'text', theme: 'forest', accent: '', font: 'mono', zoom: 100, tile: 'medium', width: 'normal', layout: 'auto',
                            rate: 'hour', clock: 'auto', abbreviate: false, separators: true,
-                           poll: 5, startTab: 'city', tutorial: true, collection: false, away: true, reports: true, mapKey: true };
+                           poll: 5, startTab: 'city', tutorial: true, collection: false, away: true, reports: true, mapKey: true, mapStyle: 'classic' };
 let settings = { ...DEFAULT_SETTINGS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
 function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} }
 // The Visuals setting: 'text' is the original interface, 'icons' adds pictures, cards and a building
 // collection. Anything the visual interface has no picture for is drawn the text way.
 const gfx = () => settings.visuals === 'icons';
-const TAB_ICONS = { city: 'house', people: 'people', explore: 'pin', research: 'knowledge', board: 'trophy', stats: 'chart', guide: 'knowledge', settings: 'settings' };
-const TAB_NAMES = { city: 'City', people: 'People', explore: 'Explore', research: 'Research', board: 'Leaderboard', stats: 'Stats', guide: 'Guide', settings: 'Settings' };
+const TAB_ICONS = { city: 'house', people: 'people', explore: 'pin', research: 'knowledge', cauldron: 'cauldron', board: 'trophy', stats: 'chart', guide: 'knowledge', settings: 'settings' };
+const TAB_NAMES = { city: 'City', people: 'People', explore: 'Explore', research: 'Research', cauldron: 'Cauldron', board: 'Leaderboard', stats: 'Stats', guide: 'Guide', settings: 'Settings' };
 let visualsWere = null;
 function applyVisuals() {
   const on = gfx();
@@ -1437,6 +1470,161 @@ function fitMap() {
 }
 window.addEventListener('resize', () => { applyLayout(); fitMap(); });
 
+// ---- Map views. 'classic' is the original map, drawn by the Visuals setting (text or icons); the others draw the
+// same tiles their own way. Every view keeps each tile an element with class "tile" and data-x / data-y, so
+// selecting, the arrow keys and Find work the same everywhere. ----
+const MAP_STYLES = {
+  atlas: ['Atlas', 'An explorer\'s chart on parchment, with contour lines from the land\'s height'],
+};
+// Views since replaced open as the ones that took their place.
+const OLD_STYLES = { iso: 'atlas', stars: 'atlas', sonar: 'atlas', swell: 'atlas', drum: 'atlas', glass: 'atlas' };
+const mapStyle = () => MAP_STYLES[settings.mapStyle] ? settings.mapStyle : OLD_STYLES[settings.mapStyle] || 'classic';
+// A steady random number from 0 to 1 for a tile, so trees and towers don't jump about on each redraw.
+function tileHash(x, y, k = 0) {
+  let h = Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263) ^ Math.imul(k + 1, 1274126177);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+// The room the map has inside its panel.
+function mapRoom() {
+  const box = $('map').parentElement, pad = getComputedStyle(box);
+  return Math.max(260, (box.clientWidth || 640) - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight));
+}
+// The height the whole map may take: every view fits the window, so every tile is in sight at once.
+function mapRoomH() {
+  const zoom = (Number(settings.zoom) || 100) / 100;
+  const bar = isMobile ? 0 : parseFloat(document.documentElement.style.getPropertyValue('--topbar-h')) || 60;
+  return Math.max(240, innerHeight / zoom - bar - 40);
+}
+// What every view needs to know about each tile of the area on screen.
+function mapCells(area, marked, findNote) {
+  const { defs } = view;
+  return area.tiles.map((row, y) => row.map((t, x) => {
+    const terr = defs.terrains[t.terrain], b = t.building && defs.buildings[t.building], info = view.tiles[y][x];
+    const status = !('need' in info) ? '' : info.priority < 0 || info.status.startsWith('stopped:') ? 'off' : info.status === 'working' ? '' : 'stop';
+    const key = `${x},${y}`, isSel = !!(sel && sel.x === x && sel.y === y), found = marked.get(key);
+    const pending = pendingTiles.has(`${view.area}:${key}`), water = (terr.groups || []).includes('water');
+    const adds = t.additions.map(a => defs.additions[a].name), name = terr.name + (b ? ' - ' + b.name : '');
+    const h = Number.isFinite(t.height) ? t.height : water ? 0 : terr.height ? (terr.height[0] + terr.height[1]) / 2 : 1;
+    return { x, y, t, terr, b, status, adds, water, h, found, sel: isSel, timer: !!timers[key],
+      kind: terrainIcon(terr),
+      cls: (b ? ' occupied' : '') + (isSel ? ' sel' : '') + (found ? ' hl' + (found.best ? ' best' : '') : '') + (pending ? ' pending' : '') +
+           (water ? ' water' : '') + (status ? ' ' + status : ''),
+      attrs: `data-x="${x}" data-y="${y}" aria-label="${esc(name + ' tile ' + x + ', ' + y)}" aria-pressed="${isSel}" ` +
+             `title="${esc(name + (t.animal ? ' - ' + defs.wildlife[t.animal].name : '') + (adds.length ? ' + ' + adds.join(', ') : '') + findNote(x, y))}"` };
+  }));
+}
+const mapBar = c => c.timer ? `<i data-bar="${c.x},${c.y}" aria-hidden="true"></i>` : '';
+// What the icons map writes on a tile: the building's name, and a + for each addition built onto it.
+const mapName = c => c.b ? `<span class="tile-name" aria-hidden="true">${esc(c.b.name)}</span>` : '';
+const mapAdds = c => c.adds.length ? `<u aria-hidden="true">${'+'.repeat(c.adds.length)}</u>` : '';
+function drawMapStyle(style, area, marked, findNote) {
+  const map = $('map'), cells = mapCells(area, marked, findNote), n = area.size, room = mapRoom(), roomH = mapRoomH();
+  setHTML(map, drawAtlas(cells, n, room, roomH));
+}
+const MAP_KEYS = {
+  atlas: 'Atlas: a heavy ink line along every shore. Buildings are inked pictures with their name above, a + for each addition (red: needs attention, ' +
+         'faded: switched off), pink paws are wildlife. Red ring: selected; dotted rings: Find results.',
+};
+
+// Atlas: an explorer's chart. Land painted with rough inked edges, the shore traced through the tile centres
+// (marching squares), stamps for woods, hills and dunes, buildings as medallions.
+function contourPath(get, n, level, ts, ox, oy) {
+  let d = '';
+  const f = v => v.toFixed(1);
+  for (let j = -1; j < n; j++) for (let i = -1; i < n; i++) {
+    const a = get(i, j), b = get(i + 1, j), c = get(i + 1, j + 1), e = get(i, j + 1);
+    const idx = (a > level) | (b > level) << 1 | (c > level) << 2 | (e > level) << 3;
+    if (idx === 0 || idx === 15) continue;
+    const x0 = ox + (i + 0.5) * ts, y0 = oy + (j + 0.5) * ts, t = (p, q) => (level - p) / (q - p);
+    const T = () => [x0 + t(a, b) * ts, y0], R = () => [x0 + ts, y0 + t(b, c) * ts],
+          B = () => [x0 + t(e, c) * ts, y0 + ts], L = () => [x0, y0 + t(a, e) * ts];
+    const segs = { 1: [[L, T]], 2: [[T, R]], 3: [[L, R]], 4: [[R, B]], 5: [[L, T], [R, B]], 6: [[T, B]], 7: [[L, B]],
+                   8: [[B, L]], 9: [[B, T]], 10: [[T, R], [B, L]], 11: [[B, R]], 12: [[R, L]], 13: [[R, T]], 14: [[T, L]] }[idx];
+    for (const [p, q] of segs) { const P = p(), Q = q(); d += `M${f(P[0])} ${f(P[1])}L${f(Q[0])} ${f(Q[1])}`; }
+  }
+  return d;
+}
+function drawAtlas(cells, n, room, roomH) {
+  const m = 8, top = 8, ts = Math.max(14, Math.min(64, Math.floor((room - 2 * m) / n), Math.floor((roomH - top - m) / n)));
+  const S = n * ts, W = S + 2 * m, Ht = S + top + m;
+  const ink = '#4a3418', red = '#a3271b', f = v => v.toFixed(1);
+  const cl = v => Math.min(n - 1, Math.max(0, v));
+  const height = (i, j) => { const c = cells[cl(j)][cl(i)]; return c.water ? 0 : Math.max(1, c.h); };
+  let land = '', water = '', stamps = '', marks = '';
+  for (const c of cells.flat()) {
+    const x = m + c.x * ts, y = top + c.y * ts, cx = x + ts / 2, cy = y + ts / 2;
+    if (c.water) water += `<rect x="${x}" y="${y}" width="${ts}" height="${ts}"/>`;
+    land += `<rect x="${x - 0.5}" y="${y - 0.5}" width="${ts + 1}" height="${ts + 1}" fill="${esc(c.terr.color)}"/>`;
+    const r = (k, s) => (tileHash(c.x, c.y, k) - 0.5) * s;
+    if (c.b) {
+      // the building's picture inked straight onto the land, with a thin parchment edge so it reads on dark ground
+      const col = c.status === 'stop' ? red : ink, size = ts * 0.6, d = ICON_PATHS[buildingIcon(c.b)] || ICON_PATHS.materials;
+      stamps += `<g opacity="${c.status === 'off' ? 0.45 : 1}" transform="translate(${f(cx - size / 2)} ${f(cy - size / 2 + ts * 0.07)}) scale(${f(size / 24)})" ` +
+        `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke">` +
+        `<path d="${d}" stroke="#f3e6c4" stroke-width="3" opacity=".7" vector-effect="non-scaling-stroke"/>` +
+        `<path d="${d}" stroke="${col}" stroke-width="1" vector-effect="non-scaling-stroke"/></g>`;
+    } else if (c.t.animal) {
+      stamps += `<g transform="translate(${f(cx - ts * 0.2)} ${f(cy - ts * 0.2)}) scale(${f(ts * 0.4 / 24)})"><path d="${ICON_PATHS.animal || ICON_PATHS.materials}" fill="none" stroke="#b0457e" stroke-width="2"/></g>`;
+    } else if (c.kind === 'tree') {
+      for (let k = 0; k < 3; k++) {
+        const tx = cx + r(k, ts * 0.55), ty = cy + r(k + 9, ts * 0.5), s = ts * 0.1;
+        stamps += `<path class="ink" d="M${f(tx)} ${f(ty + s * 1.6)}V${f(ty + s * 0.4)}" stroke="${ink}" stroke-width="1"/>` +
+                  `<circle cx="${f(tx)}" cy="${f(ty)}" r="${f(s)}" fill="#6e8a45" stroke="${ink}" stroke-width=".8"/>`;
+      }
+    } else if (!c.water && c.h >= 7) {
+      const s = ts * 0.28;
+      stamps += `<path d="M${f(cx - s)} ${f(cy + s * 0.6)}L${f(cx)} ${f(cy - s * 0.9)}L${f(cx + s)} ${f(cy + s * 0.6)}" fill="#e9dcb8" stroke="${ink}" stroke-width="1.1" stroke-linejoin="round"/>` +
+        `<path d="M${f(cx + s * 0.2)} ${f(cy - s * 0.4)}l${f(s * 0.3)} ${f(s * 0.5)}M${f(cx + s * 0.35)} ${f(cy - s * 0.05)}l${f(s * 0.3)} ${f(s * 0.5)}M${f(cx + s * 0.5)} ${f(cy + s * 0.3)}l${f(s * 0.2)} ${f(s * 0.3)}" stroke="${ink}" stroke-width=".7"/>`;
+    } else if (c.kind === 'hill') {
+      const s = ts * 0.2;
+      stamps += `<path d="M${f(cx - s * 1.6)} ${f(cy + s * 0.4)}q${f(s * 0.8)} ${f(-s * 1.4)} ${f(s * 1.6)} 0M${f(cx)} ${f(cy + s * 0.9)}q${f(s * 0.8)} ${f(-s * 1.4)} ${f(s * 1.6)} 0" fill="none" stroke="${ink}" stroke-width="1"/>`;
+    } else if (c.kind === 'desert') {
+      for (let k = 0; k < 6; k++) stamps += `<circle cx="${f(cx + r(k, ts * 0.7))}" cy="${f(cy + r(k + 20, ts * 0.7))}" r=".9" fill="${ink}" opacity=".6"/>`;
+    } else if (/marsh|swamp|mangrove|flood/i.test(c.terr.name)) {
+      for (let k = 0; k < 3; k++) { const tx = cx + r(k, ts * 0.6), ty = cy + r(k + 4, ts * 0.5);
+        stamps += `<path d="M${f(tx - 3)} ${f(ty)}h6M${f(tx)} ${f(ty)}v-4M${f(tx - 2)} ${f(ty)}l-1-3M${f(tx + 2)} ${f(ty)}l1-3" stroke="${ink}" stroke-width=".7"/>`; }
+    } else if (!c.water && tileHash(c.x, c.y, 3) < 0.35) {
+      stamps += `<path d="M${f(cx + r(1, ts * 0.5))} ${f(cy + r(2, ts * 0.5))}l1.5-3l1.5 3" fill="none" stroke="${ink}" stroke-width=".6" opacity=".6"/>`;
+    }
+    if (c.sel) marks += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(ts * 0.46)}" fill="none" stroke="${red}" stroke-width="2.2"/>` +
+                        `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(ts * 0.54)}" fill="none" stroke="${red}" stroke-width=".8"/>` +
+                        `<path d="M${f(cx)} ${f(cy - ts * 0.64)}v${f(ts * 0.16)}M${f(cx)} ${f(cy + ts * 0.48)}v${f(ts * 0.16)}M${f(cx - ts * 0.64)} ${f(cy)}h${f(ts * 0.16)}M${f(cx + ts * 0.48)} ${f(cy)}h${f(ts * 0.16)}" stroke="${red}" stroke-width="1.4"/>`;
+    else if (c.found) marks += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(ts * 0.44)}" fill="none" stroke="${c.found.best ? '#2f6b2a' : '#7a4a10'}" stroke-width="1.8" stroke-dasharray="3 3"/>`;
+  }
+  let grid = '';
+  for (let i = 1; i < n; i++) grid += `M${m + i * ts} ${top}v${S}M${m} ${top + i * ts}h${S}`;
+  const coast = contourPath(height, n, 0.5, ts, m, top);
+  // Here be dragons: a sea serpent in one open stretch of water, if the area has any.
+  const sea = cells.flat().filter(c => c.water && !c.b && /ocean|lake/i.test(c.terr.name));
+  const pick = sea.length >= 3 ? sea[Math.floor(tileHash(n, sea.length, 5) * sea.length)] : null;
+  const serpent = !pick ? '' : (() => { const x = m + pick.x * ts + ts * 0.15, y = top + pick.y * ts + ts * 0.55, s = ts * 0.12;
+    return `<path d="M${f(x)} ${f(y)}q${f(s)} ${f(-s * 2)} ${f(s * 2)} 0t${f(s * 2)} 0t${f(s * 2)} 0" fill="none" stroke="#2d4f63" stroke-width="1.6" stroke-linecap="round"/>` +
+      `<circle cx="${f(x + s * 6.3)}" cy="${f(y - s * 0.5)}" r="${f(s * 0.55)}" fill="#2d4f63"/>`; })();
+  const svg = `<svg width="${W}" height="${Ht}" viewBox="0 0 ${W} ${Ht}" font-family="Georgia, 'Times New Roman', serif" aria-hidden="true">` +
+    `<defs><filter id="atlasRough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="${f(1.6 / ts)}" numOctaves="3" seed="4"/>` +
+    `<feDisplacementMap in="SourceGraphic" scale="${f(ts * 0.2)}" xChannelSelector="R" yChannelSelector="G"/><feGaussianBlur stdDeviation=".5"/></filter>` +
+    `<filter id="atlasInk"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="2"/><feDisplacementMap in="SourceGraphic" scale="2.2" xChannelSelector="R" yChannelSelector="G"/></filter>` +
+    `<pattern id="atlasWaves" width="18" height="10" patternUnits="userSpaceOnUse"><path d="M1 6q2.5-3 5 0t5 0" fill="none" stroke="#2d4f63" stroke-width=".8" opacity=".55"/></pattern>` +
+    `<radialGradient id="atlasAge" cx="50%" cy="50%" r="72%"><stop offset="55%" stop-color="#7a5320" stop-opacity="0"/><stop offset="100%" stop-color="#5a3a12" stop-opacity=".28"/></radialGradient>` +
+    `<clipPath id="atlasClip"><rect x="${m}" y="${top}" width="${S}" height="${S}"/></clipPath></defs>` +
+    `<rect width="${W}" height="${Ht}" fill="#efe0bb"/>` +
+    `<g clip-path="url(#atlasClip)"><g filter="url(#atlasRough)" opacity=".5" style="mix-blend-mode:multiply">${land}</g>` +
+    `<g fill="#9cc3cf" opacity=".45" filter="url(#atlasRough)">${water}</g><g fill="url(#atlasWaves)">${water}</g>` +
+    `<path d="${grid}" stroke="${ink}" stroke-width=".4" stroke-dasharray="1 3" opacity=".5"/>` +
+    `<path d="${coast}" fill="none" stroke="#2d3f4a" stroke-width="2" stroke-linecap="round" filter="url(#atlasInk)"/>` +
+    `<path d="${coast}" fill="none" stroke="#2d3f4a" stroke-width=".6" opacity=".45" transform="translate(2 2)"/>` +
+    `${serpent}${stamps}${marks}</g>` +
+    `<rect x="${m}" y="${top}" width="${S}" height="${S}" fill="none" stroke="${ink}" stroke-width="1.6"/>` +
+    `<rect x="${m - 4}" y="${top - 4}" width="${S + 8}" height="${S + 8}" fill="none" stroke="${ink}" stroke-width=".6"/>` +
+    `<rect width="${W}" height="${Ht}" fill="url(#atlasAge)" pointer-events="none"/></svg>`;
+  const hits = cells.flat().map(c => `<button class="tile${c.cls}" ${c.attrs}>${mapBar(c)}${mapName(c)}${mapAdds(c)}</button>`).join('');
+  return `<div class="atlas" style="width:${W}px">${svg}<div class="atlas-hit" style="left:${m}px;top:${top}px;width:${S}px;grid-template-columns:repeat(${n},1fr)">${hits}</div></div>`;
+}
+
+let mapResizeTimer = 0;
+addEventListener('resize', () => { clearTimeout(mapResizeTimer); mapResizeTimer = setTimeout(() => { if (view && mapStyle() !== 'classic') render(); }, 150); });
+
 // Numbers the way the player asked for them.
 
 // Original, reusable vector artwork. Unknown content keeps a generic icon.
@@ -1481,6 +1669,7 @@ const ICON_PATHS = {
   support: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z',
   settings: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2ZM15 12a3 3 0 1 1-6 0a3 3 0 1 1 6 0Z',
  animal: 'M5 11 3 4l6 3h6l6-3-2 7v6l-7 5-7-5ZM8 13h1M15 13h1M10 17h4',
+ cauldron: 'M2 9h20M4 9q0 10 8 10t8-10M7 18l-1.5 3M17 18l1.5 3M9 6q-1.5-1.5 0-3M14 6q-1.5-1.5 0-3',
  desert: 'M2 19q6-10 12-3 4-5 8 3M18 3v4M16 5h4',
  plains: 'M3 19h18M6 19l-2-6M10 19l1-9M17 19l3-7',
 };
@@ -2415,6 +2604,7 @@ function render() {
   if (adv) { $('advance').textContent = `Advance to ${adv.name}`; $('advance').disabled = !adv.ready; }
   $('advanceMore').hidden = !adv;
   $('advancePanel').classList.toggle('other-tab', tab !== 'city');
+  $('advancePanel').hidden = !adv;   // nothing left to advance to: drop the side bar altogether
   if (adv) {
     const met = adv.checks.filter(c => c.ok).length;
     setHTML($('advanceSummary'), adv.ready ? '<span class="good">Everything it needs is ready</span>'
@@ -2450,9 +2640,18 @@ function render() {
   const marked = new Map(((foundNow() && foundNow().here) || []).map(r => [`${r.x},${r.y}`, r]));
   $('areas').hidden = view.areas.length < 2;
 
-  $('map').style.gridTemplateColumns = `repeat(${area.size}, auto)`;
+  // The choice of map view: the original two (the Visuals setting) and the other ways of drawing it.
+  const style = mapStyle();
+  setHTML($('mapStyles'), [['text', 'Text', 'The original letters (Visuals: text)'], ['icons', 'Icons', 'Pictures and cards (Visuals: icons)'],
+    ...Object.entries(MAP_STYLES).map(([k, [label, about]]) => [k, label, about])].map(([k, label, about]) => {
+      const on = k === style || (style === 'classic' && k === settings.visuals);
+      return `<button class="chip ${on ? 'on' : ''}" data-map-style="${k}" aria-pressed="${on}" title="${esc(about)}">${label}</button>`;
+    }).join(''));
+  $('map').className = style === 'classic' ? '' : 'ms ms-' + style;
+  $('map').style.gridTemplateColumns = style === 'classic' ? `repeat(${area.size}, auto)` : '';
   fitMap();
-  setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
+  if (style !== 'classic') drawMapStyle(style, area, marked, findNote);
+  else setHTML($('map'), area.tiles.map((row, y) => row.map((t, x) => {
     const g = esc(defs.terrains[t.terrain].glyph), b = t.building && defs.buildings[t.building];
     const on = (b ? ' occupied' : '') + (sel && sel.x === x && sel.y === y ? ' sel' : '') + (marked.has(`${x},${y}`) ? ' hl' + (marked.get(`${x},${y}`).best ? ' best' : '') : '') +
       (pendingTiles.has(`${view.area}:${x},${y}`) ? ' pending' : '');
@@ -2468,7 +2667,7 @@ function render() {
       (b ? icon(buildingIcon(b), state_) : t.animal ? icon('animal', 'animal') : icon(terrainIcon(defs.terrains[t.terrain]))) + (state_ === 'stop' ? '<span class="warning">!</span>' : '') + (adds.length ? `<u>${'+'.repeat(adds.length)}</u>` : '') + (b ? `<span class="tile-name" aria-hidden="true">${esc(b.name)}</span>` : '') + bar + `</button>`;
   }).join('')).join(''));
 
-  setHTML($('mapKey'), gfx()
+  setHTML($('mapKey'), style !== 'classic' ? esc(MAP_KEYS[style]) : gfx()
     ? `<div class="tile-facts"><span class="animal">${icon('animal')}Wildlife</span><span class="bad">${icon('alert')}Needs attention</span><span>${icon('pin')}Selected / found</span></div>`
     : `Second letter: <b class="hi">white</b> working building, <span class="bad">red</span> something wrong, ` +
       `grey switched off, <span class="animal">pink</span> wildlife. Highlighted tiles are Find results (green edge: the best of them here).`);
@@ -5188,6 +5387,21 @@ $('map').onclick = e => {
   render();
   // On a phone the tile's details are far below the map: go to them (the visual style shows them as a sheet instead).
   if (isMobile && !gfx()) $('inspector').scrollIntoView({ block: 'start' });
+};
+$('mapStyles').onclick = e => {
+  const b = e.target.closest('[data-map-style]');
+  if (!b) return;
+  const k = b.dataset.mapStyle;
+  if (k === 'text' || k === 'icons') {
+    // the original two are the Visuals setting itself, with the font that suits each (as in Settings)
+    if (k === 'icons' && settings.visuals !== k && settings.font === 'mono') settings.font = 'sans';
+    if (k === 'text' && settings.visuals !== k && settings.font === 'sans') settings.font = 'mono';
+    settings.visuals = k;
+    settings.mapStyle = 'classic';
+  } else settings.mapStyle = k;
+  saveSettings();
+  applySettings();
+  if (view) render();
 };
 $('toMap').onclick = () => $('map').scrollIntoView({ block: 'center' });
 $('advanceMore').addEventListener('toggle', () => { settings.advanceOpen = $('advanceMore').open; saveSettings(); });
