@@ -298,7 +298,7 @@ def _city(server, now, name):
     return _embed(f"{c['name']}" + {"online": " \U0001F7E2", "idle": " \U0001F319"}.get(online, ""),
                   f"A **{c['tech_name']}**" + (f" following **{c['ideology']}**" if c["ideology"] else "") + f". Rank #{rank} of {len(cities)}.",
                   [("Population", short(c["population"]), True), ("Buildings", short(c["buildings"]), True),
-                   ("Research done", short(c["research"]), True), ("Areas", short(c["areas"]), True),
+                   ("Research", short(c["research"]) + (f" (incl. {short(c['mastery'])} Mastery)" if c.get("mastery") else ""), True), ("Areas", short(c["areas"]), True),
                    ("Best beast", f"level {c['beast']}" if c["beast"] else "none yet", True),
                    ("Online", {"online": "yes", "idle": "idle (game open, not in use)"}.get(online, "no"), True),
                    ("Biggest stores", ", ".join(f"{short(v)} {game.RESOURCES[k]}" for k, v in stores[:4] if v) or "nothing yet", False)])

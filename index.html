@@ -369,7 +369,13 @@
   .statKv > div:nth-child(odd) { color: var(--dim); }
   .statKv .note { color: var(--dim); font-size: 13px; }
   .grade { font-weight: bold; font-size: 12px; padding: 0 3px; border-radius: 3px; border: 1px solid currentColor; }
-  .gS { color: #e6c35c; } .gA { color: #7fd17f; } .gB { color: #a6d96a; } .gC { color: #d9d36a; }
+  .gS { color: #e6c35c; }
+  /* the best grade there is: a gold badge that glows, so it stands out wherever it is */
+  .grade.gS { color: #2a1d00; background: linear-gradient(135deg, #fff1a8, #f2c230 45%, #c8901a 55%, #ffe37a); border-color: #ffe9a0;
+    box-shadow: 0 0 6px 1px #f5c84299, 0 0 12px 2px #f5c84255; text-shadow: 0 1px 0 #fff4c080; animation: goldGlow 2.4s ease-in-out infinite; }
+  .grade.gS sub { color: #2a1d00; }
+  @keyframes goldGlow { 0%, 100% { box-shadow: 0 0 5px 1px #f5c84288, 0 0 10px 2px #f5c84244; } 50% { box-shadow: 0 0 9px 2px #ffd85acc, 0 0 18px 4px #ffd85a66; } }
+  @media (prefers-reduced-motion: reduce) { .grade.gS { animation: none; } } .gA { color: #7fd17f; } .gB { color: #a6d96a; } .gC { color: #d9d36a; }
   .gD { color: #e0a85a; } .gE { color: #e08a5a; } .gF { color: #e06a6a; }
   .sex.m { color: #6fb3e8; } .sex.f { color: #e88fc0; }
   .breedRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; margin: 10px 0; }
@@ -4883,7 +4889,9 @@ function renderBoard() {
   const all = [...general, ...Object.entries(R)];
   const views = { overview: ['Overview', general], materials: ['Materials', Object.entries(R)], all: ['Everything', all] };
   const val = (c, k) => k in R ? c.resources[k] : c[k];
-  const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})` : num(val(c, k));   // follows the number settings
+  const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})`
+    : k === 'research' && c.mastery ? `<span title="${num(c.researched)} researched + ${num(c.mastery)} Mastery levels">${num(val(c, k))}</span>`
+    : num(val(c, k));   // follows the number settings
   const sortLabel = all.find(([k]) => k === boardSort)[1];
 
   // Ranks come from the whole list, so searching doesn't renumber anyone.

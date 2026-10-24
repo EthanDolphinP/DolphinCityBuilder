@@ -5449,7 +5449,10 @@ def summary(state):
         "tech_name": TECH_LEVELS[state["tech"]]["name"],
         "ideology": ideology.chosen(state)["name"] if ideology.chosen(state) else None,
         "population": state["population"],
-        "research": len(state["research"]),
+        # research done, and every Mastery level a Megacity has studied since (each is research too)
+        "research": len(state["research"]) + sum(state.get("mastery", {}).values()),
+        "researched": len(state["research"]),
+        "mastery": sum(state.get("mastery", {}).values()),
         "beast": max((b["level"] for b in state["beasts"]), default=0),
         "areas": len(state["areas"]),
         "buildings": sum(1 for t in all_tiles(state) if t["building"]),
