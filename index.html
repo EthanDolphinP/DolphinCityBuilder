@@ -1708,12 +1708,15 @@ function sboxOpen(box, typed) {
     html += `<div class="opt ${o.selected ? 'on' : ''} ${o === best ? 'hi' : ''}" data-v="${esc(o.value)}">${esc(text)}</div>`;
   }
   sboxList.innerHTML = html || `<div class="none">Nothing matches "${esc(typed)}"</div>`;
+  // Placed in screen pixels, then divided by the page's zoom (Settings), which the list is drawn inside: without
+  // that, at 150% the list landed half as far again from its box, often off the bottom of the window.
+  const z = Number(document.body.style.zoom) || 1, px = v => (v / z) + 'px';
   const r = box.getBoundingClientRect(), below = innerHeight - r.bottom;
-  sboxList.style.left = Math.max(4, Math.min(r.left, innerWidth - Math.max(r.width, 200) - 4)) + 'px';
-  sboxList.style.minWidth = Math.max(r.width, 160) + 'px';
-  sboxList.style.maxWidth = Math.min(480, innerWidth - 8) + 'px';
-  if (below < 200 && r.top > below) { sboxList.style.top = ''; sboxList.style.bottom = (innerHeight - r.top + 2) + 'px'; }
-  else { sboxList.style.bottom = ''; sboxList.style.top = (r.bottom + 2) + 'px'; }
+  sboxList.style.left = px(Math.max(4, Math.min(r.left, innerWidth - Math.max(r.width, 200 * z) - 4)));
+  sboxList.style.minWidth = px(Math.max(r.width, 160 * z));
+  sboxList.style.maxWidth = px(Math.min(480 * z, innerWidth - 8));
+  if (below < 200 * z && r.top > below) { sboxList.style.top = ''; sboxList.style.bottom = px(innerHeight - r.top + 2); }
+  else { sboxList.style.bottom = ''; sboxList.style.top = px(r.bottom + 2); }
   sboxList.hidden = false;
   const mark = sboxList.querySelector(words.length ? '.opt.hi' : '.opt.on');
   if (mark) mark.scrollIntoView({ block: 'nearest' });
