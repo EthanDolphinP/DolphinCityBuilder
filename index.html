@@ -2612,10 +2612,17 @@ function renderBuildList(info) {
   const { defs, state } = view, B = defs.buildings, R = defs.resources;
   const can = info.build.filter(o => !o.problem), cannot = info.build.filter(o => o.problem);
   const words = buildState.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const about = o => { const b = B[o.id];
-    return `${b.name} ${b.desc} ${defs.categories[b.category]} ${defs.tech[b.tech].name} ${plain(b.produces || {})} ${plain(b.consumes || {})} ` +
-      `${b.housing ? 'housing houses people home' : ''} ${b.generates ? 'power generator' : ''}`.toLowerCase(); };
-  const found = can.filter(o => words.every(w => about(o).includes(w)));
+  // A word typed matches the start of a word (so "arc" finds the Arcology, not the Research Institute or every
+  // "research" in a description). Buildings named by the search come first; ones that only mention it come after.
+  const wordsOf = text => text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const about = id => { const b = B[id];
+    return wordsOf(`${b.desc} ${defs.categories[b.category]} ${defs.tech[b.tech].name} ${plain(b.produces || {})} ${plain(b.consumes || {})} ` +
+      `${b.housing ? 'housing houses people home' : ''} ${b.generates ? 'power generator' : ''}`); };
+  const named = id => { const name = B[id].name.toLowerCase(), parts = wordsOf(name);
+    return words.every(w => name.startsWith(w) || parts.some(p => p.startsWith(w))); };
+  const matches = id => { if (named(id)) return true; const parts = [...wordsOf(B[id].name), ...about(id)];
+    return words.every(w => parts.some(p => p.startsWith(w))); };
+  const found = can.filter(o => matches(o.id));
   // Kinds of building, each with how many fit here.
   const cats = Object.entries(defs.categories).filter(([cat]) => found.some(o => B[o.id].category === cat));
   if (buildState.cat !== 'all' && !cats.some(([cat]) => cat === buildState.cat)) buildState.cat = 'all';
@@ -2634,7 +2641,14 @@ function renderBuildList(info) {
     cheapest: (a, b) => buildCost(B[a.id].cost) - buildCost(B[b.id].cost),
     name: () => 0,
   }[settings.buildSort || 'newest'] || (() => 0);
-  shown.sort((a, b) => (b.affordable - a.affordable) || order(a, b) || B[a.id].name.localeCompare(B[b.id].name));
+  shown.sort((a, b) => (words.length ? named(b.id) - named(a.id) : 0) || (b.affordable - a.affordable) || order(a, b) ||
+    B[a.id].name.localeCompare(B[b.id].name));
+  // Buildings the search names that can't go on this tile, or aren't known yet: say why, and where they could go.
+  const elsewhere = words.length ? cannot.filter(o => named(o.id)) : [];
+  const later = words.length ? Object.keys(B).filter(id => B[id].tech > state.tech && named(id)) : [];
+  const notHere = elsewhere.map(o => `<div class="opt small"><span class="hi">${esc(B[o.id].name)}</span> can't go on this tile: ${esc(o.problem)}` +
+      (/research/i.test(o.problem) ? '' : ` <button class="mini" data-choose-site="${esc(o.id)}">Find a tile for it</button>`) + `</div>`).join('') +
+    later.map(id => `<div class="opt small"><span class="hi">${esc(B[id].name)}</span> <span class="dim">comes at ${esc(defs.tech[B[id].tech].name)}.</span></div>`).join('');
   $('buildCount').textContent = can.length ? `(${shown.length === can.length ? can.length : shown.length + ' of ' + can.length} fit)` : '';
 
   // One line per building: what it does here and what it costs; the rest folds away.
@@ -2652,7 +2666,7 @@ function renderBuildList(info) {
     return bits.join(' &middot; ');
   };
   setHTML($('buildList'), (!can.length ? `<div class="card dim">Nothing you know how to build fits this tile.</div>`
-    : !shown.length ? `<p class="dim">Nothing that fits here matches "${esc(buildState.q)}".</p>`
+    : !shown.length ? notHere + (notHere ? '' : `<p class="dim">Nothing that fits here matches "${esc(buildState.q)}".</p>`)
     : shown.map(o => {
         const b = B[o.id];
         return `<div class="brow ${o.affordable ? '' : 'cant'}"><div class="head"><span class="hi">${gfx() ? icon(buildingIcon(b)) : ''}${esc(b.name)} ` +
@@ -2662,7 +2676,7 @@ function renderBuildList(info) {
           `<details class="fold" data-fold="bd:${esc(o.id)}" ${isOpen('bd:' + o.id, false) ? 'open' : ''}><summary>More about it</summary><div>` +
             kv(buildingRows(b, o.cycle, b.produces)) + `<div class="dim">${esc(b.desc)}</div>` +
             ((o.notes || []).length ? `<div class="dim">Speed here: ${o.notes.map(esc).join(', ')}</div>` : '') + `</div></details></div>`;
-      }).join('')) +
+      }).join('') + notHere) +
     fold('nobuild', "Can't be built on this tile", cannot.map(o => `${esc(B[o.id].name)}: ${esc(o.problem)}`)));
 }
 function renderTile() {
@@ -5091,10 +5105,7 @@ $('collectionFilters').onclick = e => { const b = e.target.closest('[data-collec
 $('collectionSearch').oninput = () => { if(view) renderCollection(); };
 $('collection').onclick = e => {
  const locate = e.target.closest('[data-locate-building]'), site = e.target.closest('[data-choose-site]');
- if(site) {
-  finder = {kind:'sites',what:site.dataset.chooseSite};
-  $('findKind').value = 'sites'; findChoices(); finder.what=site.dataset.chooseSite; $('findWhat').value=finder.what; refresh(); $('map').scrollIntoView({block:'center'}); return;
- }
+ if(site) { findSiteFor(site.dataset.chooseSite); return; }
  if(locate) {
   for(let ai=0;ai<view.state.areas.length;ai++) {
    const a = view.state.areas[ai];
@@ -5196,7 +5207,15 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.help-tip').forEach(tip => setHelpOpen(tip, false));
 });
+// The Find box set to "Where can I build..." this building: its best tiles light up on the map.
+function findSiteFor(id) {
+  finder = { kind: 'sites', what: id };
+  $('findKind').value = 'sites'; findChoices(); finder.what = id; $('findWhat').value = id;
+  refresh(); $('map').scrollIntoView({ block: 'center' });
+}
 $('tile').onclick = e => {
+  const site = e.target.closest('[data-choose-site]');
+  if (site) { findSiteFor(site.dataset.chooseSite); return; }
   const pick = e.target.closest('[data-build-cat]');
   if (pick) { buildState.cat = pick.dataset.buildCat; renderTile(); return; }
   if (e.target.dataset.build) {
