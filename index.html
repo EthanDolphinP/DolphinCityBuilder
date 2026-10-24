@@ -29,6 +29,20 @@
   button { cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   button:disabled { color: var(--faint); cursor: not-allowed; }
+  /* a dropdown turned into a search box (see pickers below): the box, and the list that opens under it */
+  input.sbox { min-width: 120px; max-width: 100%; cursor: pointer; padding-right: 20px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%), linear-gradient(135deg, var(--dim) 50%, transparent 50%);
+    background-position: calc(100% - 11px) 55%, calc(100% - 6px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+  input.sbox:focus { cursor: text; }
+  #sboxList { position: fixed; z-index: 1000; max-height: 280px; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 6px 20px rgba(0,0,0,0.45); font-size: 14px; }
+  #sboxList .opt { padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+  #sboxList .opt.hi { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--text); }
+  #sboxList .opt.on { color: var(--accent); }
+  #sboxList .grp { padding: 5px 10px 2px; color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #sboxList .none { padding: 6px 10px; color: var(--dim); }
+  html.mobile #sboxList .opt { padding: 10px 12px; }
+  html.mobile label.pick input.sbox { flex: 1; min-width: 0; }
   /* pressed and waiting for the server: shown at once, so a click never looks ignored */
   button.working { cursor: progress; border-color: var(--accent, currentColor); animation: working 0.8s ease-in-out infinite alternate; }
   @keyframes working { from { opacity: 1; } to { opacity: 0.45; } }
@@ -1593,6 +1607,142 @@ let mktView = settings.mktView || 'buy';   // which part of the market is showin
 const lotInput = new Map();   // how much the player has typed to buy from each offer
 const finInput = new Map();   // amounts being typed into a finished order: "id:give_qty" -> text
 // Replace a list's HTML without losing the box the player is typing in.
+// ---- dropdowns as search boxes ----
+// A dropdown with many choices, or one that picks a city, beast or area, gets a box in front of it: click it to see
+// every choice, type to narrow them, then a click (or the arrows and Enter) picks one. The dropdown itself stays,
+// hidden, and is set as if the player had picked in it, so everything that reads it or listens to it carries on.
+// Panels are drawn again every few seconds; a box being typed into comes back with its words, still in use.
+const SBOX_ALWAYS = '[data-curse-target], [data-duel-pick], #duelBeast, [data-bt-pay], #socCity, #areaPick, #findWhat, [data-td="species"]';
+const SBOX_NEVER = '[data-setting], #areaLook, [data-bd="count"], [data-td="kind"]';
+let sboxActive = null;      // { key, typed, hi } of the box in use, so a redraw can put it back
+const sboxList = document.createElement('div');
+sboxList.id = 'sboxList'; sboxList.hidden = true;
+document.body.appendChild(sboxList);
+function sboxKey(sel) {
+  return sel.id || [...sel.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name + '=' + a.value).join('&');
+}
+function sboxWanted(sel) {
+  if (sel._sbox || sel.multiple || sel.matches(SBOX_NEVER) || sel.closest('[data-setting]')) return false;
+  return sel.matches(SBOX_ALWAYS) || sel.options.length >= 6;
+}
+function sboxLabel(sel) {
+  const o = sel.options[sel.selectedIndex];
+  return o ? o.textContent.trim() : '';
+}
+function sboxSync(sel) {       // the box shows what the dropdown has (code can change it), and hides with it
+  const box = sel._sbox;
+  if (!box) return;
+  // only when different: setting them at all counts as a change, and changes are what call this
+  if (box.hidden !== sel.hidden) box.hidden = sel.hidden;
+  if (box.disabled !== sel.disabled) box.disabled = sel.disabled;
+  const title = sel.title || 'Click, or type to search';
+  if (box.title !== title) box.title = title;
+  if (document.activeElement !== box && box.value !== sboxLabel(sel)) box.value = sboxLabel(sel);
+}
+function sboxEnhance(sel) {
+  if (!sboxWanted(sel)) return;
+  const box = document.createElement('input');
+  box.type = 'text'; box.className = 'sbox'; box.autocomplete = 'off'; box.spellcheck = false;
+  box.setAttribute('role', 'combobox');
+  const w = sel.offsetWidth;
+  if (w) box.style.width = Math.max(w + 8, 120) + 'px';
+  if (sel.style.maxWidth) box.style.maxWidth = sel.style.maxWidth;
+  sel._sbox = box; box._sel = sel;
+  sel.style.display = 'none';
+  sel.before(box);
+  sboxSync(sel);
+  box.addEventListener('focus', () => { sboxOpen(box, ''); box.select(); });
+  box.addEventListener('input', () => sboxOpen(box, box.value));
+  box.addEventListener('blur', () => setTimeout(() => {
+    if (document.activeElement === box) return;
+    if (sboxActive && sboxActive.box === box) sboxActive = null;
+    sboxList.hidden = true; sboxSync(sel);
+  }, 120));
+  box.addEventListener('keydown', e => {
+    const opts = [...sboxList.querySelectorAll('.opt')];
+    let i = opts.findIndex(o => o.classList.contains('hi'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (sboxList.hidden) sboxOpen(box, '');
+      const all = [...sboxList.querySelectorAll('.opt')];
+      i = Math.max(0, Math.min(all.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+      all.forEach((o, n) => o.classList.toggle('hi', n === i));
+      if (all[i]) all[i].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const o = opts[i >= 0 ? i : 0];
+      if (o) sboxPick(box, o.dataset.v);
+    } else if (e.key === 'Escape') {
+      sboxList.hidden = true; sboxActive = null; box.value = sboxLabel(sel); box.blur();
+    }
+  });
+  // a box that was being typed into before the panel was drawn again: carry on in the new one
+  if (sboxActive && sboxActive.key === sboxKey(sel) && !sboxActive.box.isConnected) {
+    const typed = sboxActive.typed;
+    box.focus({ preventScroll: true });
+    box.value = typed;
+    sboxOpen(box, typed);
+  }
+}
+function sboxOpen(box, typed) {
+  const sel = box._sel, words = typed.toLowerCase().split(/\s+/).filter(Boolean);
+  sboxActive = { key: sboxKey(sel), typed, box };
+  let html = '', group = null, n = 0;
+  for (const o of sel.options) {
+    if (o.disabled && !o.selected) continue;
+    const text = o.textContent.trim(), g = o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '';
+    if (!words.every(w => (text + ' ' + g).toLowerCase().includes(w))) continue;
+    if (g !== group) { group = g; if (g) html += `<div class="grp">${esc(g)}</div>`; }
+    html += `<div class="opt ${o.selected ? 'on' : ''} ${n === 0 && words.length ? 'hi' : ''}" data-v="${esc(o.value)}">${esc(text)}</div>`;
+    n++;
+  }
+  sboxList.innerHTML = html || `<div class="none">Nothing matches "${esc(typed)}"</div>`;
+  const r = box.getBoundingClientRect(), below = innerHeight - r.bottom;
+  sboxList.style.left = Math.max(4, Math.min(r.left, innerWidth - Math.max(r.width, 200) - 4)) + 'px';
+  sboxList.style.minWidth = Math.max(r.width, 160) + 'px';
+  sboxList.style.maxWidth = Math.min(480, innerWidth - 8) + 'px';
+  if (below < 200 && r.top > below) { sboxList.style.top = ''; sboxList.style.bottom = (innerHeight - r.top + 2) + 'px'; }
+  else { sboxList.style.bottom = ''; sboxList.style.top = (r.bottom + 2) + 'px'; }
+  sboxList.hidden = false;
+  if (!words.length) { const on = sboxList.querySelector('.opt.on'); if (on) on.scrollIntoView({ block: 'nearest' }); }
+}
+function sboxPick(box, value) {
+  const sel = box._sel;
+  sboxActive = null;
+  sboxList.hidden = true;
+  if (sel.value !== value) {
+    sel.value = value;
+    sel.dispatchEvent(new Event('input', { bubbles: true }));
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  box.value = sboxLabel(sel);
+  box.blur();
+}
+sboxList.addEventListener('mousedown', e => e.preventDefault());      // keep the box in use while picking
+sboxList.addEventListener('click', e => {
+  const o = e.target.closest('.opt');
+  if (o && sboxActive && sboxActive.box.isConnected) sboxPick(sboxActive.box, o.dataset.v);
+});
+// the list follows its box (or closes) when the page scrolls
+addEventListener('scroll', e => {
+  if (sboxList.hidden || sboxList.contains(e.target)) return;
+  if (sboxActive && sboxActive.box.isConnected && document.activeElement === sboxActive.box) sboxOpen(sboxActive.box, sboxActive.typed);
+  else sboxList.hidden = true;
+}, true);
+// new dropdowns (every panel drawn again) get their box; changed choices or values show in the boxes
+let sboxQueued = false;
+function sboxAll() {
+  sboxQueued = false;
+  for (const sel of document.querySelectorAll('select')) { if (!sel._sbox) sboxEnhance(sel); else sboxSync(sel); }
+  if (sboxActive && !sboxActive.box.isConnected) sboxActive = null;
+}
+new MutationObserver(() => {
+  if (sboxQueued) return;
+  sboxQueued = true;
+  queueMicrotask(sboxAll);
+}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'disabled'] });
+setInterval(() => { for (const sel of document.querySelectorAll('select')) if (sel._sbox) sboxSync(sel); }, 500);
+sboxAll();
 function setHTMLKeep(el, html, fill) {
   const a = document.activeElement, key = a && el.contains(a) && a.dataset.k;
   const changed = el._html !== html;
@@ -4168,7 +4318,7 @@ function renderPeople() {
       : ready ? `+${status.arrivals_next} ${status.arrivals_next === 1 ? 'person' : 'people'} at the next meal` : 'Not growing') +
     ` <span class="dim">(next meal in <span data-timer="meal"></span>)</span></p>` +
     `<p class="dim">A meal happens every ${duration(status.meal_time)}. At each meal everyone eats 1 food, ` +
-    `and if both things below are true one new person joins - so at best ${perHour * status.arrivals_max} people per hour.` +
+    `and if both things below are true one new person joins - so at best ${num(perHour * status.arrivals_max)} people per hour.` +
     (status.arrivals_max > 1 ? ` Your taverns let up to <span class="hi">${status.arrivals_max}</span> arrive per meal; each extra arrival needs ` +
       `its own free place to live and enough food in store to cover one more mouth.` :` A Tavern (Village) lets one more arrive per meal.`) + `</p>` +
     status.growth.map(g => `<div class="opt"><span class="${g.ok ? 'good' : 'bad'}">[${g.ok ? 'x' : ' '}]</span> ${esc(g.text)}` +
@@ -4186,10 +4336,10 @@ function renderPeople() {
     meter([[status.food_made]], top) +
     (potentialFood == null ? '' : `<div class="dim small">Total assumes full staffing, power and supplies, with current weather and livestock.</div>`) +
     `Eaten per hour: <span class="${status.food_eaten > status.food_made ? 'bad' : ''}">${num(status.food_eaten)}</span> ` +
-    `<span class="dim">(${pop} people x 1 food x ${perHour} meals)</span>` +
+    `<span class="dim">(${pop} people x 1 food x ${num(perHour)} meals)</span>` +
     meter([[status.food_eaten, status.food_eaten > status.food_made ? 'warn' : 'alt']], top) +
     `Eaten per hour at full housing: <span class="${fullHousingFood > status.food_made ? 'bad' : 'hi'}">${num(fullHousingFood)}</span> ` +
-    `<span class="dim">(${status.housing} people x 1 food x ${perHour} meals)</span>` +
+    `<span class="dim">(${status.housing} people x 1 food x ${num(perHour)} meals)</span>` +
     meter([[fullHousingFood, fullHousingFood > status.food_made ? 'warn' : 'alt']], top) +
     `<p>Each hour your store ${net >= 0 ? 'grows' : 'shrinks'} by <span class="${net >= 0 ? 'good' : 'bad'}">${num(Math.abs(net))}</span> food.</p>` +
     `<p>In store: <span class="hi">${food}</span> food = <span class="hi">${meals}</span> ${meals === 1 ? 'meal' : 'meals'}` +
