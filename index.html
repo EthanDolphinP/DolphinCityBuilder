@@ -1637,7 +1637,7 @@ function sboxSync(sel) {       // the box shows what the dropdown has (code can 
   if (box.disabled !== sel.disabled) box.disabled = sel.disabled;
   const title = sel.title || 'Click, or type to search';
   if (box.title !== title) box.title = title;
-  if (document.activeElement !== box && box.value !== sboxLabel(sel)) box.value = sboxLabel(sel);
+  if (document.activeElement !== box && box.value !== sboxLabel(sel)) { box.value = sboxLabel(sel); box.scrollLeft = 0; }
 }
 function sboxEnhance(sel) {
   if (!sboxWanted(sel)) return;
@@ -1654,7 +1654,7 @@ function sboxEnhance(sel) {
   box.addEventListener('focus', () => { sboxOpen(box, ''); box.select(); });
   box.addEventListener('input', () => sboxOpen(box, box.value));
   box.addEventListener('blur', () => setTimeout(() => {
-    if (document.activeElement === box) return;
+    if (document.activeElement === box || sboxPressing) return;     // still in use, or a choice is being tapped
     // a box swapped for a new one when its panel was drawn again: the new one is in use, leave its list open
     if (!sboxActive || sboxActive.box === box) { sboxActive = null; sboxList.hidden = true; }
     sboxSync(sel);
@@ -1688,6 +1688,7 @@ function sboxEnhance(sel) {
 function sboxOpen(box, typed) {
   const sel = box._sel, words = typed.toLowerCase().split(/\s+/).filter(Boolean);
   sboxActive = { key: sboxKey(sel), typed, box };
+  sboxList._box = box;
   let html = '', group = null, n = 0;
   for (const o of sel.options) {
     if (o.disabled && !o.selected) continue;
@@ -1717,12 +1718,28 @@ function sboxPick(box, value) {
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   }
   box.value = sboxLabel(sel);
+  box.setSelectionRange(0, 0);     // show the start of a long name, not the end where the typing was
+  box.scrollLeft = 0;
   box.blur();
 }
+// Picking from the list. A finger on a phone takes the focus from the box before the tap counts as a click, so
+// while the list is pressed nothing closes it, and the list remembers which box it belongs to.
+let sboxPressing = false;
 sboxList.addEventListener('mousedown', e => e.preventDefault());      // keep the box in use while picking
+sboxList.addEventListener('pointerdown', () => { sboxPressing = true; });
+addEventListener('pointerup', () => setTimeout(() => { sboxPressing = false; }, 400), true);
+addEventListener('pointercancel', () => { sboxPressing = false; }, true);
+addEventListener('pointerdown', e => {       // a press anywhere else closes the list
+  if (sboxList.hidden || sboxList.contains(e.target) || (e.target.closest && e.target.closest('input.sbox'))) return;
+  sboxList.hidden = true;
+  const box = sboxList._box;
+  sboxActive = null;
+  if (box && box._sel && document.activeElement !== box) sboxSync(box._sel);
+}, true);
 sboxList.addEventListener('click', e => {
-  const o = e.target.closest('.opt');
-  if (o && sboxActive && sboxActive.box.isConnected) sboxPick(sboxActive.box, o.dataset.v);
+  const o = e.target.closest('.opt'), box = sboxActive && sboxActive.box.isConnected ? sboxActive.box : sboxList._box;
+  sboxPressing = false;
+  if (o && box && box.isConnected) sboxPick(box, o.dataset.v);
 });
 // the list follows its box (or closes) when the page scrolls
 addEventListener('scroll', e => {
