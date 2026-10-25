@@ -28,6 +28,7 @@ without touching index.html. Player-to-player trading lives in market.py, and
 beasts (eggs, missions and the bonuses they give) in beasts.py.
 """
 
+import json
 import math
 import random
 from contextlib import contextmanager
@@ -3837,14 +3838,51 @@ def work_plan(state):
     if _PLAN_CACHE is not None:
         key = id(state)
         if key not in _PLAN_CACHE:
-            _PLAN_CACHE[key] = _work_plan(state)
+            _PLAN_CACHE[key] = _remembered_plan(state)
         jobs, housing, totals = _PLAN_CACHE[key]
         return [dict(j) for j in jobs], housing, dict(totals)
-    with _stats_cached():
-        return _work_plan(state)
+    jobs, housing, totals = _remembered_plan(state)
+    return [dict(j) for j in jobs], housing, dict(totals)
 
 
 _PLAN_CACHE = None     # inside reading(): id(state) -> its work plan
+# The last work plan of each city, kept between requests: a big city's plan took a tenth of a second, and every
+# update a player's page asks for worked it out twice (catching up, then the reply), though it rarely changes.
+# It is used again only while everything it depends on is the same (_plan_key), and for at most PLAN_KEEP seconds
+# of game time, so anything the key misses can only be out of date that long.
+_PLAN_MEMO = {}        # id(state) -> (key, made at, plan)
+PLAN_KEEP = 120
+
+
+def _plan_key(state):
+    """Everything a work plan depends on: the buildings (with additions and priorities), the people to staff them,
+    research, the effects in force at the moment being worked out (ideology, rituals, the Cauldron, artifacts,
+    hexes), the active beast and the size of the herd."""
+    tiles = tuple((ai, x, y, t["building"], t.get("priority", 0), tuple(t["additions"]))
+                  for ai, area in enumerate(state["areas"]) for y, row in enumerate(area["tiles"])
+                  for x, t in enumerate(row) if t["building"])
+    beast = beasts.active(state)
+    return (tiles, len(state["areas"]), state["population"], state["tech"], len(state["research"]),
+            json.dumps(ideology.effects(state), sort_keys=True, default=str),
+            tuple((c["ideology"], c["curse"], c["scale"]) for _, c in ideology.active_curses(state)),
+            (beast["id"], beast["species"], beast["level"], beast["stage"], beast.get("cap")) if beast else None,
+            min(2.0, max(0.2, int(state["resources"]["livestock"]) / LIVESTOCK_FOR_FULL_SPEED)))
+
+
+def _remembered_plan(state):
+    with _stats_cached():
+        key = _plan_key(state)
+        old = _PLAN_MEMO.get(id(state))
+        if old and old[0] == key and 0 <= state["updated"] - old[1] <= PLAN_KEEP:
+            jobs = old[2][0]
+            # the same tiles, not copies of them (a city brought back from its save is a new set of tiles)
+            if all(j["tile"] is state["areas"][j["area"]]["tiles"][j["y"]][j["x"]] for j in jobs):
+                return old[2]
+        plan = _work_plan(state)
+    if len(_PLAN_MEMO) > 1000:
+        _PLAN_MEMO.clear()
+    _PLAN_MEMO[id(state)] = (key, state["updated"], plan)
+    return plan
 
 
 @contextmanager
@@ -4004,10 +4042,38 @@ def city_stat(state, field):
     if _STAT_CACHE is not None:
         key = (id(state), field)
         if key not in _STAT_CACHE:
-            _STAT_CACHE[key] = (sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
-                                + ideology.value(state, field))
+            # every building's numbers added up in one pass, the first time any is asked for (a big city has
+            # thousands of buildings, and a reply asks for twenty or so of these)
+            totals = _STAT_CACHE.get((id(state), None))
+            if totals is None:
+                totals = _STAT_CACHE[(id(state), None)] = _tile_totals(state)
+            _STAT_CACHE[key] = totals.get(field, 0) + ideology.value(state, field)
         return _STAT_CACHE[key]
     return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"]) + ideology.value(state, field)
+
+
+_NUMBERS = {}      # ("b" or "a", id) -> that building's or addition's number fields
+
+
+def _numbers(kind, key):
+    if (kind, key) not in _NUMBERS:
+        d = (BUILDINGS if kind == "b" else ADDITIONS)[key]
+        _NUMBERS[(kind, key)] = {f: v for f, v in d.items() if isinstance(v, (int, float)) and not isinstance(v, str)}
+    return _NUMBERS[(kind, key)]
+
+
+def _tile_totals(state):
+    """tile_stat added up over every building in the city, for every field at once."""
+    out = {}
+    for t in all_tiles(state):
+        if not t["building"]:
+            continue
+        for f, v in _numbers("b", t["building"]).items():
+            out[f] = out.get(f, 0) + v
+        for aid in t["additions"]:
+            for f, v in _numbers("a", aid).items():
+                out[f] = out.get(f, 0) + v
+    return out
 
 
 def city_attracts(state, when=None):
