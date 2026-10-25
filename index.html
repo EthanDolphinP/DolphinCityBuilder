@@ -2394,7 +2394,12 @@ function predict(action, extra) {
     if (!a || !t.building || t.additions.includes(extra.addition) || (opt && opt.problem) || !afford(a.cost)) return false;
     pay(a.cost);
     t.additions = [...t.additions, extra.addition];
-    delete cell.additions;
+    // The rest of the list stays: only the one chosen leaves it, the others say whether they can still be paid
+    // for, and once the building is full they say so (the server's answer then confirms it all).
+    const full = t.additions.length >= defs.max_additions;
+    if (cell.additions) cell.additions = cell.additions.filter(o => o.id !== extra.addition).map(o => ({ ...o,
+      problem: o.problem || (full ? `no room (a building holds ${defs.max_additions} additions)` : null),
+      affordable: afford(defs.additions[o.id].cost) }));
   } else if (action === 'priority') {
     if (!t.building) return false;
     t.priority = cell.priority = extra.priority;
@@ -2419,7 +2424,6 @@ document.addEventListener('click', e => {
 }, true);
 async function act(action, extra) {
   if (visiting) return;
-  if (action === 'add' && pendingActions) return;
   const pressed = lastPress && performance.now() - lastPress.t < 400 ? lastPress.b : null;
   lastPress = null;
   if (pressed) pressed.classList.add('working');
