@@ -17,7 +17,7 @@ using Microsoft.Win32;
 
 static class Launcher
 {
-    const string GameUrl = "https://mangoclaw119.pythonanywhere.com/";
+    const string GameUrl = "https://dolphincitybuilder.duckdns.org/";
     const string AppName = "DolphinCityBuilder";
 
     [STAThread]

@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 API_PATHS = {"/api/login", "/api/state", "/api/action", "/api/visit", "/api/leaderboard"}
-UPSTREAM = "https://mangoclaw119.pythonanywhere.com"
+UPSTREAM = "https://dolphincitybuilder.duckdns.org"
 
 
 class PreviewHandler(BaseHTTPRequestHandler):

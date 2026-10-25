@@ -10,7 +10,7 @@
 const { app, BrowserWindow, Menu, shell, session } = require('electron');
 const path = require('path');
 
-const GAME_URL = process.env.DCB_URL || 'https://mangoclaw119.pythonanywhere.com/';   // DCB_URL: test against another copy
+const GAME_URL = process.env.DCB_URL || 'https://dolphincitybuilder.duckdns.org/';   // DCB_URL: test against another copy
 const GAME_ORIGIN = new URL(GAME_URL).origin;
 const TITLE = 'Dolphin City Builder';
 

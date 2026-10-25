@@ -560,7 +560,7 @@ def _setup():
     print("  An announcements webhook comes from a channel's settings: Integrations, Webhooks, New Webhook, Copy URL.")
     print("Press Enter to keep a value already set.\n")
     asks = [("application_id", "Application ID"), ("public_key", "Public Key"), ("bot_token", "Bot token"),
-            ("webhook", "Announcements webhook URL (optional)"), ("game_url", "The game's address, e.g. https://you.pythonanywhere.com"),
+            ("webhook", "Announcements webhook URL (optional)"), ("game_url", "The game's address, e.g. https://yourname.duckdns.org"),
             ("admin_ids", "Discord user IDs allowed the admin commands besides server admins, separated by spaces (optional)")]
     out = dict(old)
     for key, label in asks:
