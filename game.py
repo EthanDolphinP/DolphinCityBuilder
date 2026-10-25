@@ -4588,15 +4588,19 @@ def queue_room(state):
     return min(MAX_EXPEDITION_QUEUE, int(sum(_researched(state, "exp_queue")) + city_stat(state, "exp_queue")))
 
 
-def destinations(state):
-    """Undiscovered positions next to a discovered area, or next to one an expedition is heading for
-    (so a queue can push outwards), leaving out those already planned."""
-    known = {(a["rx"], a["ry"]) for a in state["areas"]} | set(planned(state))
+def destinations(state, with_planned=False):
+    """Undiscovered positions next to an area already mapped, leaving out those an expedition is heading for (or
+    keeping them, with_planned, for the Explore tab to show where they stand). New land opens up only when an
+    expedition has mapped the land next to it, not when one sets out: a queue can't run on ahead in one direction,
+    and the list of places to go doesn't change with every team sent."""
+    known = {(a["rx"], a["ry"]) for a in state["areas"]}
+    skip = set() if with_planned else set(planned(state))
     out = set()
     for rx, ry in known:
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            if (rx + dx, ry + dy) not in known:
-                out.add((rx + dx, ry + dy))
+            p = (rx + dx, ry + dy)
+            if p not in known and p not in skip:
+                out.add(p)
     return sorted(out, key=lambda p: (abs(p[0]) + abs(p[1]), p[1], p[0]))
 
 
@@ -4650,7 +4654,7 @@ def expedition_problem(state, rx, ry):
             return "an expedition is already under way" + (f" (research {better} to queue more)" if better else "")
         return f"the queue is full ({queue_room(state)} waiting)"
     if (rx, ry) not in destinations(state):
-        return "you can only explore next to land you already know, or are already exploring"
+        return "you can only explore next to land an expedition has already mapped"
     if abs(rx) + abs(ry) > max(_researched(state, "explore_range")):
         better = [r["name"] for r in RESEARCH.values()
                   if r.get("explore_range", 0) >= abs(rx) + abs(ry)]
@@ -5017,7 +5021,12 @@ def _view(state, ai, detail):
         tiles.append(row)
 
     explore = []
-    for rx, ry in destinations(state):
+    plan = planned(state)
+    for rx, ry in destinations(state, with_planned=True):
+        if (rx, ry) in plan:        # kept in the list where it was: "on its way" (0) or its place in the queue
+            explore.append({"rx": rx, "ry": ry, "where": where(rx, ry), "env": region_env(state, rx, ry),
+                            "distance": abs(rx) + abs(ry), "planned": plan.index((rx, ry))})
+            continue
         cost = expedition_cost(state, rx, ry)
         explore.append({
             "rx": rx, "ry": ry, "where": where(rx, ry), "env": region_env(state, rx, ry),

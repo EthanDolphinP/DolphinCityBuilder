@@ -2048,7 +2048,7 @@ const HOWTO = [
   ['Additions', 'Click a finished building to attach additions to it. Each one improves that building: faster, more output, more beds. A building can hold two.'],
   ['Research', 'Knowledge buys research on the Research tab. Research unlocks buildings and additions, speeds buildings up, and lets you use difficult land. It costs more at every tech level. Important research (anything that opens a building, longer journeys, a bigger expedition queue and the like) also takes materials of its era: wood and stone early on, then ore and tools, then gold and electronics. Research about animals takes livestock too. Each tech level\'s research needs its research building standing in your city: Shaman Hut, School, University, Laboratory, Research Institute.'],
   ['Tech levels', 'Tribe, Village, Town, City, Metropolis, Megacity. The list at the top of the City tab shows what the next one asks for: people, materials, research and areas. Advancing spends the materials (and livestock for the feast), unlocks new buildings and research, and makes your home area bigger.'],
-  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It takes food and wood for the land it is heading to, and pack animals (livestock); from Town on tools as well, and from City on gold. The further from home the dearer, and each area you already hold (or have an expedition heading for) makes the next one dearer still, as does a higher tech level. It takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. Each kind of land has its own terrain, wildlife, likely weather and things an expedition may bring back: caves and crystal caverns in Cave Country, reefs and kelp in the Reef Shallows, tundra in the Icefields, heath on the Moorland, scrub in the Outback, and more. Each beast has home lands where its eggs are likelier to be found. You can rename areas to keep track of them. With Expedition Planning (and later Supply Lines, The Grand Survey, an Expedition Camp and an Explorers\' Guild) up to five more expeditions can wait in a queue, supplies paid, each setting off the moment the one before is back, even while you are away; a queued team can head past land still being mapped, and calling one off gives its supplies back.'],
+  ['Exploring', 'Once you have researched Pathfinding, the Explore tab can send an expedition to claim a new area next to the ones you own. It takes food and wood for the land it is heading to, and pack animals (livestock); from Town on tools as well, and from City on gold. The further from home the dearer, and each area you already hold (or have an expedition heading for) makes the next one dearer still, as does a higher tech level. It takes time to arrive. Rarer land, wild animals and beast eggs are likelier far out. Each kind of land has its own terrain, wildlife, likely weather and things an expedition may bring back: caves and crystal caverns in Cave Country, reefs and kelp in the Reef Shallows, tundra in the Icefields, heath on the Moorland, scrub in the Outback, and more. Each beast has home lands where its eggs are likelier to be found. You can rename areas to keep track of them. With Expedition Planning (and later Supply Lines, The Grand Survey, an Expedition Camp and an Explorers\' Guild) up to five more expeditions can wait in a queue, supplies paid, each setting off the moment the one before is back, even while you are away; calling one off gives its supplies back. New places to explore open up only once an expedition has mapped the land next to them, so a queue spreads out in several directions rather than running on ahead in one.'],
   ['Wildlife and livestock', 'Some animals, such as bats, owls and foxes, come out mostly at night, and puffins mostly by day. Wild animals wander onto your tiles. With Animal Taming you can tame them into Livestock, or raise it in a Chicken Coop, and later a Breeding Pen, Stockyard or Livestock Complex; pastures breed more with Selective Breeding, and expeditions bring some back. Livestock is spent on expeditions (pack animals), animal research, the feast for each new tech level, and several buildings and additions. A Pasture keeps and farms it, and a Butcher, Tannery, Leatherworks, Cannery or Meat Packing Plant turns it into food, gold and tools. A Salt Lick brings wild animals in more often.'],
   ['Power', 'From the Town level on, bigger buildings need power. Build generators (the Power group in the build menu) to supply it. If the city has less power than it needs, everything that uses power slows down by the same share.'],
   ['The market', 'Every trade is between two cities: nothing comes from nowhere. Post an offer saying what you give and what you want; it is held until sold or cancelled. Buyers can take part of an offer at its price. Sold-out offers wait under Finished orders so you can post them again. A bill is a trade that repeats every so many hours with one named city.'],
@@ -2359,6 +2359,13 @@ function predictOther(action, extra) {
     for (const t of Object.values(m.tracks)) t.affordable = afford(t.cost);
     return true;
   }
+  if (action === 'explore') {
+    const ex = view.explore, d = ex && ex.destinations.find(o => o.rx === extra.rx && o.ry === extra.ry);
+    if (!d || d.planned !== undefined || d.problem || !d.cost || !afford(d.cost)) return false;
+    pay(d.cost);
+    d.planned = ex.destinations.filter(o => o.planned !== undefined).length;      // 0: it sets off now
+    return true;
+  }
   if (action === 'beast_active') {
     const b = view.beast && view.beast.beasts.find(x => x.id === extra.beast);
     if (!b || b.egg || b.active) return false;
@@ -2422,19 +2429,48 @@ document.addEventListener('click', e => {
   if (b.classList.contains('working')) { e.stopPropagation(); e.preventDefault(); return; }
   lastPress = { b, t: performance.now() };
 }, true);
+// What was clicked stays where it was on the screen after the page is drawn again, even if something above it
+// (a new card, a longer list) grew or shrank: the page scrolls by the difference. Found again by a data-anchor
+// on its row or card, or else by its own data- attributes.
+function anchorOf(el) {
+  if (!el || !el.isConnected) return null;
+  // the first of these still on the page after the redraw is kept in place: the row or card that was clicked, the
+  // button itself, then the panel it is in (if the click made its own row go, the panel at least doesn't jump)
+  const marks = [];
+  const row = el.closest('[data-anchor]');
+  if (row) marks.push([`[data-anchor="${CSS.escape(row.dataset.anchor)}"]`, row]);
+  const own = [...el.attributes].filter(x => x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+  if (own) marks.push([own, el]);
+  const panel = el.closest('[id]');
+  if (panel && panel !== document.body) marks.push(['#' + CSS.escape(panel.id), panel]);
+  return marks.length ? marks.map(([sel, e]) => ({ sel, top: e.getBoundingClientRect().top })) : null;
+}
+function keepAnchor(anchor) {
+  for (const { sel, top } of anchor || []) {
+    const el = [...document.querySelectorAll(sel)].find(e => e.offsetParent !== null);
+    if (!el) continue;
+    const moved = el.getBoundingClientRect().top - top;
+    if (Math.abs(moved) > 1) window.scrollBy(0, moved);
+    return;
+  }
+}
+let actAnchor = null;      // the anchor of the action on its way (kept in place after each redraw it causes)
 async function act(action, extra) {
   if (visiting) return;
   const pressed = lastPress && performance.now() - lastPress.t < 400 ? lastPress.b : null;
   lastPress = null;
   if (pressed) pressed.classList.add('working');
-  try { return await doAct(action, extra); } finally { if (pressed) pressed.classList.remove('working'); }
+  const anchor = anchorOf(pressed);
+  actAnchor = anchor;
+  try { return await doAct(action, extra); }
+  finally { if (pressed) pressed.classList.remove('working'); keepAnchor(anchor); if (actAnchor === anchor) actAnchor = null; }
 }
 async function doAct(action, extra) {
   actionRevision++;
   pendingActions++;
   const log = view ? view.state.log : [], last = log.length ? log[log.length - 1] : null;
   const id = ++guessId;
-  if (predict(action, extra)) { guesses.push({ id, action, extra }); render(); }
+  if (predict(action, extra)) { guesses.push({ id, action, extra }); render(); keepAnchor(actAnchor); }
   const settle = () => {       // this action is answered: forget its guess, keep the others'
     const i = guesses.findIndex(g => g.id === id);
     if (i >= 0) guesses.splice(i, 1);
@@ -3157,8 +3193,9 @@ function renderExplore() {
     `. A team already on its way keeps the time it set out with.</span>`);
   const { defs, explore, state } = view, E = defs.environments, T = defs.terrains;
   const trip = explore.expedition;
-  const destinations = explore.destinations.filter(d => !trip || d.rx !== trip.rx || d.ry !== trip.ry);
-  const sendable = destinations.filter(d => !d.problem && d.affordable).length;
+  // places an expedition is heading for stay in the list where they were, marked (so the rows don't move)
+  const destinations = explore.destinations.filter(d => !trip || d.planned !== undefined || d.rx !== trip.rx || d.ry !== trip.ry);
+  const sendable = destinations.filter(d => d.planned === undefined && !d.problem && d.affordable).length;
   const attention = view.areas.filter(a => a.problems).length;
 
   // ---- the two parts of the tab ----
@@ -3229,25 +3266,27 @@ function renderExplore() {
       ? `Research <span class="hi">Expedition Planning</span> (Village) to have another expedition wait and set off the moment this one is back.`
       : queue.length >= explore.queue_room
         ? (queueMore().length ? `The queue is full. More places: ${esc(queueMore().join(', '))}.` : 'The queue is full.')
-        : `${explore.queue_room - queue.length} more can wait: pick a destination below and press Queue it. A queued team can head past land still being mapped.`) +
+        : `${explore.queue_room - queue.length} more can wait: pick a destination below and press Queue it. Land next to an area opens up once it has been mapped.`) +
     `</p></div>` : '');
   fillKinds($('destKind'), destinations.map(d => d.env), 'Any land');
   const dkind = $('destKind').value;
   const dests = destinations.filter(d => !dkind || d.env === dkind);
-  const dfilters = { all: ['All', () => true], ...(visiting ? {} : { afford: ['I can afford', d => !d.problem && d.affordable] }) };
+  const dfilters = { all: ['All', () => true], ...(visiting ? {} : { afford: ['I can afford', d => d.planned !== undefined || (!d.problem && d.affordable)] }) };
   setHTML($('destFilters'), Object.entries(dfilters).map(([k, [label, test]]) =>
     `<button data-dest-filter="${k}" class="${destFilter === k ? 'on' : ''}">${label} (${dests.filter(test).length})</button>`).join(''));
-  const supplies = d => Object.values(d.cost).reduce((a, b) => a + b, 0);
+  const supplies = d => Object.values(d.cost || {}).reduce((a, b) => a + b, 0);
   const dorder = { closest: (a, b) => a.distance - b.distance || supplies(a) - supplies(b), cheapest: (a, b) => supplies(a) - supplies(b),
                    name: (a, b) => E[a.env].name.localeCompare(E[b.env].name) || a.distance - b.distance }[$('destSort').value];
   const list = dests.filter((dfilters[destFilter] || dfilters.all)[1]).sort(dorder);   // "I can afford" is not offered while visiting
   setHTML($('explore'), !list.length ? `<p class="dim">No destinations match.</p>`
     : `<table><tr><th>Where</th><th>Land</th><th class="n">Distance</th><th>Supplies needed</th><th>Travel time</th><th></th></tr>` +
-      list.map(d => `<tr><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}${landHint(E[d.env])}</td>` +
-        `<td class="n">${d.distance}</td><td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>` +
-        (d.problem ? `<span class="bad">${esc(d.problem)}</span>`
+      list.map(d => `<tr data-anchor="dest:${d.rx},${d.ry}"><td>${esc(d.where)}</td><td>${esc(E[d.env].name)}${landHint(E[d.env])}</td>` +
+        `<td class="n">${d.distance}</td>` + (d.planned !== undefined
+          ? `<td class="dim" colspan="2">supplies packed</td><td><span class="good">${d.planned ? `Queued #${d.planned}` : 'On its way'}</span></td></tr>`
+          : `<td>${goods(d.cost)}</td><td>${duration(d.time)}</td><td>`) +
+        (d.planned !== undefined ? '' : d.problem ? `<span class="bad">${esc(d.problem)}</span>`
           : `<button data-send="${d.rx},${d.ry}" ${d.affordable ? '' : 'disabled'}>${trip ? 'Queue it' : 'Send expedition'}</button>`) +
-        `</td></tr>`).join('') + `</table>`);
+        (d.planned !== undefined ? '' : `</td></tr>`)).join('') + `</table>`);
 }
 
 // The research and buildings that would add a place in the expedition queue, that this city does not have yet.
