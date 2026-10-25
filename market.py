@@ -290,20 +290,26 @@ def _bill(market, bill_id):
 def bill_text(bill):
     hours = bill["every"] // 3600
     return (f"{bill['from']} sends {bill['give_qty']:,} {game.RESOURCES[bill['give']]}, "
-            f"{bill['to']} sends {bill['want_qty']:,} {game.RESOURCES[bill['want']]}, "
+            f"{bill['to'] or 'whoever takes it'} sends {bill['want_qty']:,} {game.RESOURCES[bill['want']]}, "
             f"every {hours} hour{'s' if hours != 1 else ''}")
 
 
 def propose_bill(market, state, now, data, get_city):
-    """`state`'s city offers to send `give` to city `to` and receive `want`, every `hours`."""
+    """`state`'s city offers to send `give` to city `to` and receive `want`, every `hours`. With no city named
+    (`to` empty) it is an open bill: any city may take it, and it then runs between the two like any other."""
     to, hours = data.get("to"), data.get("hours")
     give, give_qty = data.get("give"), data.get("give_qty")
     want, want_qty = data.get("want"), data.get("want_qty")
-    target = get_city(to) if to != state["name"] else None
-    if not target:
-        return "Pick another city that exists to make the bill with."
-    if state["name"] in target["banned"]:
-        return f"{to} is not accepting bills from your city."
+    open_bill = not (to or "").strip()
+    target = None
+    if open_bill:
+        to = None
+    else:
+        target = get_city(to) if to != state["name"] else None
+        if not target:
+            return "Pick another city that exists to make the bill with, or leave it empty for any city."
+        if state["name"] in target["banned"]:
+            return f"{to} is not accepting bills from your city."
     if give not in game.RESOURCES or want not in game.RESOURCES:
         return "Pick what to send and what to receive."
     if give in game.UNTRADEABLE or want in game.UNTRADEABLE:
@@ -314,15 +320,18 @@ def propose_bill(market, state, now, data, get_city):
         return f"Amounts must be whole numbers from 1 to {MAX_QUANTITY:,}."
     if not (_valid_qty(hours) and MIN_BILL_HOURS <= hours <= MAX_BILL_HOURS):
         return f"A bill repeats every {MIN_BILL_HOURS} to {MAX_BILL_HOURS} hours."
-    for name in (state["name"], to):
+    for name in [state["name"]] + ([to] if to else []):
         if sum(1 for b in market["bills"] if name in (b["from"], b["to"])) >= MAX_BILLS_PER_CITY:
             return f"{name} already has {MAX_BILLS_PER_CITY} bills."
 
     bill = {"id": market["next_id"], "from": state["name"], "to": to, "created": now,
             "give": give, "give_qty": give_qty, "want": want, "want_qty": want_qty,
-            "every": hours * 3600, "status": "proposed", "next": None, "missed": 0}
+            "every": hours * 3600, "status": "open" if open_bill else "proposed", "next": None, "missed": 0}
     market["next_id"] += 1
     market["bills"].append(bill)
+    if open_bill:
+        game.log(state, now, f"Offered an open bill, for any city to take: {bill_text(bill)}.")
+        return None
     game.log(state, now, f"Proposed a bill: {bill_text(bill)}.")
     social(state, now, to, "bill", f"You proposed a bill: {bill_text(bill)}.")
     social(target, now, state["name"], "bill", f"They proposed a bill: {bill_text(bill)}.")
@@ -331,6 +340,25 @@ def propose_bill(market, state, now, data, get_city):
 
 def accept_bill(market, state, now, bill_id, get_city=None):
     bill = _bill(market, bill_id)
+    if bill and bill["status"] == "open":          # an open bill: whoever takes it first is the other city
+        if bill["from"] == state["name"]:
+            return "That is your own open bill."
+        proposer = get_city(bill["from"]) if get_city else None
+        if not proposer:
+            return "That bill no longer exists."
+        if state["name"] in proposer["banned"] or bill["from"] in state["banned"]:
+            return "You can't take that bill: one of your cities has banned the other."
+        if sum(1 for b in market["bills"] if state["name"] in (b["from"], b["to"])) >= MAX_BILLS_PER_CITY:
+            return f"Your city already has {MAX_BILLS_PER_CITY} bills."
+        bill["to"] = state["name"]
+        bill.update(status="active", next=now + bill["every"])
+        game.log(state, now, f"Took an open bill: {bill_text(bill)}.")
+        game.log(proposer, now, f"{state['name']} took your open bill: {bill_text(bill)}.")
+        social(state, now, bill["from"], "bill", f"You took their open bill: {bill_text(bill)}.")
+        social(proposer, now, state["name"], "bill", f"They took your open bill: {bill_text(bill)}.")
+        return None
+    if bill and bill["to"] != state["name"] and bill["status"] == "active" and bill["created"] and state["name"] != bill["from"]:
+        return "Another city has already taken that bill."
     if not bill or bill["status"] != "proposed" or bill["to"] != state["name"]:
         return "That bill is not waiting for your answer."
     bill.update(status="active", next=now + bill["every"])
@@ -347,6 +375,9 @@ def cancel_bill(market, state, now, bill_id, get_city):
     if not bill or state["name"] not in (bill["from"], bill["to"]):
         return "That bill no longer exists."
     market["bills"].remove(bill)
+    if bill["to"] is None:             # an open bill nobody has taken: only its own city knew of it
+        game.log(state, now, f"Withdrew the open bill: {bill_text(bill)}.")
+        return None
     for name in (bill["from"], bill["to"]):
         city = state if name == state["name"] else get_city(name)
         if city:

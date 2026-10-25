@@ -1091,12 +1091,13 @@
       <details class="panel" open data-mkt="bills">
         <summary class="cat">Bills <span id="billsCount" class="count"></span></summary>
         <div id="bills" class="scroll"></div>
+        <div id="openBills" class="scroll"></div>
         <div id="debts"></div>
         <div class="cat">Propose a bill</div>
         <form id="billForm" class="bar">
           <span class="pair">Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours</span>
           <span class="pair">I send <input id="billGiveQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="10" style="width:110px"> <select id="billGiveRes"></select></span>
-          <span class="pair">to <input id="billTo" list="cityList" maxlength="24" placeholder="city name"></span>
+          <span class="pair">to <input id="billTo" list="cityList" maxlength="24" placeholder="any city (or a name)" title="Leave empty to offer it to any city: the first to take it gets it"></span>
           <span class="pair">and receive <input id="billWantQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="20" style="width:110px"> <select id="billWantRes"></select></span>
           <button>Propose bill</button>
         </form>
@@ -5025,6 +5026,14 @@ function renderMarket() {
   // Proposals waiting for this city's answer come first.
   const waiting = b => b.status === 'proposed' && b.to === state.name;
   const bills = myBills.slice().sort((a, b) => waiting(b) - waiting(a));
+  // open bills other cities have offered to anyone: this city can take one
+  const openOthers = market.bills.filter(b => b.status === 'open' && b.from !== state.name);
+  setHTML($('openBills'), !openOthers.length ? '' : `<div class="cat">Open bills <span class="dim small">offered to any city</span></div>` +
+    `<table><tr><th>From</th><th>You would send</th><th>You would receive</th><th>Every</th><th></th></tr>` +
+    openOthers.map(b => `<tr data-anchor="bill:${b.id}"><td>${esc(b.from)}</td>` +
+      `<td class="${state.resources[b.want] >= b.want_qty ? '' : 'bad'}">${qty(b.want_qty, b.want)}</td>` +
+      `<td>${qty(b.give_qty, b.give)}</td><td>${duration(b.every)}</td>` +
+      `<td><button data-bill-accept="${b.id}" title="It starts now, between your city and ${esc(b.from)}">Take it</button></td></tr>`).join('') + `</table>`);
   $('billsCount').textContent = `(${bills.length})`;
   // ---- debts: missed bill payments owed, growing with interest, taken from the debtor's store as it has it ----
   const debts = market.debts || [];
@@ -5042,11 +5051,12 @@ function renderMarket() {
     }).join('') + `</table>`);
   setHTML($('bills'), bills.length ? `<table><tr><th>With</th><th>You send</th><th>You receive</th><th>Every</th><th>Status</th><th></th></tr>` +
     bills.map(b => {
-      const sent = b.from === state.name, other = sent ? b.to : b.from;
+      const sent = b.from === state.name, other = sent ? (b.to || 'any city') : b.from;
       const send = sent ? [b.give, b.give_qty] : [b.want, b.want_qty];
       const get = sent ? [b.want, b.want_qty] : [b.give, b.give_qty];
       const status = b.status === 'active'
         ? `next in <span class="hi" data-timer="bill${b.id}"></span>` + (b.missed ? ` <span class="bad">(${b.missed} missed)</span>` : '')
+        : b.status === 'open' ? 'open: waiting for any city to take it'
         : sent ? `waiting for ${esc(other)} to accept` : `<span class="hi">${esc(other)} proposes this</span>`;
       const buttons = b.status === 'active' ? `<button data-bill-cancel="${b.id}">Cancel</button>`
         : sent ? `<button data-bill-cancel="${b.id}">Withdraw</button>`
@@ -5907,6 +5917,10 @@ $('billForm').onsubmit = e => {
 $('debts').onclick = e => {
   const id = e.target.dataset.debtForgive;
   if (id && confirm('Forgive this debt? Whatever is left of it will not be paid back.')) act('debt_forgive', { debt: +id });
+};
+$('openBills').onclick = e => {
+  const id = e.target.dataset.billAccept;
+  if (id && confirm('Take this bill? It starts now and repeats until either city cancels it.')) act('bill_accept', { bill: +id });
 };
 $('bills').onclick = e => {
   if (e.target.dataset.billAccept) act('bill_accept', { bill: +e.target.dataset.billAccept });
