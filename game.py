@@ -1370,6 +1370,66 @@ BUILDINGS = {
         "produces": {"wood": 160}, "sheltered": True,
         "desc": "Wood grown from cells in warm tanks, no tree needed: more wood than any forest, anywhere, in any weather or time of day.",
     },
+    # ---- rivers, lakes and the ocean: something for every stage of the game ----
+    "river_fish_weir": {
+        "name": "Fish Weir", "glyph": "\u0152", "tech": 1, "category": "food",
+        "terrain": ["river"], "cost": {"wood": 40, "stone": 20}, "workers": 2, "time": 15 * MIN,
+        "produces": {"food": 13}, "modifiers": ["fish"],
+        "desc": "A fence of stakes across the river that steers the fish into traps. Faster with more fish.",
+    },
+    "river_barge_port": {
+        "name": "River Barge Port", "glyph": "\u0153", "tech": 4, "category": "trade", "power": 3,
+        "terrain": ["river"], "cost": {"stone": 250, "tools": 100, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 45}, "explore_speed": 0.1,
+        "desc": "Long barges carry goods up and down the river: gold, and expeditions are 10% faster.",
+    },
+    "run_of_river_turbines": {
+        "name": "Run-of-River Turbines", "glyph": "\u0160", "tech": 5, "category": "power",
+        "terrain": ["river"], "cost": {"stone": 500, "tools": 200, "electronics": 60, "gold": 400}, "workers": 1, "generates": 60,
+        "desc": "Turbines set in the current itself, with no dam: steady power with no fuel.",
+    },
+    "duck_farm": {
+        "name": "Duck Farm", "glyph": "\u017d", "tech": 1, "category": "food",
+        "terrain": ["lake"], "cost": {"wood": 40}, "workers": 2, "time": 15 * MIN,
+        "produces": {"food": 11, "livestock": 0.05},
+        "desc": "Ducks and geese on the shallows: food, and now and then a bird to keep.",
+    },
+    "aquaculture_pens": {
+        "name": "Aquaculture Pens", "glyph": "\u00d6", "tech": 4, "category": "food", "power": 2,
+        "terrain": ["lake"], "cost": {"stone": 200, "tools": 100, "gold": 150}, "workers": 4, "time": 15 * MIN,
+        "produces": {"food": 66}, "modifiers": ["fish"],
+        "desc": "Floating net pens raising fish by the thousand: a great deal of food. Faster in richer water.",
+    },
+    "floating_solar": {
+        "name": "Floating Solar", "glyph": "\u0110", "tech": 5, "category": "power",
+        "terrain": ["lake"], "cost": {"stone": 300, "tools": 150, "electronics": 60, "gold": 300}, "workers": 1, "generates": 55,
+        "generates_modifiers": ["sunlight"],
+        "desc": "Panels floating on the lake, kept cool by the water: more power than a solar farm. Less at night and under cloud.",
+    },
+    "sea_salt_pans": {
+        "name": "Sea Salt Pans", "glyph": "\u0111", "tech": 1, "category": "trade",
+        "terrain": ["ocean"], "cost": {"wood": 30, "stone": 20}, "workers": 2, "time": 15 * MIN,
+        "produces": {"gold": 8},
+        "desc": "Shallow pans the sea fills and the sun dries: salt to sell.",
+    },
+    "marina": {
+        "name": "Marina", "glyph": "\u0126", "tech": 3, "category": "trade", "power": 1,
+        "terrain": ["river", "lake", "ocean"], "cost": {"wood": 120, "stone": 100, "gold": 80}, "workers": 3, "time": 20 * MIN,
+        "produces": {"gold": 24}, "housing": 4, "attracts": 1,
+        "desc": "Moorings for pleasure boats, with a clubhouse: gold, rooms for 4, and one extra arrival per meal.",
+    },
+    "deep_sea_trawlers": {
+        "name": "Deep-Sea Trawlers", "glyph": "\u0127", "tech": 4, "category": "food", "power": 3,
+        "terrain": ["ocean"], "cost": {"stone": 200, "tools": 150, "gold": 200}, "workers": 4, "time": 15 * MIN,
+        "produces": {"food": 80}, "modifiers": ["fish", "open_water"],
+        "desc": "Big ships that stay out for weeks: a great deal of food. Faster with more fish and bigger water.",
+    },
+    "ocean_mining_rig": {
+        "name": "Ocean Mining Rig", "glyph": "\u0141", "tech": 5, "category": "materials", "power": 15,
+        "terrain": ["ocean"], "cost": {"stone": 600, "tools": 300, "electronics": 120, "gold": 600}, "workers": 4, "time": 15 * MIN,
+        "produces": {"ore": 60, "electronics": 4},
+        "desc": "Robot dredgers lift metal-rich nodules from the deep sea floor: a great deal of ore, and rare metals for electronics.",
+    },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
     # Hot springs
@@ -3347,6 +3407,49 @@ for _aid, _more in {
     "work_lights": ["tree_plantation", "harvester_fleet"],
     "irrigation_pipes": ["tree_plantation"],
     "clean_room": ["bio_timber_vats"],
+}.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
+
+# More water buildings: additions of their own, and old ones that fit them.
+ADDITIONS.update({
+    "fish_ladder": {"name": "Fish Ladder", "for": [],
+                    "cost": {"wood": 60, "stone": 60}, "produces": {"food": 4}, "desc": "Fish swim up past it all year: 4 more food each cycle."},
+    "feed_barge": {"name": "Feed Barge", "for": [],
+                   "cost": {"wood": 100, "tools": 40}, "speed": 1.3, "desc": "Feed taken out to the pens and the birds every day: 30% faster."},
+    "sonar_fish_finder": {"name": "Sonar Fish Finder", "research": "electricity", "for": [],
+                          "cost": {"tools": 60, "gold": 80}, "speed": 1.3, "power": 1, "desc": "Finds the shoals first: 30% faster. Uses 1 more power."},
+    "mooring_buoys": {"name": "Mooring Buoys", "for": [],
+                      "cost": {"wood": 60, "gold": 60}, "produces": {"gold": 8}, "desc": "Room for visiting boats: 8 more gold each cycle."},
+    "riser_pipes": {"name": "Riser Pipes", "research": "engineering", "for": [],
+                    "cost": {"stone": 200, "tools": 150, "electronics": 40}, "speed": 1.25, "desc": "Wider pipes from the sea floor: 25% faster."},
+})
+for _aid, _more in {
+    "fish_ladder": ["river_fish_weir", "run_of_river_turbines", "water_mill"],
+    "feed_barge": ["aquaculture_pens", "duck_farm"],
+    "sonar_fish_finder": ["deep_sea_trawlers", "fishery", "aquaculture_pens", "river_fish_weir"],
+    "mooring_buoys": ["marina", "river_barge_port"],
+    "riser_pipes": ["ocean_mining_rig"],
+    "fishing_nets": ["river_fish_weir", "deep_sea_trawlers", "aquaculture_pens"],
+    "storm_hulls": ["deep_sea_trawlers", "river_barge_port", "marina"],
+    "lanterns": ["river_fish_weir", "duck_farm", "sea_salt_pans", "marina"],
+    "tool_shed": ["river_fish_weir", "duck_farm", "sea_salt_pans"],
+    "market_stalls": ["sea_salt_pans", "duck_farm", "marina"],
+    "drying_racks": ["sea_salt_pans"],
+    "cold_store": ["deep_sea_trawlers", "aquaculture_pens"],
+    "ice_house": ["river_fish_weir", "duck_farm"],
+    "labour_saving": ["deep_sea_trawlers", "aquaculture_pens", "river_barge_port"],
+    "automation": ["ocean_mining_rig", "deep_sea_trawlers"],
+    "smart_meters": ["ocean_mining_rig"],
+    "work_lights": ["sea_salt_pans", "aquaculture_pens"],
+    "crane": ["river_barge_port"],
+    "advertising": ["marina", "river_barge_port"],
+    "guest_rooms": ["marina"],
+    "promenade": ["marina"],
+    "transformer": ["run_of_river_turbines", "floating_solar"],
+    "sun_trackers": ["floating_solar"],
+    "battery_bank": ["floating_solar", "run_of_river_turbines"],
+    "sea_wall": ["run_of_river_turbines"],
+    "clean_room": ["ocean_mining_rig"],
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
