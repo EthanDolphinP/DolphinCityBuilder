@@ -55,6 +55,12 @@ MESSAGES_KEPT = 300     # messages (sent and received) remembered per city
 MESSAGES_PER_MINUTE = 10
 MIN_BILL_HOURS, MAX_BILL_HOURS = 1, 168
 MISSES_ALLOWED = 3      # payments in a row that may fail before a bill is cancelled
+# A city that can't make its side of a bill payment owes it to the other city: a debt, which grows by
+# DEBT_INTEREST a day (compounding) up to DEBT_MAX_TIMES what was first owed, and is taken from the debtor's
+# store, a little at a time, whenever it has any of that material (checked every DEBT_COLLECT_EVERY seconds).
+DEBT_INTEREST = 0.10
+DEBT_MAX_TIMES = 3
+DEBT_COLLECT_EVERY = 30
 
 
 def social(state, now, other, kind, text):
@@ -68,7 +74,7 @@ def social(state, now, other, kind, text):
 
 
 def new_market():
-    return {"next_id": 1, "offers": [], "history": [], "bills": [], "beast_offers": []}
+    return {"next_id": 1, "offers": [], "history": [], "bills": [], "beast_offers": [], "debts": []}
 
 
 def _find(market, offer_id):
@@ -265,6 +271,8 @@ def drop_city(market, name):
     market["beast_offers"] = [o for o in market.get("beast_offers", []) if o["city"] != name]
     market["artifact_offers"] = [o for o in market.get("artifact_offers", []) if o["city"] != name]
     market["duels"] = [d for d in market.get("duels", []) if d["city"] != name]
+    # a debt owed to a city that starts again is gone; one it owes is not (starting again doesn't clear a debt)
+    market["debts"] = [d for d in market.get("debts", []) if d["creditor"] != name]
 
 
 def drop_proposals(market, sender, receiver):
@@ -373,6 +381,13 @@ def run_bills(market, now, get_city):
             else:
                 bill["missed"] += 1
                 text = f"Bill missed ({' and '.join(short)} could not pay): {bill_text(bill)}."
+                # whoever could not pay owes it to the other city, with interest
+                for debtor, creditor, res, qty in ((bill["from"], bill["to"], bill["give"], bill["give_qty"]),
+                                                   (bill["to"], bill["from"], bill["want"], bill["want_qty"])):
+                    if debtor in short:
+                        add_debt(market, when, debtor, creditor, res, qty)
+                        text += (f" {debtor} now owes {creditor} {qty:,} {game.RESOURCES[res]}, growing by "
+                                 f"{round(DEBT_INTEREST * 100)}% a day until it is paid back.")
                 if bill["missed"] >= MISSES_ALLOWED:
                     text += f" It was cancelled after {MISSES_ALLOWED} missed payments in a row."
             game.log(sender, when, text)
@@ -382,6 +397,84 @@ def run_bills(market, now, get_city):
             if bill["missed"] >= MISSES_ALLOWED:
                 market["bills"].remove(bill)
                 break
+
+
+def add_debt(market, now, debtor, creditor, res, qty):
+    """`debtor` owes `creditor` `qty` more of `res` (added to what it owes already, if anything)."""
+    debts = market.setdefault("debts", [])
+    debt = next((d for d in debts if d["debtor"] == debtor and d["creditor"] == creditor and d["res"] == res), None)
+    if debt:
+        _accrue(debt, now)
+        debt["owed"] += qty
+        debt["principal"] += qty
+    else:
+        debts.append({"id": market["next_id"], "debtor": debtor, "creditor": creditor, "res": res, "owed": float(qty),
+                      "principal": float(qty), "paid": 0.0, "since": now, "t": now, "checked": 0})
+        market["next_id"] += 1
+
+
+def _accrue(debt, now):
+    """Interest on what is still owed, up to `now`: DEBT_INTEREST a day, never more than DEBT_MAX_TIMES the debt."""
+    days = max(0.0, now - debt["t"]) / 86400
+    debt["owed"] = min(debt["owed"] * (1 + DEBT_INTEREST) ** days, debt["principal"] * DEBT_MAX_TIMES - debt["paid"])
+    debt["t"] = now
+
+
+def collect_debts(market, now, get_city):
+    """Take what each debtor can pay of its debts (every DEBT_COLLECT_EVERY seconds) and give it to its creditor."""
+    for debt in list(market.get("debts", [])):
+        if now - debt.get("checked", 0) < DEBT_COLLECT_EVERY:
+            continue
+        debt["checked"] = now
+        debtor, creditor = get_city(debt["debtor"]), get_city(debt["creditor"])
+        if not creditor:            # the city owed is gone: nobody to pay
+            market["debts"].remove(debt)
+            continue
+        if not debtor:
+            continue
+        _accrue(debt, now)
+        take = min(debt["owed"], max(0.0, debtor["resources"][debt["res"]]))
+        if take > 0:
+            debtor["resources"][debt["res"]] -= take
+            creditor["resources"][debt["res"]] += take
+            debt["owed"] -= take
+            debt["paid"] += take
+        if debt["owed"] < 0.5:      # paid back
+            market["debts"].remove(debt)
+            text = (f"Debt paid back: {debt['debtor']} has repaid {round(debt['paid']):,} {game.RESOURCES[debt['res']]} "
+                    f"to {debt['creditor']} (it first owed {round(debt['principal']):,}).")
+            for city, other in ((debtor, debt["creditor"]), (creditor, debt["debtor"])):
+                game.log(city, now, text)
+                social(city, now, other, "bill", text)
+
+
+def forgive_debt(market, state, now, debt_id, get_city):
+    """The city owed lets a debt go."""
+    debt = next((d for d in market.get("debts", []) if d["id"] == debt_id), None)
+    if not debt or debt["creditor"] != state["name"]:
+        return "That is not a debt owed to your city."
+    _accrue(debt, now)
+    market["debts"].remove(debt)
+    text = f"{state['name']} forgave {debt['debtor']}'s debt of {round(debt['owed']):,} {game.RESOURCES[debt['res']]}."
+    game.log(state, now, text)
+    social(state, now, debt["debtor"], "bill", text)
+    debtor = get_city(debt["debtor"])
+    if debtor:
+        game.log(debtor, now, text)
+        social(debtor, now, state["name"], "bill", text)
+    return None
+
+
+def debts_view(market, now):
+    """Every debt as it stands right now (interest added), for the page."""
+    out = []
+    for d in market.get("debts", []):
+        e = dict(d)
+        _accrue(e, now)
+        out.append({"id": e["id"], "debtor": e["debtor"], "creditor": e["creditor"], "res": e["res"], "owed": round(e["owed"], 1),
+                    "principal": e["principal"], "paid": round(e["paid"], 1), "since": e["since"], "cap": e["principal"] * DEBT_MAX_TIMES,
+                    "rate": DEBT_INTEREST})
+    return out
 
 
 def bill_rates(market, name):

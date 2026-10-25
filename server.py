@@ -412,6 +412,7 @@ def startup():
         MARKET.setdefault("beast_offers", [])
         MARKET.setdefault("artifact_offers", [])
         MARKET.setdefault("duels", [])
+        MARKET.setdefault("debts", [])
         for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
             offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
 
@@ -423,6 +424,7 @@ def run_bills(now):
         return
     LAST_UPKEEP = now
     market.run_bills(MARKET, now, lambda name: find_city(name, now))
+    market.collect_debts(MARKET, now, lambda name: find_city(name, now))
     market.tidy(MARKET, now, lambda name: find_city(name, now))
     deliver_presents(now)
 
@@ -526,7 +528,8 @@ def _city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=F
     out["state"] = _sent_state(state, out["area"])
     out["now"] = now
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]),
-                         artifact_offers=market.artifact_offers_view(MARKET))
+                         artifact_offers=market.artifact_offers_view(MARKET),
+                         debts=[d for d in market.debts_view(MARKET, now) if state["name"] in (d["debtor"], d["creditor"])])
     out["cities"] = all_city_names()
     out["online"] = sorted(n for n in ONLINE if presence(n, now) == "online")
     out["idle"] = sorted(n for n in ONLINE if presence(n, now) == "idle")
@@ -755,6 +758,8 @@ def handle_post(path, data, token, now):
                                     lambda other: find_city(other, now))
     elif action == "bill_accept":
         error = market.accept_bill(MARKET, state, now, data.get("bill"), lambda other: find_city(other, now))
+    elif action == "debt_forgive":
+        error = market.forgive_debt(MARKET, state, now, data.get("debt"), lambda other: find_city(other, now))
     elif action == "bill_cancel":
         error = market.cancel_bill(MARKET, state, now, data.get("bill"),
                                    lambda other: find_city(other, now))

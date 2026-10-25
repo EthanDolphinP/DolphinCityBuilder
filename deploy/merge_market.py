@@ -13,7 +13,7 @@ import shutil
 import sys
 import tarfile
 
-LISTS = ("offers", "beast_offers", "artifact_offers", "bills", "duels")
+LISTS = ("offers", "beast_offers", "artifact_offers", "bills", "duels", "debts")
 HISTORY_LENGTH = 20
 
 

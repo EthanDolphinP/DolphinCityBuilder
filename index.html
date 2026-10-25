@@ -1091,6 +1091,7 @@
       <details class="panel" open data-mkt="bills">
         <summary class="cat">Bills <span id="billsCount" class="count"></span></summary>
         <div id="bills" class="scroll"></div>
+        <div id="debts"></div>
         <div class="cat">Propose a bill</div>
         <form id="billForm" class="bar">
           <span class="pair">Every <input id="billHours" type="number" min="1" max="168" step="1" value="24"> hours</span>
@@ -1102,7 +1103,9 @@
         <datalist id="cityList"></datalist>
         <details class="market-help"><summary>How bills work</summary><p class="dim small">A bill is a repeating trade with one other city. It starts once they accept, and
           either of you can cancel it at any time. If either city can't pay when it comes due, nothing
-          changes hands that time; three misses in a row cancel the bill. Active bills are counted in the
+          changes hands that time; three misses in a row cancel the bill. Whoever could not pay owes what they
+          should have sent: a debt that grows by 10% a day until it is paid back, taken from their store whenever
+          they have it (the city owed can forgive it). Active bills are counted in the
           per-hour figures at the top.</p></details>
       </details>
 
@@ -2630,9 +2633,10 @@ function render() {
     : 'Explore' + (reportsNew ? ` <span class="good">(${reportsNew} back)</span>` : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   const billsAsked = visiting ? 0 : view.market.bills.filter(b => b.status === 'proposed' && b.to === state.name).length;
+  const inDebt = !visiting && (view.market.debts || []).some(d => d.debtor === state.name);
   setHTML(document.querySelector('[data-tab=market]'), gfx()
-    ? icon('storefront') + 'Market' + (billsAsked ? ` <span class="nav-badge">Bill</span>` : unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
-    : 'Market' + (billsAsked ? ` <span class="hi">(${billsAsked === 1 ? 'a bill' : billsAsked + ' bills'} to answer)</span>` : '') +
+    ? icon('storefront') + 'Market' + (inDebt ? ` <span class="nav-badge">Debt</span>` : billsAsked ? ` <span class="nav-badge">Bill</span>` : unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
+    : 'Market' + (inDebt ? ` <span class="bad">(in debt)</span>` : '') + (billsAsked ? ` <span class="hi">(${billsAsked === 1 ? 'a bill' : billsAsked + ' bills'} to answer)</span>` : '') +
       (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
   const mailNew = visiting ? 0 : (state.messages || []).filter(m => !m.read).length;
   setHTML(document.querySelector('[data-tab=social]'), gfx()
@@ -5005,6 +5009,20 @@ function renderMarket() {
   const waiting = b => b.status === 'proposed' && b.to === state.name;
   const bills = myBills.slice().sort((a, b) => waiting(b) - waiting(a));
   $('billsCount').textContent = `(${bills.length})`;
+  // ---- debts: missed bill payments owed, growing with interest, taken from the debtor's store as it has it ----
+  const debts = market.debts || [];
+  setHTML($('debts'), !debts.length ? '' : `<div class="cat">Debts</div>` +
+    `<p class="dim small" style="margin:0 0 6px">A city that can't make its side of a bill payment owes it to the other city. ` +
+    `A debt grows by ${Math.round(debts[0].rate * 100)}% a day until it is paid, up to three times what was first owed, and is taken from ` +
+    `the debtor's store whenever it has any of that material. The city owed can forgive it.</p>` +
+    `<table><tr><th>Who</th><th>Owes</th><th>Now</th><th>First owed</th><th>Paid back</th><th>Since</th><th></th></tr>` +
+    debts.map(d => {
+      const mine = d.debtor === state.name;
+      return `<tr data-anchor="debt:${d.id}"><td>${mine ? `<span class="bad">You owe ${esc(d.creditor)}</span>` : `<span class="good">${esc(d.debtor)} owes you</span>`}</td>` +
+        `<td>${esc(view.defs.resources[d.res])}</td><td class="n ${mine ? 'bad' : 'good'}">${num(d.owed)}</td><td class="n dim">${num(d.principal)}</td>` +
+        `<td class="n">${num(d.paid)}</td><td class="dim small">${esc(clock(d.since))}</td>` +
+        `<td>${mine ? '' : `<button data-debt-forgive="${d.id}" title="Let ${esc(d.debtor)} off what is left">Forgive</button>`}</td></tr>`;
+    }).join('') + `</table>`);
   setHTML($('bills'), bills.length ? `<table><tr><th>With</th><th>You send</th><th>You receive</th><th>Every</th><th>Status</th><th></th></tr>` +
     bills.map(b => {
       const sent = b.from === state.name, other = sent ? b.to : b.from;
@@ -5868,6 +5886,10 @@ $('billForm').onsubmit = e => {
   act('bill_propose', { to: $('billTo').value.trim(), hours: Number($('billHours').value),
                         give: $('billGiveRes').value, give_qty: amount($('billGiveQty').value),
                         want: $('billWantRes').value, want_qty: amount($('billWantQty').value) });
+};
+$('debts').onclick = e => {
+  const id = e.target.dataset.debtForgive;
+  if (id && confirm('Forgive this debt? Whatever is left of it will not be paid back.')) act('debt_forgive', { debt: +id });
 };
 $('bills').onclick = e => {
   if (e.target.dataset.billAccept) act('bill_accept', { bill: +e.target.dataset.billAccept });
