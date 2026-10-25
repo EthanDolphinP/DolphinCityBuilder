@@ -2451,8 +2451,10 @@ function anchorOf(el) {
   if (row) marks.push([`[data-anchor="${CSS.escape(row.dataset.anchor)}"]`, row]);
   const own = [...el.attributes].filter(x => x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
   if (own) marks.push([own, el]);
-  const panel = el.closest('[id]');
-  if (panel && panel !== document.body) marks.push(['#' + CSS.escape(panel.id), panel]);
+  // the whole panel it is in (not a list inside it: a list the click emptied, such as the build menu once the
+  // building is placed, sits somewhere else afterwards, and lining that up made the page jump)
+  const panel = el.closest('.panel[id], details.panel[id]');
+  if (panel) marks.push(['#' + CSS.escape(panel.id), panel]);
   return marks.length ? marks.map(([sel, e]) => ({ sel, top: e.getBoundingClientRect().top })) : null;
 }
 function keepAnchor(anchor) {
@@ -2472,6 +2474,7 @@ async function act(action, extra) {
   if (pressed) pressed.classList.add('working');
   const anchor = anchorOf(pressed);
   actAnchor = anchor;
+  holdCityHeight();         // before the click's own redraw can shrink the page under the map
   try { return await doAct(action, extra); }
   finally { if (pressed) pressed.classList.remove('working'); keepAnchor(anchor); if (actAnchor === anchor) actAnchor = null; }
 }
@@ -2545,6 +2548,17 @@ function powerCoverage(power) {
   const label = percent === null ? 'No demand' : `${Math.floor(percent)}%`;
   return `<span class="power-${level}" title="${num(power.supply)} power supplied / ${num(power.demand)} consumed">${label}</span>`;
 }
+// The map stays put while the tile panel beside it changes. The map is pinned (sticky) inside the row it shares with
+// the tile panel, so when that panel got much shorter (a long build list becoming a building's details) the row
+// shrank and the map jumped back up the page. While the page is scrolled down, the row keeps the height it had;
+// it gives the space back once the page is at the top again, where nothing visible moves.
+function holdCityHeight() {
+  const row = $('mapPanel').parentElement;
+  if (tab !== 'city' || scrollY < 10) { row.style.minHeight = ''; return; }
+  const h = row.offsetHeight;
+  if (h > (parseFloat(row.style.minHeight) || 0)) row.style.minHeight = h + 'px';
+}
+addEventListener('scroll', () => { if (view) holdCityHeight(); }, { passive: true });     // scrolling down starts holding it too
 function render() {
   writeTabRoute();
   const { state, status, defs } = view;
@@ -2684,7 +2698,9 @@ function render() {
   const chip = (i, count, cls, title) => `<button data-area="${i}" class="chip ${i === view.area ? 'on' : ''}" title="${title}">` +
     `${esc(view.areas[i].name)} <span class="${cls}">${count}</span></button>`;
   const withHits = hits ? view.areas.map((a, i) => i).filter(i => hits[i]) : [];
-  const withProblems = view.areas.map((a, i) => i).filter(i => view.areas[i].problems);
+  // other areas with buildings not working (this one's show on the map below; listing it too moved the map down
+  // whenever something built here was still waiting for workers or power)
+  const withProblems = view.areas.map((a, i) => i).filter(i => i !== view.area && view.areas[i].problems);
   setHTML($('areas'), n < 2 ? '' :
     `<div class="bar" style="margin:0"><button data-area="${(view.area + n - 1) % n}" title="Previous area">&lt;</button>` +
     `<select id="areaPick" title="Choose an area to view">` + view.areas.map((a, i) =>
@@ -2744,6 +2760,7 @@ function render() {
   if (tab === 'beast') renderBeast();
   if (tab === 'guide') renderGuide();
   if (tab === 'stats' && !visiting) renderStats();
+  holdCityHeight();
   if (tab === 'settings') renderSettings();
   $('mapKey').hidden = !settings.mapKey;
   fitMap();
