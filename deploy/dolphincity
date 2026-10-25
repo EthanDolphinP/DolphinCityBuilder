@@ -44,6 +44,13 @@ case "${1:-}" in
       systemctl start dolphincity
       echo "Restoring $2 failed part way; the game was started again."; exit 1
     fi ;;
+  merge-market)                                   # the market from a backup put back, keeping trades made since
+    [[ -f "${2:-}" ]] || { echo "Usage: dolphincity merge-market file.tar.gz"; exit 1; }
+    systemctl stop dolphincity                    # (it saves every city on the way down)
+    if python3 "$CODE/deploy/merge_market.py" "$2" "$DATA"; then status=0; else status=1; fi
+    chown -R dolphin:dolphin "$DATA"
+    systemctl start dolphincity
+    exit $status ;;
   *)
     cat <<'USAGE'
 dolphincity update                     get the latest code from GitHub and restart
@@ -53,6 +60,7 @@ dolphincity reset-password City        the next person to sign in to City picks 
 dolphincity discord setup|register|test|daily   the Discord bot (see README.md, "Discord")
 dolphincity backup                     save a backup now (one is made every night; 14 are kept)
 dolphincity restore file.tar.gz        replace the game's data with a backup
+dolphincity merge-market file.tar.gz   put the market from a backup back, keeping trades made since
 USAGE
     ;;
 esac
