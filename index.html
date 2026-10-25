@@ -2829,6 +2829,7 @@ function buildingFacts(rows, key) {
 }
 // ---- The build menu: search, kinds of building, recently built, and one line per building.
 const buildState = { q: '', cat: 'all' };
+let buildOrder = { key: '', ids: [] };     // the build list's order for the tile on screen (see renderBuildList)
 function buildCost(cost) { return Object.values(cost).reduce((a, b) => a + b, 0); }
 function renderBuildList(info) {
   const { defs, state } = view, B = defs.buildings, R = defs.resources;
@@ -2865,6 +2866,14 @@ function renderBuildList(info) {
   }[settings.buildSort || 'newest'] || (() => 0);
   shown.sort((a, b) => (words.length ? named(b.id) - named(a.id) : 0) || (b.affordable - a.affordable) || order(a, b) ||
     B[a.id].name.localeCompare(B[b.id].name));
+  // While the same tile stays selected (same order, search and kind), the rows keep the order they first came in:
+  // the server's answer, with this tile's real speeds, would otherwise move them under the player's pointer.
+  const orderKey = `${view.area}:${sel ? sel.x + ',' + sel.y : ''}|${settings.buildSort}|${buildState.q}|${buildState.cat}`;
+  if (buildOrder.key === orderKey) {
+    const place = new Map(buildOrder.ids.map((id, i) => [id, i]));
+    shown.sort((a, b) => (place.has(a.id) ? place.get(a.id) : 1e9) - (place.has(b.id) ? place.get(b.id) : 1e9));
+  }
+  buildOrder = { key: orderKey, ids: shown.map(o => o.id) };
   // Buildings the search names that can't go on this tile, or aren't known yet: say why, and where they could go.
   const elsewhere = words.length ? cannot.filter(o => named(o.id)) : [];
   const later = words.length ? Object.keys(B).filter(id => B[id].tech > state.tech && named(id)) : [];
