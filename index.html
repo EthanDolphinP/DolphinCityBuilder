@@ -2901,6 +2901,68 @@ function renderBuildList(info) {
       }).join('') + notHere) +
     fold('nobuild', "Can't be built on this tile", cannot.map(o => `${esc(B[o.id].name)}: ${esc(o.problem)}`)));
 }
+// ---- What fits on a tile, worked out on the page the moment it is selected ----
+// The same checks the server makes (placement_problem / addition_problem in game.py), so the build menu and the
+// additions show at once instead of after a round trip. The server's answer follows and replaces them, adding how
+// fast each building would work here.
+const terrainIs = (terr, wanted) => terr === wanted || ((view.defs.terrains[terr] || {}).groups || []).includes(wanted);
+const terrainLabel = k => view.defs.terrains[k] ? view.defs.terrains[k].name.toLowerCase() : ({ water: 'water', fresh: 'fresh water' }[k] || k);
+function nearTiles(area, x, y) {
+  const out = [];
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const nx = x + dx, ny = y + dy;
+    if ((dx || dy) && nx >= 0 && ny >= 0 && nx < area.size && ny < area.size) out.push(area.tiles[ny][nx]);
+  }
+  return out;
+}
+const tileNumber = (tile, field) => (view.defs.buildings[tile.building][field] || 0) +
+  tile.additions.reduce((n, a) => n + (view.defs.additions[a][field] || 0), 0);
+function fertilityHere(area, x, y) {
+  const tile = area.tiles[y][x];
+  if (terrainIs(tile.terrain, 'water')) return 0;
+  return Math.min(100, nearTiles(area, x, y).reduce((f, n) => f + (n.building ? tileNumber(n, 'fertility_aura') : 0), tile.fertility));
+}
+function placeProblem(area, x, y, bid) {
+  const { state, defs } = view, b = defs.buildings[bid], tile = area.tiles[y][x], R = defs.research;
+  if (b.tech > state.tech) return `requires ${defs.tech[b.tech].name} tech`;
+  if (b.research && !state.research.includes(b.research)) return `requires research: ${R[b.research].name}`;
+  if (b.unique && buildingCount(bid)) return 'a city can only have one';
+  if (!b.terrain.some(k => terrainIs(tile.terrain, k))) return 'needs ' + b.terrain.map(terrainLabel).join(' or ');
+  const lock = defs.terrains[tile.terrain].research;
+  if (lock && !state.research.includes(lock)) return `this land can't be used until you research ${R[lock].name}`;
+  if ('max_height' in b && tile.height > b.max_height) return `too steep (height ${tile.height}, max ${b.max_height})`;
+  if ('min_height' in b && tile.height < b.min_height) return `too low (height ${tile.height}, needs ${b.min_height}+)`;
+  if ('min_fertility' in b && fertilityHere(area, x, y) < b.min_fertility) return `not fertile enough (${fertilityHere(area, x, y)}%, needs ${b.min_fertility}%)`;
+  if ('min_temp' in b && tile.temp < b.min_temp) return `too cold (${tile.temp}C)`;
+  if ('max_temp' in b && tile.temp > b.max_temp) return `too hot (${tile.temp}C)`;
+  if ('adjacent' in b && !nearTiles(area, x, y).some(n => terrainIs(n.terrain, b.adjacent))) return `must be next to ${terrainLabel(b.adjacent)}`;
+  return null;
+}
+function addProblem(area, x, y, aid) {
+  const { state, defs } = view, a = defs.additions[aid], tile = area.tiles[y][x];
+  if (!a.for.includes(tile.building)) return "doesn't fit this building";
+  if (tile.additions.includes(aid)) return 'already attached';
+  if (tile.additions.length >= defs.max_additions) return `no room (a building holds ${defs.max_additions} additions)`;
+  if ((a.tech || 0) > state.tech) return `requires ${defs.tech[a.tech].name} tech`;
+  if (a.research && !state.research.includes(a.research)) return `requires research: ${defs.research[a.research].name}`;
+  if ('adjacent' in a && !nearTiles(area, x, y).some(n => terrainIs(n.terrain, a.adjacent))) return `building must be next to ${terrainLabel(a.adjacent)}`;
+  return null;
+}
+// Fill in what the selected tile can take, until the server says (it then replaces this, speeds and all).
+function fitsHere(info, x, y) {
+  const { state, defs } = view, area = state.areas[view.area], tile = area.tiles[y][x], have = state.resources;
+  const afford = cost => Object.entries(cost).every(([k, v]) => have[k] >= v);
+  if (tile.building) {
+    info.additions = Object.keys(defs.additions).filter(aid => defs.additions[aid].for.includes(tile.building) && !tile.additions.includes(aid))
+      .map(aid => ({ id: aid, problem: addProblem(area, x, y, aid), affordable: afford(defs.additions[aid].cost) }));
+  } else {
+    info.build = Object.keys(defs.buildings).filter(bid => defs.buildings[bid].tech <= state.tech).map(bid => {
+      const problem = placeProblem(area, x, y, bid), b = defs.buildings[bid];
+      return problem ? { id: bid, problem } : { id: bid, problem: null, affordable: afford(b.cost), cycle: b.time || null, notes: [] };
+    });
+  }
+  info.local = true;
+}
 function renderTile() {
   const box = $('tileInfo');
   const building = sel && !visiting && view.state.areas[view.area].tiles[sel.y][sel.x].building === null;
@@ -2911,6 +2973,7 @@ function renderTile() {
   if (!sel) { setHTML(box, `<div class="inspector-empty">${icon('pin')}<strong>Your city, tile by tile</strong><p>Select a building to manage it.<br>Select empty land to see what fits.</p><div class="owned-badge">${icon('check')} Built</div> <span class="state-badge missing">Empty land</span></div>`); return; }
   const { state, defs } = view;
   const t = state.areas[view.area].tiles[sel.y][sel.x], info = view.tiles[sel.y][sel.x], status = view.status;
+  if (!visiting && !(t.building ? 'additions' in info : 'build' in info)) fitsHere(info, sel.x, sel.y);
   const waiting = !(t.building ? 'additions' in info : 'build' in info);
   if (waiting && detailAsked !== `${view.area}:${sel.x},${sel.y}`) { detailAsked = `${view.area}:${sel.x},${sel.y}`; refresh(); }
   const terr = defs.terrains[t.terrain];
