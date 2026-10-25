@@ -4744,7 +4744,7 @@ def _arrive(state, trip):
         "loot": loot,
         "egg": beasts.RARITIES[beasts.SPECIES[egg["species"]]["rarity"]]["name"] if egg else None,
     })
-    del state["reports"][:-10]
+    del state["reports"][:-50]       # kept until read in the Explore tab's summary
     beasts.note(state, when, "explore")
 
 

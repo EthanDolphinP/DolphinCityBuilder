@@ -967,6 +967,7 @@
         <div id="expViews" class="bar" style="margin-top:0"></div>
         <p id="exploreSpeed" class="small" style="margin:8px 0 0"></p>
       </div>
+      <div id="expReports"></div>
       <div id="trip"></div>
       <div class="panel" data-exp="areas">
         <h2>Your areas <span id="areasCount" class="count"></span></h2>
@@ -1180,7 +1181,7 @@
           <label class="check"><input data-setting="tutorial" type="checkbox"> Show the Getting started list on the City tab</label>
           <label class="check"><input data-setting="collection" type="checkbox"> Show the Building collection on the City tab</label>
           <label class="check"><input data-setting="away" type="checkbox"> Show the "While you were away" window</label>
-          <label class="check"><input data-setting="reports" type="checkbox"> Show a report when an expedition returns</label>
+          <label class="check"><input data-setting="reports" type="checkbox"> Keep reports of returned expeditions for the Explore tab</label>
           <label class="check"><input data-setting="mapKey" type="checkbox"> Show the colour key under the map</label>
         </div>
         <p class="dim small" style="margin-bottom:0">These settings are saved in this browser only, so each player and each
@@ -2275,17 +2276,16 @@ function accept(data) {
   render();
   if (tab === 'board' && !board) loadBoard();
   if (data.away) showAway(data.away);
-  if (!visiting && data.reports && data.reports.length) {
-    // Expeditions that came back while the player was away are in the "while you were away" summary already:
-    // their reports are put away without a window each. One that arrives while playing still shows its own.
-    const away = data.away && settings.away && data.reports.some(r => r.t > data.away.since);
-    if (away) { if (awayReportsCleared !== data.away.since) { awayReportsCleared = data.away.since; act('report_seen', { since: data.away.since }); } }
-    else showReport(data.reports[0]);
+  // Expedition reports no longer open a window each: they wait, all together, at the top of the Explore tab
+  // (and the tab says how many). With reports turned off in Settings they are put away unread.
+  if (!visiting && data.reports && data.reports.length && !settings.reports && reportsCleared !== data.reports.length) {
+    reportsCleared = data.reports.length;
+    act('report_seen', { since: -1 });
   }
 }
 
 let reportShown = null;   // the expedition report already on screen
-let awayReportsCleared = null;     // the "away since" whose expedition reports have been put away
+let reportsCleared = null;     // how many reports were being put away (with reports turned off), so it is asked once
 function showReport(r) {
   if (reportShown === r.t) return;
   reportShown = r.t;
@@ -2624,6 +2624,10 @@ function render() {
   setHTML(document.querySelector('[data-tab=beast]'), gfx()
     ? icon('animal') + 'Beast' + (challenged ? ' <span class="nav-badge">Duel</span>' : todo ? ' <span class="nav-badge">Mission</span>' : '')
     : 'Beast' + (challenged ? ' <span class="hi">(duel)</span>' : todo ? ' <span class="good">(mission)</span>' : ''));
+  const reportsNew = visiting ? 0 : (view.reports || []).length;    // expedition reports waiting in the Explore tab
+  setHTML(document.querySelector('[data-tab=explore]'), gfx()
+    ? icon('pin') + 'Explore' + (reportsNew ? ` <span class="nav-badge">${reportsNew}</span>` : '')
+    : 'Explore' + (reportsNew ? ` <span class="good">(${reportsNew} back)</span>` : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
   setHTML(document.querySelector('[data-tab=market]'), gfx()
     ? icon('storefront') + 'Market' + (unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
@@ -3192,7 +3196,38 @@ function renderResearch() {
 
 let expView = settings.expView || 'send';   // which part of the Explore tab shows (remembered)
 let areaFilter = 'all', destFilter = 'all';
+// Every expedition report not read yet, in one summary: what was mapped, and all that came back, added up.
+function renderExpReports() {
+  const reports = visiting ? [] : (view.reports || []), R = view.defs.resources;
+  if (!reports.length) { setHTML($('expReports'), ''); return; }
+  const loot = {}, eggs = {}, animals = new Set();
+  for (const r of reports) {
+    for (const [k, n] of Object.entries(r.loot || {})) loot[k] = (loot[k] || 0) + n;
+    if (r.egg) eggs[r.egg] = (eggs[r.egg] || 0) + 1;
+    for (const a of r.animals || []) animals.add(a);
+  }
+  const index = name => view.areas.findIndex(a => a.name === name);
+  const gains = Object.entries(loot).filter(([, n]) => n).map(([k, n]) => `<span class="good">+${num(n)} ${esc(R[k])}</span>`).join(', ');
+  const eggText = Object.entries(eggs).map(([rarity, n]) => `${n} ${esc(rarity)}`).join(', ');
+  const rows = reports.slice().reverse().map(r => {
+    const i = index(r.area), bits = [];
+    if (r.terrain && r.terrain.length) bits.push(`mostly ${r.terrain.slice(0, 3).map(([name, n]) => `${esc(name)} (${n})`).join(', ')}`);
+    const got = Object.entries(r.loot || {}).filter(([, n]) => n).map(([k, n]) => `+${num(n)} ${esc(R[k])}`).join(', ');
+    if (got) bits.push(`<span class="good">${got}</span>`);
+    if (r.egg) bits.push(`<span class="good">a ${esc(r.egg)} egg</span>`);
+    if (r.animals && r.animals.length) bits.push(`wildlife: ${esc(r.animals.join(', '))}`);
+    return `<div class="opt"><span class="hi">${esc(r.area)}</span> <span class="dim">${esc(r.land)}, ${esc(r.where)} of home</span>` +
+      (i >= 0 ? ` <button class="mini" data-view="${i}">View</button>` : '') + `<br><span class="small">${bits.join(' &middot; ')}</span></div>`;
+  }).join('');
+  setHTML($('expReports'), `<div class="panel" style="border-color:var(--accent)"><div class="head"><h2 style="margin:0">` +
+    `${reports.length === 1 ? 'An expedition is back' : `${reports.length} expeditions are back`}</h2>` +
+    `<button data-reports-clear>Got it</button></div>` +
+    `<p style="margin:6px 0">${reports.length === 1 ? 'It mapped' : 'They mapped'} <span class="hi">${reports.length} new ${reports.length === 1 ? 'area' : 'areas'}</span>` +
+    (gains ? ` and brought back ${gains}` : '') + (eggText ? `, and found <span class="good">${eggText} ${Object.values(eggs).reduce((a, b) => a + b, 0) === 1 ? 'egg' : 'eggs'}</span> (see the Beast tab)` : '') + `.` +
+    (animals.size ? ` <span class="dim">Wildlife seen: ${esc([...animals].join(', '))}.</span>` : '') + `</p>${rows}</div>`);
+}
 function renderExplore() {
+  renderExpReports();
   setHTML($('tameEverywhere'), tameAllButton(view.state.areas.map((a, n) => n), 'Tame all animals in every area'));
   const ex = view.status.explore;
   setHTML($('exploreSpeed'), `Expeditions travel at <span class="hi">${Math.round(ex.times * 100)}%</span> of normal speed. ` +
@@ -5607,6 +5642,12 @@ $('findOut').onclick = e => {
 };
 $('areas').onclick = e => { const b = e.target.closest('[data-area]'); if (b) showArea(+b.dataset.area); };
 $('areas').onchange = e => { if (e.target.id === 'areaPick') showArea(+e.target.value); };
+$('expReports').onclick = e => {
+  const b = e.target.closest('[data-reports-clear], [data-view]');
+  if (!b) return;
+  if ('reportsClear' in b.dataset) { view.reports = []; renderExpReports(); act('report_seen', { since: -1 }); }
+  else { tab = 'city'; showArea(+b.dataset.view); }
+};
 $('known').onclick = e => {
   const d = (e.target.closest('[data-view], [data-rename]') || e.target).dataset;
   if (d.view) { tab = 'city'; showArea(+d.view); }
