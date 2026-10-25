@@ -1348,6 +1348,28 @@ BUILDINGS = {
         "consumes": {"ore": 12}, "produces": {"electronics": 24},
         "desc": "Machines too small to see build circuits atom by atom: the most electronics of any building.",
     },
+    # ---- wood for a Metropolis and a Megacity, whose buildings take it by the thousand ----
+    "tree_plantation": {
+        "name": "Tree Plantation", "glyph": "\u00b0", "tech": 4, "category": "materials", "research": "forestry",
+        "terrain": ["plains"], "min_fertility": 30,
+        "cost": {"stone": 150, "tools": 80, "gold": 120}, "workers": 4, "time": 15 * MIN,
+        "produces": {"wood": 70}, "modifiers": ["fertility"],
+        "desc": "Rows of fast-growing trees, cut in turn and planted again: a great deal of wood from open land. Faster on richer soil.",
+    },
+    "harvester_fleet": {
+        "name": "Harvester Fleet", "glyph": "\u00b7", "tech": 4, "category": "materials", "power": 4, "research": "forestry",
+        "terrain": ["forest"],
+        "cost": {"stone": 150, "tools": 120, "gold": 150}, "workers": 3, "time": 15 * MIN,
+        "produces": {"wood": 60}, "modifiers": ["deep_forest"],
+        "desc": "Machines that fell, strip and stack a tree in a minute. Faster deeper in the woods.",
+    },
+    "bio_timber_vats": {
+        "name": "Bio-Timber Vats", "glyph": "\u00a1", "tech": 5, "category": "materials", "power": 15, "research": "hydroponics",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 500, "tools": 200, "electronics": 80, "gold": 500}, "workers": 4, "time": 15 * MIN,
+        "produces": {"wood": 160}, "sheltered": True,
+        "desc": "Wood grown from cells in warm tanks, no tree needed: more wood than any forest, anywhere, in any weather or time of day.",
+    },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
     # Hot springs
@@ -3303,6 +3325,30 @@ for _aid, _more in {
     if _aid in ADDITIONS:
         ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
+
+# Wood for a Metropolis and a Megacity: additions of their own.
+ADDITIONS.update({
+    "fast_clones": {"name": "Fast-Growing Clones", "research": "botany", "for": [],
+                    "cost": {"wood": 200, "gold": 150}, "speed": 1.3, "desc": "Trees bred to grow quickly: 30% faster."},
+    "log_loader": {"name": "Log Loader", "research": "mechanics", "for": [],
+                   "cost": {"stone": 80, "tools": 60}, "produces": {"wood": 15}, "desc": "15 more wood each cycle: nothing left lying in the woods."},
+    "nutrient_feed": {"name": "Nutrient Feed", "research": "hydroponics", "for": [],
+                      "cost": {"tools": 100, "electronics": 40, "gold": 150}, "speed": 1.3, "desc": "Richer broth in the tanks: 30% faster."},
+})
+for _aid, _more in {
+    "fast_clones": ["tree_plantation", "timber_yard", "harvester_fleet"],
+    "log_loader": ["tree_plantation", "harvester_fleet", "timber_yard"],
+    "nutrient_feed": ["bio_timber_vats"],
+    "band_saws": ["tree_plantation", "harvester_fleet", "bio_timber_vats"],
+    "replanting": ["tree_plantation", "harvester_fleet"],
+    "labour_saving": ["tree_plantation", "harvester_fleet"],
+    "automation": ["bio_timber_vats", "harvester_fleet"],
+    "smart_meters": ["bio_timber_vats", "harvester_fleet"],
+    "work_lights": ["tree_plantation", "harvester_fleet"],
+    "irrigation_pipes": ["tree_plantation"],
+    "clean_room": ["bio_timber_vats"],
+}.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
 # Kinds of area an expedition can find. Fields:
 #   weight   how common it is (0 = never found by exploring)
