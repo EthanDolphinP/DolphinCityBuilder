@@ -4787,7 +4787,12 @@ def apply_action(state, now, action, data):
     if action == "egg_deliver":
         return beasts.deliver(state, now, data.get("beast"))
     if action == "report_seen":     # the player has read the oldest expedition report
-        del state["reports"][:1]
+        since = data.get("since")
+        if isinstance(since, (int, float)) and not isinstance(since, bool):
+            # ...or every report from since the player went away: the "while you were away" summary covers them
+            state["reports"] = [r for r in state["reports"] if r["t"] <= since]
+        else:
+            del state["reports"][:1]
         return None
     if action == "slaughter":
         return slaughter(state, now, data.get("count"))

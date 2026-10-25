@@ -2275,10 +2275,17 @@ function accept(data) {
   render();
   if (tab === 'board' && !board) loadBoard();
   if (data.away) showAway(data.away);
-  if (!visiting && data.reports && data.reports.length) showReport(data.reports[0]);
+  if (!visiting && data.reports && data.reports.length) {
+    // Expeditions that came back while the player was away are in the "while you were away" summary already:
+    // their reports are put away without a window each. One that arrives while playing still shows its own.
+    const away = data.away && settings.away && data.reports.some(r => r.t > data.away.since);
+    if (away) { if (awayReportsCleared !== data.away.since) { awayReportsCleared = data.away.since; act('report_seen', { since: data.away.since }); } }
+    else showReport(data.reports[0]);
+  }
 }
 
 let reportShown = null;   // the expedition report already on screen
+let awayReportsCleared = null;     // the "away since" whose expedition reports have been put away
 function showReport(r) {
   if (reportShown === r.t) return;
   reportShown = r.t;
