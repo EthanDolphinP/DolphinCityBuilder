@@ -2629,9 +2629,11 @@ function render() {
     ? icon('pin') + 'Explore' + (reportsNew ? ` <span class="nav-badge">${reportsNew}</span>` : '')
     : 'Explore' + (reportsNew ? ` <span class="good">(${reportsNew} back)</span>` : ''));
   const unseen = visiting ? 0 : (state.sales || []).length;    // sales the player has not read about yet
+  const billsAsked = visiting ? 0 : view.market.bills.filter(b => b.status === 'proposed' && b.to === state.name).length;
   setHTML(document.querySelector('[data-tab=market]'), gfx()
-    ? icon('storefront') + 'Market' + (unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
-    : 'Market' + (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
+    ? icon('storefront') + 'Market' + (billsAsked ? ` <span class="nav-badge">Bill</span>` : unseen ? ` <span class="nav-badge">${unseen}</span>` : '')
+    : 'Market' + (billsAsked ? ` <span class="hi">(${billsAsked === 1 ? 'a bill' : billsAsked + ' bills'} to answer)</span>` : '') +
+      (unseen ? ` <span class="good">(${unseen} sold)</span>` : ''));
   const mailNew = visiting ? 0 : (state.messages || []).filter(m => !m.read).length;
   setHTML(document.querySelector('[data-tab=social]'), gfx()
     ? icon('people') + 'Social' + (mailNew ? ` <span class="nav-badge">${mailNew}</span>` : '')
@@ -4041,7 +4043,7 @@ function renderSocial() {
         `<button data-soc-tag="enemy" data-city="${esc(c.name)}" class="${c.tag === 'enemy' ? 'on' : ''}">Enemy</button></td>` +
         `<td class="dim">${count || 'none yet'}</td>` +
         `<td class="dim small" style="white-space:normal;min-width:200px">${c.last ? `[${clock(c.last.t)}] ${esc(c.last.text)}` : ''}</td>` +
-        `<td>${c.exists ? `<button data-soc-visit="${esc(c.name)}">Visit</button> <button data-soc-msg="${esc(c.name)}">Message</button> ` : ''}` +
+        `<td>${c.exists ? `<button data-soc-visit="${esc(c.name)}">Visit</button> <button data-soc-msg="${esc(c.name)}">Message</button> <button data-propose-bill="${esc(c.name)}" title="Propose a repeating trade with ${esc(c.name)}">Bill</button> ` : ''}` +
         (c.n ? `<button data-soc-hist="${esc(c.name)}">History</button>` : '') + `</td></tr>`;
     }).join('') + `</table>`
     : `<span class="dim">${socFilter === 'all' || words ? 'No cities match.' : 'Nothing here yet. Choose Every city to mark allies and enemies, or trade with someone.'}</span>`);
@@ -5099,7 +5101,7 @@ function renderBoard() {
       cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
       (withIdeology ? `<td class="dim">${c.ideology ? esc(c.ideology) : '-'}</td>` : '') +
       `<td class="${c.name === city ? 'mine' : 'acts'}">` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
-        (visiting ? '' : `<button data-board-msg="${esc(c.name)}">Message</button> ` + (banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
+        (visiting ? '' : `<button data-board-msg="${esc(c.name)}">Message</button> <button data-propose-bill="${esc(c.name)}" title="Propose a repeating trade with ${esc(c.name)}">Bill</button> ` + (banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
                                    : `<button data-ban="${esc(c.name)}">Ban</button>`))) +
       `</td></tr>`).join('') + `</table>` +
       (cut ? `<div class="bar"><span class="dim small">Showing the top ${TOP} of ${matching.length}${rank.get(city) > TOP ? ', and your city' : ''}.</span>` +
@@ -5876,6 +5878,17 @@ $('board').addEventListener('click', e => {
   if (d.visit) visit(d.visit);
   else if (d.ban) act('ban', { target: d.ban });
   else if (d.unban) act('unban', { target: d.unban });
+});
+// "Bill" beside a city: the bill form on the Market tab, made out to that city
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-propose-bill]');
+  if (!b || visiting) return;
+  mktView = settings.mktView = 'bills'; saveSettings();
+  tab = 'market'; render();
+  $('billTo').value = b.dataset.proposeBill;
+  $('billForm').scrollIntoView({ block: 'center' });
+  $('billGiveQty').focus({ preventScroll: true });
+  say(`Fill in what you send ${b.dataset.proposeBill} and what you want back, and how often, then press Propose bill.`, true);
 });
 $('board').onclick = e => {
   const d = e.target.dataset;
