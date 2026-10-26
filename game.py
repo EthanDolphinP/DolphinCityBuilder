@@ -5215,6 +5215,8 @@ def apply_action(state, now, action, data):
         return beasts.deliver(state, now)
     if action == "egg_deliver":
         return beasts.deliver(state, now, data.get("beast"))
+    if action == "quest_give":
+        return ideology.quest_give(state, now, data.get("res") or None, data.get("amount"))
     if action == "tutorial":
         return tutorial_reach(state, now, data.get("reach"))
     if action == "tutorial_skip":
@@ -5970,6 +5972,7 @@ def summary(state):
         "research": len(state["research"]) + sum(state.get("mastery", {}).values()),
         "researched": len(state["research"]),
         "mastery": sum(state.get("mastery", {}).values()),
+        "quests": state.get("quests", {}).get("done", 0),       # ideology quests done
         "beast": max((b["level"] for b in state["beasts"]), default=0),
         "areas": len(state["areas"]),
         "buildings": sum(1 for t in all_tiles(state) if t["building"]),

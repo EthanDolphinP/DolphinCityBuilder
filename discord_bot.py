@@ -179,7 +179,8 @@ COMMANDS = [
      "options": [{"type": 3, "name": "by", "description": "What to rank them by (tech level if left out)", "required": False,
                   "choices": [{"name": n, "value": v} for v, n in (
                       ("tech", "Tech level"), ("population", "Population"), ("buildings", "Buildings"), ("research", "Research"),
-                      ("areas", "Areas"), ("beast", "Beast level"), ("gold", "Gold"), ("food", "Food"), ("knowledge", "Knowledge"))]}]},
+                      ("areas", "Areas"), ("beast", "Beast level"), ("quests", "Ideology quests"), ("gold", "Gold"), ("food", "Food"),
+                      ("knowledge", "Knowledge"))]}]},
     {"name": "city", "description": "Everything public about one city",
      "options": [{"type": 3, "name": "name", "description": "The city's name", "required": True}]},
     {"name": "market", "description": "What is on sale on the market right now",
@@ -264,7 +265,7 @@ def _ranked(cities, key):
 
 
 LABELS = {"tech": "Tech level", "population": "Population", "buildings": "Buildings", "research": "Research",
-          "areas": "Areas", "beast": "Beast level"}
+          "areas": "Areas", "beast": "Beast level", "quests": "Ideology quests"}
 
 
 def _show(c, key):

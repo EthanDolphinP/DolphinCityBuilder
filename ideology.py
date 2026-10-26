@@ -41,6 +41,7 @@ touch `game` at import time: only inside functions.
 """
 
 import math
+import random
 
 import game
 
@@ -564,7 +565,8 @@ def own_effects(state):
         return {"speed": {}}
     total = {"speed": {}}
     for eff in ([ideo["effects"]] + [ideo["perks"][p]["effects"] for p in state.get("perks", []) if p in ideo["perks"]]
-                + [_scaled(ideo["rituals"][rid]["effects"], r["scale"]) for rid, r in active_rituals(state)]):
+                + [_scaled(ideo["rituals"][rid]["effects"], r["scale"]) for rid, r in active_rituals(state)]
+                + [quest_effects(state)]):          # the prizes its quests have won
         for key, value in eff.items():
             if key == "speed":
                 for cat, x in value.items():
@@ -881,4 +883,137 @@ def view(state):
               "load": {**{cat: round(1 - curse_factor(state, "speed", cat), 3) for cat in game.CATEGORIES},
                        **{k: round(1 - curse_factor(state, k), 3) for k in PENALTY_WORDS}}}
     return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state), "rituals": rituals, "curses": curses,
+            "quests": quest_view(state),
             "total": describe(own_effects(state)) if chosen(state) else []}
+
+
+# ---- quests: each ideology's own kind, paid for in resources, every one dearer than the last ----
+# A quest asks for a few resources (QUEST_PICKS of them, from its ideology's list) that can be handed in a bit at a
+# time with no time limit. Each costs QUEST_GROWTH times the one before. Early quests ask only for the plainest
+# materials; more kinds join in from quest QUEST_TIER_AT[1] and [2], when a city can make them. Every quest done gives a
+# prize for good, in turn from its ideology's list, each QUEST_REWARD_GROWTH bigger than the last.
+QUEST_NAMES = {"faith": ("Pilgrimage", "Pilgrimages"), "progress": ("Grand Project", "Grand Projects"),
+               "commerce": ("Venture", "Ventures"), "wild": ("Trial of the Wild", "Trials of the Wild"),
+               "wayfarers": ("Odyssey", "Odysseys"), "community": ("Endeavour", "Endeavours")}
+QUEST_GROWTH = 1.6
+QUEST_REWARD_GROWTH = 0.1
+QUEST_PICKS = 3
+QUEST_TIER_AT = (0, 3, 6)          # quest numbers (from 0) at which the second and third lists join in
+QUEST_BASE = {"food": 600, "wood": 400, "stone": 300, "gold": 300, "knowledge": 200,
+              "ore": 200, "tools": 80, "livestock": 15, "electronics": 30}
+QUEST_POOLS = {      # what each ideology's quests ask for: plain materials, then more from quest 4, then from quest 7
+    "faith":     (["food", "knowledge", "gold", "stone"], ["tools", "livestock"], ["electronics"]),
+    "progress":  (["stone", "wood", "knowledge", "gold"], ["ore", "tools"], ["electronics"]),
+    "commerce":  (["gold", "wood", "food", "stone"], ["tools", "ore"], ["electronics"]),
+    "wild":      (["food", "wood", "knowledge", "stone"], ["livestock", "tools"], ["electronics"]),
+    "wayfarers": (["food", "wood", "gold", "stone"], ["livestock", "tools"], ["ore", "electronics"]),
+    "community": (["food", "wood", "stone", "gold"], ["tools", "livestock"], ["electronics"]),
+}
+QUEST_REWARDS = {    # the prizes, in turn (the first quest gives the first)
+    "faith":     [{"speed": {"food": 0.03}}, {"speed": {"knowledge": 0.03}}, {"housing": 4}, {"speed": {"all": 0.015}}],
+    "progress":  [{"speed": {"materials": 0.03}}, {"power": 0.03}, {"speed": {"knowledge": 0.03}}, {"speed": {"all": 0.015}}],
+    "commerce":  [{"speed": {"trade": 0.03}}, {"explore_cost": 0.03}, {"speed": {"food": 0.02}}, {"speed": {"all": 0.015}}],
+    "wild":      [{"beast_xp": 0.05}, {"wildlife_speed": 0.05}, {"speed": {"food": 0.03}}, {"mission_speed": 0.03}],
+    "wayfarers": [{"explore_speed": 0.04}, {"explore_cost": 0.03}, {"speed": {"trade": 0.02}}, {"speed": {"all": 0.015}}],
+    "community": [{"housing": 5}, {"speed": {"food": 0.03}}, {"speed": {"trade": 0.02}}, {"speed": {"all": 0.015}}],
+}
+for _k, (_word, _plural) in QUEST_NAMES.items():
+    IDEOLOGIES[_k]["quest_word"], IDEOLOGIES[_k]["quest_plural"] = _word, _plural
+
+
+def _quest_nice(x):
+    """A round number: 2 significant figures."""
+    if x < 100:
+        return max(1, int(round(x)))
+    digits = len(str(int(x))) - 2
+    return int(round(x / 10 ** digits)) * 10 ** digits
+
+
+def quests_done(state):
+    return state.get("quests", {}).get("done", 0)
+
+
+def quest_need(ideo_id, n):
+    """What quest number `n` (from 0) of this ideology asks for: {resource: amount}."""
+    tiers = QUEST_POOLS[ideo_id]
+    pool = [r for i, tier in enumerate(tiers) if n >= QUEST_TIER_AT[i] for r in tier]
+    picks = random.Random(f"{ideo_id}:{n}").sample(pool, min(QUEST_PICKS, len(pool)))
+    return {r: _quest_nice(QUEST_BASE[r] * QUEST_GROWTH ** n) for r in picks}
+
+
+def quest_reward(ideo_id, n):
+    """The prize for finishing quest number `n` (from 0)."""
+    rewards = QUEST_REWARDS[ideo_id]
+    prize = _scaled(rewards[n % len(rewards)], 1 + QUEST_REWARD_GROWTH * n)
+    if "housing" in prize:
+        prize["housing"] = int(round(prize["housing"]))       # whole people
+    return prize
+
+
+_QUEST_TOTALS = {}
+
+
+def quest_effects(state):
+    """Every prize the city's quests have won, added up (worked out once for each ideology and number done)."""
+    ideo_id, done = state.get("ideology"), quests_done(state)
+    if not ideo_id or not done or ideo_id not in QUEST_REWARDS:
+        return {}
+    key = (ideo_id, done)
+    if key not in _QUEST_TOTALS:
+        total = {"speed": {}}
+        for n in range(done):
+            for k, v in quest_reward(ideo_id, n).items():
+                if k == "speed":
+                    for cat, x in v.items():
+                        total["speed"][cat] = total["speed"].get(cat, 0) + x
+                else:
+                    total[k] = total.get(k, 0) + v
+        _QUEST_TOTALS[key] = total
+    return _QUEST_TOTALS[key]
+
+
+def quest_give(state, now, res=None, amount=None):
+    """Hand resources in to the quest under way: `res` (or every resource it asks for, with no `res`), as much as
+    the city has up to what is still needed (or `amount` of it). The quest is done when nothing more is needed."""
+    ideo = chosen(state)
+    if not ideo:
+        return "Choose an ideology first: quests are its own."
+    quests = state.setdefault("quests", {"done": 0, "given": {}})
+    need = quest_need(state["ideology"], quests["done"])
+    given = quests.setdefault("given", {})
+    if res is not None and res not in need:
+        return f"This {ideo['quest_word']} doesn't ask for that."
+    if amount is not None and not (isinstance(amount, (int, float)) and not isinstance(amount, bool) and amount > 0):
+        return "Give a number above 0."
+    took = {}
+    for r in ([res] if res else need):
+        left = need[r] - given.get(r, 0)
+        take = min(left, int(state["resources"][r]), amount if amount is not None else left)
+        if take > 0:
+            state["resources"][r] -= take
+            given[r] = given.get(r, 0) + take
+            took[r] = take
+    if not took:
+        return "You have none of that to give yet." if res else "You have none of what it asks for yet."
+    word = ideo["quest_word"]
+    if all(given.get(r, 0) >= q for r, q in need.items()):
+        n = quests["done"]
+        quests["done"] = n + 1
+        quests["given"] = {}
+        prize = ", ".join(describe(quest_reward(state["ideology"], n)))
+        game.tally(state, "quests")
+        game.log(state, now, f"{word} {n + 1} is complete! Its prize, for good: {prize}.")
+    else:
+        game.log(state, now, f"Gave {game.fmt_goods(took)} to {word} {quests['done'] + 1}.")
+    return None
+
+
+def quest_view(state):
+    ideo, ideo_id = chosen(state), state.get("ideology")
+    if not ideo or ideo_id not in QUEST_REWARDS:
+        return None
+    done = quests_done(state)
+    return {"word": ideo["quest_word"], "plural": ideo["quest_plural"], "done": done,
+            "need": quest_need(ideo_id, done), "given": state.get("quests", {}).get("given", {}),
+            "prize": describe(quest_reward(ideo_id, done)), "won": describe(quest_effects(state)),
+            "growth": QUEST_GROWTH, "reward_growth": QUEST_REWARD_GROWTH}
