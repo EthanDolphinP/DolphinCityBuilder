@@ -961,6 +961,7 @@
     <div id="tab-people" hidden>
       <div class="panel"><h2>People</h2><div id="pplViews" class="bar" style="margin-top:0"></div></div>
       <div class="panel" data-ppl="growth"><h2>Will the city grow?</h2><div id="pplGrowth"></div></div>
+      <div class="panel" data-ppl="growth"><h2>Training</h2><div id="pplTraining"></div></div>
       <div class="cols">
         <div class="panel" data-ppl="food"><h2>Food</h2><div id="pplFood"></div>
           <form id="slaughterForm" class="bar" hidden>
@@ -1849,7 +1850,7 @@ const TUTOR = [
     done: c => c.additions > c.base.additions, fallback: c => !c.canAdd, fallbackText: 'You can\'t afford an addition right now. You can come back to them later.' },
   { ...tabStep('people', 'people'), title: 'Your people', text: 'Open the People tab (at the top).' },
   { id: 'people_read', tab: 'people', read: true, title: 'Growing your city',
-    text: 'Here you can see why your city is or isn\'t growing. At each meal one new person can arrive if there is a free home and enough food. Taverns let more arrive at once. Workers fill the jobs in your buildings; people with no job still eat.' },
+    text: 'Here you can see why your city is or isn\'t growing. At each meal one new person can arrive if there is a free home and enough food. Taverns let more arrive at once. Workers fill the jobs in your buildings; people with no job still eat. Later you can send newcomers to Training instead, to make every worker better.' },
   { ...tabStep('research_open', 'research'), title: 'Research', text: 'Open the Research tab.' },
   { id: 'research', tab: 'research', allow: '[data-research]', glow: '[data-research]:not([disabled])', title: 'Research something',
     text: 'Research costs knowledge, and the tutorial has given you some to try it. Press Research on anything you can afford.',
@@ -4939,6 +4940,17 @@ function renderPeople() {
       (g.ok ? '' : `<br><span class="hi">What to do:</span> ${esc(g.fix)}`) + `</div>`).join('') +
     (state.hungry ? `<div class="opt bad">The food has run out. Nobody leaves or dies, but every building that does not make food works at half speed until a meal can be served in full.</div>` : ''));
 
+  // ---- training: newcomers sent to train instead of joining make every worker better ----
+  const tr = view.training, pct = x => `${Math.round(x * 1000) / 10}%`;
+  setHTML($('pplTraining'), !tr ? '' :
+    `<p class="dim small" style="margin-top:0">Send some of each meal's newcomers to training instead of letting them join the city. ` +
+    `Trained people don't eat or need a home: each one makes every building with workers a little faster, for good ` +
+    `(20 trained: +5%, 60: +10%, 140: +15%, then +5% more each time the number doubles). Only people who would really have ` +
+    `arrived are trained, so a city whose homes are full trains nobody.</p>` +
+    `<p><span class="hi">${num(tr.trained)}</span> trained: every building with workers is <span class="good">${pct(tr.bonus)}</span> faster. ` +
+    `<span class="dim small">Next: ${pct(tr.next_bonus)} at ${num(tr.next_at)} trained.</span></p>` +
+    `<div class="bar"><span class="dim small">Newcomers sent to training:</span>` +
+    tr.shares.map(s => `<button data-train-share="${s}" class="${tr.share === s ? 'on' : ''}" ${visiting ? 'disabled' : ''}>${s === 0 ? 'None' : s === 1 ? 'All' : Math.round(s * 100) + '%'}</button>`).join('') + `</div>`);
   // Food
   const fullHousingFood = status.housing * perHour;
   const potentialFood = status.food_potential;
@@ -6125,6 +6137,10 @@ document.addEventListener('click', e => {
   $('billForm').scrollIntoView({ block: 'center' });
   $('billGiveQty').focus({ preventScroll: true });
   say(`Fill in what you send ${b.dataset.proposeBill} and what you want back, and how often, then press Propose bill.`, true);
+});
+$('pplTraining').addEventListener('click', e => {
+  const b = e.target.closest('[data-train-share]');
+  if (b && !visiting) act('training_set', { share: Number(b.dataset.trainShare) });
 });
 $('board').onclick = e => {
   const d = e.target.dataset;

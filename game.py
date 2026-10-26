@@ -1476,6 +1476,37 @@ BUILDINGS = {
         "produces": {"stone": 100}, "sheltered": True,
         "desc": "Binds ash and clay into blocks as hard as granite, on any flat ground: a great deal of stone without a hill to quarry.",
     },
+    # ---- knowledge on the water ----
+    "tide_watchers": {
+        "name": "Tide Watchers", "glyph": "\u0106", "tech": 2, "category": "knowledge",
+        "terrain": ["ocean"], "cost": {"wood": 60, "stone": 40}, "workers": 2, "time": 20 * MIN,
+        "produces": {"knowledge": 10},
+        "desc": "Keep a record of the tides, the currents and the stars over the sea: knowledge.",
+    },
+    "freshwater_lab": {
+        "name": "Freshwater Lab", "glyph": "\u0179", "tech": 3, "category": "knowledge", "power": 2,
+        "terrain": ["river", "lake"], "cost": {"stone": 120, "tools": 30, "gold": 60}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 22},
+        "desc": "Studies the life of rivers and lakes, from fish to the smallest water bugs: knowledge.",
+    },
+    "limnology_station": {
+        "name": "Limnology Station", "glyph": "\u0143", "tech": 4, "category": "knowledge", "power": 3,
+        "terrain": ["lake"], "cost": {"stone": 250, "tools": 100, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 30, "food": 10},
+        "desc": "Floating labs that study the whole lake, and breed better fish while they are at it: knowledge and some food.",
+    },
+    "oceanographic_institute": {
+        "name": "Oceanographic Institute", "glyph": "\u015a", "tech": 4, "category": "knowledge", "power": 4,
+        "terrain": ["ocean"], "cost": {"stone": 300, "tools": 120, "gold": 250}, "workers": 3, "time": 20 * MIN,
+        "produces": {"knowledge": 35},
+        "desc": "Research ships and a harbour full of instruments, mapping the seas: a great deal of knowledge.",
+    },
+    "deep_sea_lab": {
+        "name": "Deep Sea Lab", "glyph": "\u0102", "tech": 5, "category": "knowledge", "power": 12,
+        "terrain": ["ocean"], "cost": {"stone": 500, "tools": 200, "electronics": 150, "gold": 600}, "workers": 4, "time": 20 * MIN,
+        "produces": {"knowledge": 100},
+        "desc": "A station on the sea floor, studying life no one has seen before: more knowledge than any lab on land.",
+    },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
     # Hot springs
@@ -3547,6 +3578,30 @@ for _aid, _more in {
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
+# Knowledge on the water: additions of their own, and old ones that fit.
+ADDITIONS.update({
+    "research_submarine": {"name": "Research Submarine", "research": "marine_biology", "for": [],
+                           "cost": {"tools": 120, "gold": 150}, "speed": 1.3, "desc": "Goes where divers can't: 30% faster."},
+    "sample_archive": {"name": "Sample Archive", "for": [],
+                       "cost": {"stone": 100, "gold": 80}, "produces": {"knowledge": 6}, "desc": "Every sample kept and studied again: 6 more knowledge each cycle."},
+})
+for _aid, _more in {
+    "research_submarine": ["oceanographic_institute", "deep_sea_lab", "limnology_station"],
+    "sample_archive": ["tide_watchers", "freshwater_lab", "limnology_station", "oceanographic_institute", "deep_sea_lab"],
+    "library": ["tide_watchers", "freshwater_lab"],
+    "scriptorium": ["tide_watchers"],
+    "lanterns": ["tide_watchers"],
+    "specialist_equipment": ["freshwater_lab", "limnology_station", "oceanographic_institute"],
+    "diving_bells": ["freshwater_lab", "oceanographic_institute"],
+    "supercomputer": ["deep_sea_lab", "oceanographic_institute"],
+    "clean_room": ["deep_sea_lab"],
+    "smart_meters": ["deep_sea_lab", "oceanographic_institute"],
+    "automation": ["deep_sea_lab"],
+    "storm_hulls": ["oceanographic_institute", "tide_watchers"],
+    "fishing_nets": ["limnology_station"],
+}.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
+
 # Kinds of area an expedition can find. Fields:
 #   weight   how common it is (0 = never found by exploring)
 #   terrain  multipliers on how common each terrain is (ordinary or rare)
@@ -4188,6 +4243,9 @@ def tile_cycle(state, area, x, y, bid):
     hexed = ideology.curse_speed(state, b.get("category"))
     if hexed:
         factors.append(hexed)
+    # Workers trained by newcomers sent to training (see training_bonus).
+    if b.get("workers") and state.get("training", {}).get("trained"):
+        factors.append((1 + training_bonus(state), "Trained workers"))
     # Researched techniques.
     for rid in state["research"]:
         if bid in RESEARCH[rid].get("boost", {}):
@@ -4295,7 +4353,8 @@ def _plan_key(state):
             json.dumps(ideology.effects(state), sort_keys=True, default=str),
             tuple((c["ideology"], c["curse"], c["scale"]) for _, c in ideology.active_curses(state)),
             (beast["id"], beast["species"], beast["level"], beast["stage"], beast.get("cap")) if beast else None,
-            min(2.0, max(0.2, int(state["resources"]["livestock"]) / LIVESTOCK_FOR_FULL_SPEED)))
+            min(2.0, max(0.2, int(state["resources"]["livestock"]) / LIVESTOCK_FOR_FULL_SPEED)),
+            state.get("training", {}).get("trained", 0))
 
 
 def _remembered_plan(state):
@@ -4424,6 +4483,52 @@ def _speed(state, job, power=1.0, env=1.0):
     return speed
 
 
+# ---- training: newcomers sent to train instead of joining the city make every worker better ----
+# A city can send a share of each meal's newcomers (TRAINING_SHARES) to training. They don't join the city (so they
+# don't eat or need a home): each one adds to the city's trained count, and every building with workers is faster by
+# TRAINING_STEP for each doubling of it (in TRAINING_UNIT steps): 20 trained +5%, 60 +10%, 140 +15%, 300 +20%...
+# Only people who would really have come are trained, so a city whose homes are all full trains nobody.
+TRAINING_SHARES = (0, 0.25, 0.5, 1.0)
+TRAINING_STEP = 0.05
+TRAINING_UNIT = 20
+
+
+def training_bonus(state, trained=None):
+    """How much faster trained workers make every building: TRAINING_STEP per doubling."""
+    n = state.get("training", {}).get("trained", 0) if trained is None else trained
+    return TRAINING_STEP * math.log2(1 + n / TRAINING_UNIT) if n > 0 else 0.0
+
+
+def set_training(state, now, share):
+    if share not in TRAINING_SHARES:
+        return "Pick how many newcomers to send to training."
+    t = state.setdefault("training", {"share": 0, "trained": 0, "carry": 0.0})
+    t["share"] = share
+    log(state, now, "Newcomers now all join the city." if not share else
+                    f"{'All' if share == 1 else f'{round(share * 100)}% of'} newcomers now go to training instead of joining the city.")
+    return None
+
+
+def _train(state, arrivals):
+    """Of this meal's `arrivals`, how many go to training (the rest join the city)."""
+    t = state.get("training")
+    if not t or not t.get("share") or not arrivals:
+        return 0
+    t["carry"] = t.get("carry", 0.0) + arrivals * t["share"]
+    sent = min(arrivals, int(t["carry"]))
+    t["carry"] -= sent
+    t["trained"] = t.get("trained", 0) + sent
+    return sent
+
+
+def training_view(state):
+    t = state.get("training", {})
+    trained = t.get("trained", 0)
+    next_at = TRAINING_UNIT * (2 ** (math.floor(math.log2(1 + trained / TRAINING_UNIT)) + 1) - 1)
+    return {"share": t.get("share", 0), "trained": trained, "bonus": round(training_bonus(state), 4), "shares": list(TRAINING_SHARES),
+            "next_at": int(next_at), "next_bonus": round(training_bonus(state, next_at), 4)}
+
+
 def _meal(state, housing, when):
     """Everyone eats. Returns True if the population changed."""
     res, pop = state["resources"], state["population"]
@@ -4442,11 +4547,15 @@ def _meal(state, housing, when):
         state["hungry"] = False
         log(state, when, "Everyone is fed again.")
     arrivals = _arrivals(pop, res["food"], housing, 1 + city_attracts(state, when))
+    trained = _train(state, arrivals)          # some go to training instead of joining the city
+    arrivals -= trained
     state["population"] += arrivals
     if arrivals:
         tally(state, "arrivals", arrivals)
         beasts.note(state, when, "arrival", arrivals)
-    return arrivals > 0
+    if trained:
+        tally(state, "trained", trained)
+    return arrivals > 0 or trained > 0
 
 
 _STAT_CACHE = None     # while view() or work_plan() runs (they change nothing) each city_stat is worked out once, not per tile
@@ -5215,6 +5324,8 @@ def apply_action(state, now, action, data):
         return beasts.deliver(state, now)
     if action == "egg_deliver":
         return beasts.deliver(state, now, data.get("beast"))
+    if action == "training_set":
+        return set_training(state, now, data.get("share"))
     if action == "quest_give":
         return ideology.quest_give(state, now, data.get("res") or None, data.get("amount"))
     if action == "tutorial":
@@ -5528,6 +5639,7 @@ def _view(state, ai, detail):
         "cauldron": cauldron.view(state),
         "artifacts": artifacts.view(state),
         "mastery": mastery_view(state),
+        "training": training_view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
