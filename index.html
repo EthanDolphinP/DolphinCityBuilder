@@ -3012,6 +3012,27 @@ function exploreWords(own, built) {
   return `travel ${pct(own)} faster on its own; ${built ? 'it adds' : 'one more would add'} <span class="hi">+${pct(adds)}</span> now ` +
     `<span class="dim small">(past +${pct(e.full)} from buildings, each one counts for less)</span>`;
 }
+// ---- wonders in words: what one gives, what yours give together, what the next would add ----
+function wonderSaid(eff, s = 1) {
+  const C = view.defs.categories, pct = x => `${Math.round(x * 1000) / 10}%`;
+  const name = c => c === 'all' ? 'All buildings' : `${C[c]} buildings`;
+  return [...Object.entries(eff.speed || {}).map(([c, x]) => `${name(c)} ${pct(x * s)} faster`),
+          ...Object.entries(eff.yield || {}).map(([c, x]) => `${name(c)} make ${pct(x * s)} more`)];
+}
+const wonderRow = id => ((view.wonders || {}).list || []).find(r => r.id === id);
+const nth = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+function wonderRows(b, id, built) {
+  const r = wonderRow(id), d = view.wonders ? view.wonders.decay : 0.85, good = list => `<span class="good">${list.map(esc).join(', ')}</span>`;
+  if (!r) return [['Boosts', good(wonderSaid(b.wonder)) + ' <span class="dim">(for a city of its ideology)</span>']];
+  const rows = [];
+  if (r.count) rows.push(['Boosts', `your ${r.count} together: ` + good(wonderSaid(b.wonder, r.now))]);
+  else rows.push(['Boosts', `the first one: ` + good(wonderSaid(b.wonder, 1))]);
+  rows.push(['Next one', (r.count ? `a ${nth(r.count + 1)} would add ` : 'building it adds ') + good(wonderSaid(b.wonder, r.next)) +
+    (r.count ? ` <span class="dim">(${Math.round(r.next * 100)}% of the first one's bonus)</span>` : '')]);
+  rows.push(['Wonder', `it boosts your other buildings across the whole city, wherever they are. Each copy of the same wonder gives ` +
+    `${Math.round((1 - d) * 100)}% less than the one before (never nothing). Your city's other bonuses don't make wonders any better.`]);
+  return rows;
+}
 function buildingRows(b, cycle, produces, live) {
   const R = view.defs.resources, rows = [];
   const housing = live ? live.housing : b.housing;
@@ -3020,6 +3041,10 @@ function buildingRows(b, cycle, produces, live) {
   if (b.generates) rows.push(['Generates', `<span class="good">${num(live ? live.power_out : b.generates)} power</span>`]);
   if (b.power) rows.push(['Needs', `${live ? live.power_in : b.power} power`]);
   if (b.unique) rows.push(['Limit', 'one per city']);
+  if (b.wonder) {
+    const id = Object.keys(view.defs.buildings).find(k => view.defs.buildings[k] === b);
+    rows.push(...wonderRows(b, id, !!live));
+  }
   if (b.beast_xp) rows.push(['Beast', `missions give ${Math.round(b.beast_xp * 100)}% more experience`]);
   if (b.beast_power) rows.push(['Beast', `its bonus is ${Math.round(b.beast_power * 100)}% stronger`]);
   if (b.hatch_speed) rows.push(['Eggs', `hatch ${Math.round(b.hatch_speed * 100)}% faster`]);
@@ -3085,10 +3110,10 @@ function renderCollection() {
  }).join('') || '<p class="dim">No buildings match this view.</p>');
 }
 function buildingFacts(rows, key) {
- const kinds = {Houses:'house',Makes:'materials',Workers:'people',Every:'clock',Generates:'power',Needs:'power',Status:'clock'};
+ const kinds = {Houses:'house',Boosts:'check',['Next one']:'materials',Makes:'materials',Workers:'people',Every:'clock',Generates:'power',Needs:'power',Status:'clock'};
  const primary = rows.filter(([label]) => kinds[label]);
  const other = rows.filter(([label]) => !kinds[label]);
- return `<div class="building-facts">${primary.map(([label,value]) => `<div class="building-fact${['Makes', 'Every'].includes(label) ? ' wide' : ''}"><span class="dim">${label}</span><span class="hi">${value.replace(/<br\s*\/?\s*>/gi, ' &middot; ')}</span></div>`).join('')}</div>` + fold('buildingFacts:' + key, 'More effects', other.map(([label,value]) => `${label}: ${value}`));
+ return `<div class="building-facts">${primary.map(([label,value]) => `<div class="building-fact${['Makes', 'Every', 'Boosts', 'Next one'].includes(label) ? ' wide' : ''}"><span class="dim">${label}</span><span class="hi">${value.replace(/<br\s*\/?\s*>/gi, ' &middot; ')}</span></div>`).join('')}</div>` + fold('buildingFacts:' + key, 'More effects', other.map(([label,value]) => `${label}: ${value}`));
 }
 // ---- The build menu: search, kinds of building, recently built, and one line per building.
 const buildState = { q: '', cat: 'all' };
@@ -3156,6 +3181,11 @@ function renderBuildList(info) {
     if (b.attracts) bits.push(`+${num(b.attracts)} ${b.attracts === 1 ? 'arrival' : 'arrivals'} per meal`);
     if (b.power) bits.push(`needs ${num(b.power)} power`);
     if (b.workers) bits.push(`${b.workers} workers`);
+    if (b.wonder) {
+      const r = wonderRow(o.id);
+      bits.unshift(r ? `${r.count ? `your ${nth(r.count + 1)} adds` : 'adds'} <span class="good">${wonderSaid(b.wonder, r.next).map(esc).join(', ')}</span>`
+                     : `<span class="good">${wonderSaid(b.wonder).map(esc).join(', ')}</span>`);
+    }
     if (!bits.length) bits.push(esc(b.desc.split('. ')[0]));
     return bits.join(' &middot; ');
   };
@@ -4497,17 +4527,20 @@ function treePanel(i, iv, own) {
       `It has no top level: level it as long as you keep earning tree points.</p>${treeNode(tr.endless, own)}</div>` : '') + `</div>`;
 }
 function wonderPanel(i, iv, own) {
-  const w = view.wonders, C = view.defs.categories, T = view.defs.tech, pct = x => `${Math.round(x * 1000) / 10}%`;
+  const w = view.wonders, T = view.defs.tech, said = wonderSaid;
   if (!w || !w.list.length) return '';
-  const name = c => c === 'all' ? 'All buildings' : `${C[c]} buildings`;
-  const said = (eff, s) => [...Object.entries(eff.speed || {}).map(([c, x]) => `${name(c)} ${pct(x * s)} faster`),
-                            ...Object.entries(eff.yield || {}).map(([c, x]) => `${name(c)} make ${pct(x * s)} more`)];
   const total = said(w, 1);
+  const steps = [1, 2, 3, 4, 5].map(n => Math.round(8 * w.decay ** (n - 1) * 10) / 10);
+  const ten = Math.round(8 * (1 - w.decay ** 10) / (1 - w.decay) * 10) / 10;
   return `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Wonders</h2>` +
     `<p class="dim small" style="margin-top:0">Wonders are ${esc(i.name)}'s own great buildings, built on the map like any other (they have a section of their own in the build menu). ` +
     `Each opens at a tech level and a number of ${esc((iv.quests ? iv.quests.plural : 'quests').toLowerCase())} done. Most make nothing themselves: they make your other buildings faster and give more each cycle. ` +
     `They are very dear, and <span class="hi">each copy of the same wonder gives ${Math.round((1 - w.decay) * 100)}% less than the one before</span> (never nothing). ` +
     `Your city's other bonuses don't make wonders any better.</p>` +
+    `<p class="small" style="margin-top:0"><span class="hi">How copies add up</span>, for a wonder that makes buildings 8% faster: ` +
+    `the 1st adds ${steps[0]}%, the 2nd ${steps[1]}%, the 3rd ${steps[2]}%, the 4th ${steps[3]}%, the 5th ${steps[4]}%... ` +
+    `so 10 of them give ${ten}% in all, and no number of them gives more than ${Math.round(8 / (1 - w.decay))}%. ` +
+    `Building a different wonder is usually worth more than another copy. Select a wonder on the map to see what yours give.</p>` +
     `<p>Your wonders give now: ${total.length ? `<span class="good">${total.map(esc).join(', ')}</span>` : '<span class="dim">nothing yet</span>'}</p>` +
     `<div class="scroll"><table><tr><th>Wonder</th><th>Opens at</th><th>Built</th><th>Gives now</th><th>The next one adds</th><th>Costs</th></tr>` +
     w.list.map(r => `<tr><td class="hi">${esc(r.name)}</td>` +
