@@ -38,6 +38,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+# Started as `python server.py` (as on a server of your own), this file runs as "__main__". The Discord bot does
+# `import server`, which would then load this file a second time, with a second set of cities read from disk:
+# its admin commands (/resetpassword, /renamecity, /removecity) changed that copy, and the game running here
+# saved over them. Under the name "server" too, `import server` finds the game that is running.
+if __name__ == "__main__":
+    sys.modules.setdefault("server", sys.modules[__name__])
+
 import beasts
 import discord_bot
 import game
