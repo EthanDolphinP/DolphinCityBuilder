@@ -383,6 +383,8 @@ def handle(body, headers, now):
     data = request.get("data") or {}
     options = {o.get("name"): o.get("value") for o in data.get("options") or []}
     name = data.get("name")
+    if request.get("guild_id"):
+        _backfill(request["guild_id"])
     if name == "leaderboard":
         return 200, _reply(_leaderboard(server, now, options.get("by") or "tech"))
     if name == "city":
@@ -649,6 +651,22 @@ def _store(path, value):
 
 def members():
     return _load(MEMBERS_FILE, {"guild": None, "cities": {}})
+
+
+def _backfill(guild):
+    """The first time a command comes from the server: note its id, and every player who claimed a city before
+    discord_members.json existed (each save remembers its "discord_user")."""
+    known = members()
+    if known.get("guild") and known.get("filled"):
+        return
+    known["guild"] = known.get("guild") or guild
+    if not known.get("filled"):
+        for path in (_data_dir() / "saves").glob("*.json"):
+            user = _load(path, {}).get("discord_user")
+            if user and str(user) not in known["cities"]:
+                known["cities"][str(user)] = path.stem
+        known["filled"] = True
+    _store(MEMBERS_FILE, known)
 
 
 def member_city(user):
