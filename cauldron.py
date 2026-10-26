@@ -71,9 +71,24 @@ def strength(times):
     return 1 + GIFT_STRENGTH * math.log2(max(1.0, times))
 
 
-def cost(rid, times):
-    """What one brew (an hour) of `times` the recipe takes."""
-    return {k: math.ceil(v * times) for k, v in RECIPES[rid]["ingredients"].items()}
+def boosts(state):
+    """(what ingredients cost, as a multiple; how strong brews are, as a multiple) from the city's buildings and their
+    additions, its ideology's perks and tree, and its enshrined artifacts. A cheaper-brews bonus x makes them cost
+    1 / (1 + x): each one helps less than the last, and brews are never free."""
+    import artifacts
+    import game
+    if state is None:
+        return 1.0, 1.0
+    own, arts = ideology.own_effects(state), artifacts.effects(state)
+    thrift = game.building_stat(state, "cauldron_cost") + own.get("cauldron_cost", 0) + arts.get("cauldron_cost", 0)
+    power = game.building_stat(state, "cauldron_power") + own.get("cauldron_power", 0) + arts.get("cauldron_power", 0)
+    return 1 / (1 + max(0.0, thrift)), 1 + max(0.0, power)
+
+
+def cost(rid, times, state=None):
+    """What one brew (an hour) of `times` the recipe takes (less, for a city with cheaper-brews bonuses)."""
+    mult = boosts(state)[0]
+    return {k: math.ceil(v * times * mult) for k, v in RECIPES[rid]["ingredients"].items()}
 
 
 def _good_times(times):
@@ -85,7 +100,7 @@ def _brew(state, when):
     import game
     pot = state["cauldron"]
     rid, times = pot["recipe"], pot["times"]
-    price = cost(rid, times)
+    price = cost(rid, times, state)
     short = game._missing(state, price) or ({k: 1 for k in locked(state, rid)} or None)
     pot.update(start=when, until=when + BREW_TIME, brewing=not short)
     if short:
@@ -109,13 +124,13 @@ def set_recipe(state, now, rid, times=1):
     missing = locked(state, rid)
     if missing:
         return f"You have no {', '.join(game.RESOURCES[k] for k in missing)} to put in yet."
-    price = cost(rid, times)
+    price = cost(rid, times, state)
     short = game._missing(state, price)
     if short:
         return f"Not enough for an hour of {RECIPES[rid]['name']} (need {game.fmt_goods(short)})."
     state["cauldron"] = {"recipe": rid, "times": times}
     _brew(state, now)
-    words = ", ".join(ideology.describe(ideology._scaled(RECIPES[rid]["effects"], strength(times))))
+    words = ", ".join(ideology.describe(ideology._scaled(RECIPES[rid]["effects"], strength(times) * boosts(state)[1])))
     game.log(state, now, f"*** The cauldron is brewing {RECIPES[rid]['name']} from {game.fmt_goods(price)} an hour: "
                          f"{words}. It brews again every hour while the ingredients are there. ***")
     return None
@@ -157,7 +172,7 @@ def hourly(state):
     pot = state.get("cauldron")
     if not pot or not pot.get("recipe") or pot["recipe"] not in RECIPES or not pot.get("brewing"):
         return {}
-    return {k: v * HOUR / BREW_TIME for k, v in cost(pot["recipe"], pot["times"]).items()}
+    return {k: v * HOUR / BREW_TIME for k, v in cost(pot["recipe"], pot["times"], state).items()}
 
 
 def ends(state):
@@ -173,7 +188,7 @@ def active(state):
     rid = pot and (pot.get("recipe") or pot.get("recipe_stopped"))
     if not pot or not pot.get("brewing") or rid not in RECIPES or not pot["start"] <= t < pot["until"]:
         return None
-    return rid, strength(pot["times"])
+    return rid, strength(pot["times"]) * boosts(state)[1]
 
 
 def effects(state):
@@ -216,6 +231,7 @@ def view(state):
     now = active(state)
     return {"recipe": pot.get("recipe"), "stopped": pot.get("recipe_stopped"), "times": pot.get("times", 1),
             "until": pot.get("until"), "brewing": bool(now),
-            "cost": cost(rid, pot["times"]) if rid else None,
+            "cost": cost(rid, pot["times"], state) if rid else None,
+            "cost_mult": round(boosts(state)[0], 4), "power_mult": round(boosts(state)[1], 4),
             "text": ideology.describe(ideology._scaled(RECIPES[now[0]]["effects"], now[1])) if now else [],
             "locked": {r: locked(state, r) for r in RECIPES}}

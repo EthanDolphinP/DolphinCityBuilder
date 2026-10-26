@@ -1507,6 +1507,31 @@ BUILDINGS = {
         "produces": {"knowledge": 100},
         "desc": "A station on the sea floor, studying life no one has seen before: more knowledge than any lab on land.",
     },
+    # ---- for the Cauldron: cheaper and stronger brews. A city can have one of each ----
+    "witchs_garden": {
+        "name": "Witch's Garden", "glyph": "\u0118", "tech": 1, "category": "support", "unique": True,
+        "terrain": ["plains", "forest", "hill", "marsh", "swamp"], "cost": {"wood": 60, "food": 40, "stone": 20},
+        "cauldron_cost": 0.1,
+        "desc": "Herbs, roots and mushrooms grown for the pot: Cauldron brews take fewer ingredients. A city can have one.",
+    },
+    "alchemists_workshop": {
+        "name": "Alchemist's Workshop", "glyph": "\u011a", "tech": 3, "category": "support", "unique": True, "power": 2,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 150, "tools": 40, "gold": 120},
+        "cauldron_power": 0.15,
+        "desc": "Flasks, furnaces and a great deal of careful notes: Cauldron brews are stronger. A city can have one.",
+    },
+    "grand_apothecary": {
+        "name": "Grand Apothecary", "glyph": "\u010e", "tech": 4, "category": "support", "unique": True, "power": 3,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 300, "tools": 100, "gold": 300},
+        "cauldron_cost": 0.15, "cauldron_power": 0.1,
+        "desc": "A great hall of jars and drawers, with every ingredient known: brews take less and are stronger. A city can have one.",
+    },
+    "arcane_distillery": {
+        "name": "Arcane Distillery", "glyph": "\u0139", "tech": 5, "category": "support", "unique": True, "power": 10,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 500, "tools": 250, "electronics": 100, "gold": 800},
+        "cauldron_power": 0.3,
+        "desc": "Towers of glass coils that wring every last drop of power from a brew: Cauldron brews are much stronger. A city can have one.",
+    },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
     # Hot springs
@@ -3602,6 +3627,22 @@ for _aid, _more in {
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
+# Additions for the Cauldron buildings.
+ADDITIONS.update({
+    "copper_stills": {"name": "Copper Stills", "for": [], "cost": {"ore": 60, "tools": 40, "gold": 60},
+                      "cauldron_power": 0.05, "desc": "Cauldron brews 5% stronger."},
+    "spice_cellar": {"name": "Spice Cellar", "for": [], "cost": {"stone": 80, "wood": 60, "gold": 40},
+                     "cauldron_cost": 0.05, "desc": "Cauldron brews take a little fewer ingredients."},
+    "rare_reagents": {"name": "Rare Reagents", "research": "botany", "for": [], "cost": {"gold": 200, "knowledge": 100},
+                      "cauldron_power": 0.08, "desc": "Cauldron brews 8% stronger."},
+})
+for _aid, _more in {
+    "copper_stills": ["alchemists_workshop", "grand_apothecary", "arcane_distillery"],
+    "spice_cellar": ["witchs_garden", "grand_apothecary", "alchemists_workshop"],
+    "rare_reagents": ["grand_apothecary", "arcane_distillery", "witchs_garden"],
+}.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
+
 # Kinds of area an expedition can find. Fields:
 #   weight   how common it is (0 = never found by exploring)
 #   terrain  multipliers on how common each terrain is (ordinary or rare)
@@ -4593,6 +4634,17 @@ def city_stat(state, field):
     return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"]) + ideology.value(state, field)
 
 
+def building_stat(state, field):
+    """`field` added up over the city's buildings and their additions alone, without the ideology's (city_stat adds
+    that): for the Cauldron, whose bonuses ideology.effects itself takes in."""
+    if _STAT_CACHE is not None:
+        totals = _STAT_CACHE.get((id(state), None))
+        if totals is None:
+            totals = _STAT_CACHE[(id(state), None)] = _tile_totals(state)
+        return totals.get(field, 0)
+    return sum(tile_stat(t, field) for t in all_tiles(state) if t["building"])
+
+
 _NUMBERS = {}      # ("b" or "a", id) -> that building's or addition's number fields
 
 
@@ -5329,6 +5381,8 @@ def apply_action(state, now, action, data):
         return beasts.deliver(state, now, data.get("beast"))
     if action == "training_set":
         return set_training(state, now, data.get("share"))
+    if action == "tree_take":
+        return ideology.tree_take(state, now, data.get("node"))
     if action == "quest_give":
         return ideology.quest_give(state, now, data.get("res") or None, data.get("amount"))
     if action == "tutorial":

@@ -42,6 +42,24 @@
   #tutorCoach.small { width: auto; }
   #tutorCoach.small .tut-body { display: none; }
   html.mobile #tutorCoach { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 45vh; }
+  /* ---- the quest tree: two branches side by side, each forking into two paths of which one may be taken ---- */
+  .qtree { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 10px; }     /* a branch a row: each path gets room */
+  .qfork > div { min-width: 0; }
+  .qbranch { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .qbranch > h3 { margin: 0 0 8px; color: var(--ideo, var(--accent)); }
+  .qfork { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .qforkhead { text-align: center; margin: 6px 0; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .qdown { text-align: center; color: var(--dim); line-height: 1; margin: 4px 0; }
+  .qnode { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--inset); }
+  .qnode.has { border-color: var(--ideo, var(--accent)); }
+  .qnode.full { box-shadow: inset 0 0 0 1px var(--ideo, var(--accent)); }
+  .qnode.closed { opacity: .45; }
+  .qnode .qname { font-weight: bold; }
+  .qnode .qlvl { float: right; font-size: 12px; color: var(--dim); }
+  .qpips { display: flex; gap: 3px; margin: 5px 0; }
+  .qpips i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); }
+  .qpips i.on { background: var(--ideo, var(--accent)); }
+  html.mobile .qfork { grid-template-columns: 1fr; }
   button:disabled { color: var(--faint); cursor: not-allowed; }
   /* a dropdown turned into a search box (see pickers below): the box, and the list that opens under it */
   input.sbox { min-width: 120px; max-width: 100%; cursor: pointer; padding-right: 20px;
@@ -4324,7 +4342,8 @@ function renderIdeology() {
   const pfilters = { all: ['All', () => true], can: ['Can take now', can], yours: ['Yours', ([id]) => iv.perks.includes(id)],
                      later: ['Not open yet', ([, p]) => p.tier > state.tech] };
   if (!pfilters[perkFilter]) perkFilter = 'all';
-  const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && iv.points ? `<span class="good">${num(iv.points)} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
+  const parts = { mine: ['Your ideology', ''], perks: ['Perks', own && (iv.points || (iv.tree && iv.tree.points))
+                    ? `<span class="good">${num(iv.points + (iv.tree ? iv.tree.points : 0))} to spend</span>` : `${iv.perks.length} of ${perks.length} yours`],
                   curses: [i.curse_plural, iv.curses.on_me.length ? `<span class="bad">${iv.curses.on_me.length} against you</span>`
                                     : Object.keys(iv.curses.cursing).length ? `${Object.keys(iv.curses.cursing).length} on others` : ''],
                   rituals: [i.ritual_plural, Object.keys(iv.rituals.active).length ? `<span class="good">${Object.keys(iv.rituals.active).length} running</span>`
@@ -4355,7 +4374,13 @@ function renderIdeology() {
 
   const shown = perks.filter(pfilters[perkFilter][1]);
   const tiers = [...new Set(shown.map(([, p]) => p.tier))].sort((a, b) => a - b);
-  const perkPanel = `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.perk_plural)}</h2>` +
+  const perkTabs = iv.tree ? `<div class="bar" style="margin-top:0"><button data-perk-tab="perks" class="${perkTab === 'perks' ? 'on' : ''}">${esc(i.perk_plural)} ` +
+      `<span class="small">${iv.points ? `<span class="good">${num(iv.points)} to spend</span>` : `${iv.perks.length} of ${perks.length}`}</span></button>` +
+      `<button data-perk-tab="tree" class="${perkTab === 'tree' ? 'on' : ''}">${esc(iv.tree.name)} <span class="small">` +
+      `${iv.tree.points ? `<span class="good">${iv.tree.points} to spend</span>` : 'from quests'}</span></button></div>` : '';
+  const perkPanel = iv.tree && perkTab === 'tree'
+    ? `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(iv.tree.name)}</h2>${perkTabs}${treePanel(i, iv, own)}</div>`
+    : `<div class="panel" style="--ideo:${esc(i.color)}"><h2>${esc(i.perk_plural)}</h2>${perkTabs}` +
     `<div class="bar" style="margin-top:0">` + Object.entries(pfilters).map(([k, [label, test]]) =>
       `<button class="chip ${perkFilter === k ? 'on' : ''}" data-perk-filter="${k}">${label} <span class="dim">${perks.filter(test).length}</span></button>`).join('') + `</div>` +
     (shown.length ? tiers.map(tier => {
@@ -4381,6 +4406,38 @@ function renderIdeology() {
     (show('perks') ? perkPanel : '') + (show('quests') ? questPanel(i, iv, own) : '') + (show('artifacts') ? artifactPanel(i, iv, own) : '') +
     (show('compare') ? compare : ''));
 }
+// ---- the quest tree, in the Perks part of the Ideology tab ----
+let perkTab = settings.perkTab || 'perks';     // 'perks' (by tech level) or 'tree' (from quests): remembered
+function treeNode(n, own) {
+  const pips = Array.from({ length: n.max }, (_, k) => `<i class="${k < n.level ? 'on' : ''}"></i>`).join('');
+  const kind = { root: 'Start of the branch', fork: 'Fork: one of two', cap: 'Final perk' }[n.kind];
+  return `<div class="qnode ${n.level ? 'has' : ''} ${n.level >= n.max ? 'full' : ''} ${n.not_chosen ? 'closed' : ''}">` +
+    `<span class="qlvl">Level ${n.level} of ${n.max}</span><div class="qname">${esc(n.name)}</div>` +
+    `<div class="dim small">${kind} &middot; ${n.cost} ${n.cost === 1 ? 'point' : 'points'} a level</div>` +
+    `<div class="qpips">${pips}</div>` +
+    `<div class="small">Each level: <span class="good">${n.per.map(esc).join(', ')}</span></div>` +
+    (n.level ? `<div class="small">Now: <span class="good">${n.now.map(esc).join(', ')}</span></div>` : '') +
+    (n.not_chosen ? `<div class="small bad">Closed: the other path of this fork was chosen.</div>`
+      : n.level >= n.max ? `<div class="small good">Complete</div>`
+      : own ? (n.problem && !/tree point/.test(n.problem) ? `<div class="small dim">${esc(n.problem)}</div>`
+        : `<button data-tree-take="${esc(n.id)}" ${n.problem ? 'disabled' : ''} title="${esc(n.problem || '')}">Take level ${n.level + 1}</button>`) : '') +
+    `</div>`;
+}
+function treePanel(i, iv, own) {
+  const tr = iv.tree;
+  if (!tr) return '';
+  return `<p class="dim small" style="margin-top:0">Every ${tr.every} ${esc((iv.quests ? iv.quests.plural : 'quests').toLowerCase())} done earn a tree point ` +
+    `(${tr.done} done so far). Each branch starts with a perk anyone can take. At level ${tr.fork_at} it forks: ` +
+    `<span class="hi">you can only ever take one of the two</span>, and each leads on to its own final perk, which opens once the perk before it is complete. ` +
+    `Look at where each path leads before you choose: nothing taken can be given back.</p>` +
+    `<p><span class="hi">${tr.points}</span> tree ${tr.points === 1 ? 'point' : 'points'} to spend.` +
+    (tr.total.length ? ` <span class="dim small">The tree gives you now: </span><span class="good small">${tr.total.map(esc).join(', ')}</span>` : '') + `</p>` +
+    `<div class="qtree">` + tr.branches.map(b =>
+      `<div class="qbranch"><h3>${esc(b.name)}</h3>${treeNode(b.root, own)}<div class="qdown">|<br>v</div>` +
+      `<div class="qforkhead">Choose one path</div><div class="qfork">` +
+      b.forks.map(f => `<div>${treeNode(f.fork, own)}<div class="qdown">|<br>v</div>${treeNode(f.cap, own)}</div>`).join('') +
+      `</div></div>`).join('') + `</div>`;
+}
 // ---- quests: the ideology's own kind, paid in resources, every one dearer than the last, each won for good ----
 function questPanel(i, iv, own) {
   const q = iv.quests, R = view.defs.resources, have = view.state.resources;
@@ -4404,6 +4461,15 @@ function questPanel(i, iv, own) {
       : `<p class="dim">Nothing yet.</p>`) + `</div>`;
 }
 
+$('ideologyBody').addEventListener('click', e => {      // the perk tabs and the tree
+  const tabBtn = e.target.closest('[data-perk-tab]');
+  if (tabBtn) { perkTab = settings.perkTab = tabBtn.dataset.perkTab; saveSettings(); renderIdeology(); return; }
+  const node = e.target.closest('[data-tree-take]');
+  if (node && !visiting) {
+    const name = node.closest('.qnode').querySelector('.qname').textContent;
+    if (confirm(`Take the next level of ${name}? Tree points can't be taken back, and at a fork the other path closes for good.`)) act('tree_take', { node: node.dataset.treeTake });
+  }
+});
 $('ideologyBody').addEventListener('click', e => {      // the quest buttons
   const qb = e.target.closest('[data-quest-give], [data-quest-all]');
   if (qb && !visiting) act('quest_give', qb.dataset.questGive ? { res: qb.dataset.questGive } : {});
@@ -4694,8 +4760,9 @@ function potArt(colour, busy, frame) {
   }).join('\n');
 }
 // How strong a brew of `times` the recipe is, as cauldron.strength() works it out. It always lasts an hour.
-const brewStrength = times => 1 + view.defs.cauldron.gift_strength * Math.log2(Math.max(1, times));
-const brewCost = (r, times) => Object.fromEntries(Object.entries(r.ingredients).map(([k, v]) => [k, Math.ceil(v * times)]));
+// the city's Cauldron bonuses (buildings, additions, perks, artifacts): ingredients times cost_mult, strength times power_mult
+const brewStrength = times => (1 + view.defs.cauldron.gift_strength * Math.log2(Math.max(1, times))) * ((view.cauldron && view.cauldron.power_mult) || 1);
+const brewCost = (r, times) => Object.fromEntries(Object.entries(r.ingredients).map(([k, v]) => [k, Math.ceil(v * times * ((view.cauldron && view.cauldron.cost_mult) || 1))]));
 // The biggest amount of this recipe the city could put in for one hour now (at least 1).
 const brewMost = r => Math.max(1, Math.floor(Math.min(...Object.entries(r.ingredients).map(([k, v]) => (view.state.resources[k] || 0) / v)) * 100) / 100);
 // How many hours the stores would keep this going (not counting what comes in meanwhile).

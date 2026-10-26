@@ -39,9 +39,10 @@ GRADES = [(100, "S"), (90, "A"), (75, "B"), (50, "C"), (25, "D"), (10, "E"), (0,
 # What each buff is worth at its full value (100 in its stat and in Purity), by ideology.describe's keys.
 FULL = {"speed": 0.15, "speed_all": 0.06, "explore_speed": 0.25, "explore_cost": 0.15, "wildlife_speed": 0.4,
         "attracts": 1.0, "housing": 20, "power": 0.15, "beast_xp": 0.4, "beast_power": 0.25, "hatch_speed": 0.4,
-        "egg_chance": 0.06, "mission_speed": 0.25, "night_shelter": 0.25, "weather_shelter": 0.25}
+        "egg_chance": 0.06, "mission_speed": 0.25, "night_shelter": 0.25, "weather_shelter": 0.25,
+        "cauldron_power": 0.3, "cauldron_cost": 0.3}
 
-# Five artifacts per ideology. buffs: [first (Potency), second (Resonance)], each a buff key, or "speed:<category>".
+# Five artifacts per ideology, and a sixth for the Cauldron. buffs: [first (Potency), second (Resonance)], each a buff key, or "speed:<category>".
 ARTIFACTS = {
     # ---- The Old Faith ----
     "reliquary_of_dawn": {"name": "Reliquary of Dawn", "ideology": "faith", "buffs": ["speed:knowledge", "night_shelter"],
@@ -109,6 +110,19 @@ ARTIFACTS = {
                     "cost": {"wood": 60, "food": 100}, "desc": "Long enough for the whole city, beasts included."},
     "guild_charter": {"name": "Guild Charter", "ideology": "community", "buffs": ["speed:materials", "housing"],
                       "cost": {"knowledge": 20, "gold": 40, "wood": 30}, "desc": "Signed by every guild in the city, and kept by all."},
+    # ---- one more for each ideology: for the Cauldron ----
+    "anointed_ladle": {"name": "Anointed Ladle", "ideology": "faith", "buffs": ["cauldron_power", "cauldron_cost"],
+                       "cost": {"gold": 60, "food": 120, "knowledge": 30}, "desc": "Blessed at the altar: what it stirs is stronger, and goes further."},
+    "precision_still": {"name": "Precision Still", "ideology": "progress", "buffs": ["cauldron_cost", "speed:materials"],
+                        "cost": {"tools": 40, "ore": 40, "gold": 30}, "desc": "Not a drop wasted: brews take less, and the workshops hum along."},
+    "merchants_measure": {"name": "Merchant's Measure", "ideology": "commerce", "buffs": ["cauldron_cost", "speed:trade"],
+                          "cost": {"gold": 120, "wood": 40}, "desc": "Weighs every ingredient to the grain, and every coin."},
+    "green_mans_bowl": {"name": "Green Man's Bowl", "ideology": "wild", "buffs": ["cauldron_power", "wildlife_speed"],
+                        "cost": {"wood": 100, "food": 80, "livestock": 1}, "desc": "Carved from a living oak: brews in it run wild and strong."},
+    "travellers_flask": {"name": "Traveller's Flask", "ideology": "wayfarers", "buffs": ["cauldron_power", "explore_speed"],
+                         "cost": {"gold": 60, "stone": 40, "food": 60}, "desc": "Every road's best recipe, carried home in one battered flask."},
+    "hearth_cauldron": {"name": "Hearth Cauldron", "ideology": "community", "buffs": ["cauldron_power", "housing"],
+                        "cost": {"stone": 100, "wood": 60, "food": 60}, "desc": "The pot the whole village cooks in: stronger brews, and room at the fire."},
 }
 
 

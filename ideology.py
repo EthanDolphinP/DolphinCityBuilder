@@ -41,6 +41,7 @@ touch `game` at import time: only inside functions.
 """
 
 import math
+import re
 import random
 
 import game
@@ -566,7 +567,7 @@ def own_effects(state):
     total = {"speed": {}}
     for eff in ([ideo["effects"]] + [ideo["perks"][p]["effects"] for p in state.get("perks", []) if p in ideo["perks"]]
                 + [_scaled(ideo["rituals"][rid]["effects"], r["scale"]) for rid, r in active_rituals(state)]
-                + [quest_effects(state)]):          # the prizes its quests have won
+                + [quest_effects(state), tree_effects(state)]):     # the prizes its quests have won, and its tree
         for key, value in eff.items():
             if key == "speed":
                 for cat, x in value.items():
@@ -836,6 +837,8 @@ def describe(eff):
         "mission_speed": lambda x: f"Beast missions come {pct(x)} more often",
         "night_shelter": lambda x: f"Night slows the city {pct(x)} less",
         "weather_shelter": lambda x: f"Bad weather slows the city {pct(x)} less",
+        "cauldron_power": lambda x: f"Cauldron brews {pct(x)} stronger",
+        "cauldron_cost": lambda x: f"Cauldron brews take {pct(x / (1 + x))} fewer ingredients",
     }
     for key, x in eff.items():
         if key in words and x:
@@ -883,7 +886,7 @@ def view(state):
               "load": {**{cat: round(1 - curse_factor(state, "speed", cat), 3) for cat in game.CATEGORIES},
                        **{k: round(1 - curse_factor(state, k), 3) for k in PENALTY_WORDS}}}
     return {"id": state.get("ideology"), "perks": state.get("perks", []), "points": points(state), "rituals": rituals, "curses": curses,
-            "quests": quest_view(state),
+            "quests": quest_view(state), "tree": tree_view(state),
             "total": describe(own_effects(state)) if chosen(state) else []}
 
 
@@ -1017,3 +1020,182 @@ def quest_view(state):
             "need": quest_need(ideo_id, done), "given": state.get("quests", {}).get("given", {}),
             "prize": describe(quest_reward(ideo_id, done)), "won": describe(quest_effects(state)),
             "growth": QUEST_GROWTH, "reward_growth": QUEST_REWARD_GROWTH}
+
+
+# ---- the quest tree: perks of each ideology's own, paid for with points from its quests ----
+# Every TREE_EVERY quests done earns a tree point. A tree has two branches. Each starts with a perk anyone may take
+# (up to 3 levels); at level TREE_FORK_AT it forks into two perks of which only ONE may ever be taken (3 levels);
+# each of those leads on to its own final perk (2 levels), open once the one before it is at its highest. A level
+# costs 1 point (2 for a final perk). Nothing taken can be given back: where a fork leads is the choice.
+TREE_EVERY = 2
+TREE_FORK_AT = 2
+TREE_LEVELS = {"root": 3, "fork": 3, "cap": 2}
+TREE_COST = {"root": 1, "fork": 1, "cap": 2}
+_c = lambda cat, x: {"speed": {cat: x}}
+TREES = {      # (name, [(branch name, (root name, per level), [((fork name, per level), (final name, per level)) x2])])
+    "faith": ("The Pilgrim's Way", [
+        ("Harvest Rites", ("Blessed Fields", _c("food", 0.03)),
+         [(("Feast Days", {"housing": 4}), ("Endless Bounty", _c("all", 0.02))),
+          (("Sacred Herbs", {"cauldron_cost": 0.05}), ("Holy Brews", {"cauldron_power": 0.12}))]),
+        ("Temple Lore", ("Scriptoria", _c("knowledge", 0.03)),
+         [(("Night Vigils", {"night_shelter": 0.05}), ("Eternal Flame", _c("all", 0.02))),
+          (("Relic Keepers", {"beast_xp": 0.05}), ("Divine Favour", {"beast_power": 0.05}))]),
+    ]),
+    "progress": ("The Engine of Ages", [
+        ("Industry", ("Standard Parts", _c("materials", 0.03)),
+         [(("Power Grid", {"power": 0.04}), ("Perpetual Motion", {"power": 0.08})),
+          (("Mass Production", _c("trade", 0.03)), ("Global Exports", _c("trade", 0.05)))]),
+        ("Science", ("Laboratories", _c("knowledge", 0.03)),
+         [(("Chemistry", {"cauldron_power": 0.08}), ("Elixir Science", {"cauldron_cost": 0.1, "cauldron_power": 0.05})),
+          (("Field Surveys", {"explore_speed": 0.05}), ("Grand Atlas", {"explore_cost": 0.05}))]),
+    ]),
+    "commerce": ("The Golden Ledger", [
+        ("Markets", ("Market Days", _c("trade", 0.03)),
+         [(("Guild Halls", _c("materials", 0.03)), ("Monopolies", _c("all", 0.02))),
+          (("Caravans", {"explore_cost": 0.04}), ("Silk Roads", {"explore_speed": 0.06}))]),
+        ("Luxuries", ("Spice Trade", {"cauldron_cost": 0.05}),
+         [(("Perfumers", {"cauldron_power": 0.08}), ("Elixir Empire", {"cauldron_power": 0.15})),
+          (("Grand Hotels", {"housing": 4}), ("Tourism Boom", {"attracts": 1}))]),
+    ]),
+    "wild": ("The Green Road", [
+        ("Beasts", ("Beast Bonds", {"beast_xp": 0.05}),
+         [(("Pack Leaders", {"beast_power": 0.04}), ("Alpha", {"beast_power": 0.08})),
+          (("Nesting Grounds", {"egg_chance": 0.01}), ("Brood Mother", {"hatch_speed": 0.15}))]),
+        ("Forest", ("Forest Kin", _c("food", 0.03)),
+         [(("Wild Herbs", {"cauldron_cost": 0.05}), ("Witch's Brew", {"cauldron_power": 0.15})),
+          (("Herd Calls", {"wildlife_speed": 0.08}), ("Great Migration", {"wildlife_speed": 0.12, "mission_speed": 0.05}))]),
+    ]),
+    "wayfarers": ("The Endless Road", [
+        ("Expeditions", ("Seasoned Guides", {"explore_speed": 0.04}),
+         [(("Light Packs", {"explore_cost": 0.04}), ("Masters of the Map", {"explore_speed": 0.08})),
+          (("Treasure Hunters", {"egg_chance": 0.01}), ("Lost Hoards", _c("trade", 0.05)))]),
+        ("Hospitality", ("Roadside Inns", {"housing": 4}),
+         [(("Travellers' Tales", _c("knowledge", 0.03)), ("Grand Library", _c("knowledge", 0.05))),
+          (("Brewmasters", {"cauldron_power": 0.08}), ("Traveller's Draught", {"cauldron_cost": 0.1}))]),
+    ]),
+    "community": ("The Common Hearth", [
+        ("Homes", ("Barn Raising", {"housing": 5}),
+         [(("Welcome Feasts", {"attracts": 1}), ("Thriving Town", _c("all", 0.02))),
+          (("Shared Larders", _c("food", 0.04)), ("Community Kitchens", {"cauldron_cost": 0.1}))]),
+        ("Craft", ("Guild Work", _c("materials", 0.03)),
+         [(("Apprenticeships", _c("knowledge", 0.03)), ("Master Craft", _c("materials", 0.05))),
+          (("Harvest Festivals", {"cauldron_power": 0.08}), ("Festival Brews", {"cauldron_power": 0.15}))]),
+    ]),
+}
+
+
+def _slug(text):
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+
+
+def _tree_nodes():
+    """Every node of every tree: id -> {ideology, name, kind, per, branch, fork, parent, sibling, max, cost}."""
+    nodes = {}
+    for ideo_id, (_, branches) in TREES.items():
+        for b, (bname, (rname, rper), forks) in enumerate(branches):
+            rid = f"{ideo_id}.{_slug(rname)}"
+            nodes[rid] = {"ideology": ideo_id, "name": rname, "kind": "root", "per": rper, "branch": b, "fork": None, "parent": None, "sibling": None}
+            fids = [f"{ideo_id}.{_slug(f[0][0])}" for f in forks]
+            for k, ((fname, fper), (cname, cper)) in enumerate(forks):
+                cid = f"{ideo_id}.{_slug(cname)}"
+                nodes[fids[k]] = {"ideology": ideo_id, "name": fname, "kind": "fork", "per": fper, "branch": b, "fork": k,
+                                  "parent": rid, "sibling": fids[1 - k]}
+                nodes[cid] = {"ideology": ideo_id, "name": cname, "kind": "cap", "per": cper, "branch": b, "fork": k,
+                              "parent": fids[k], "sibling": None}
+    for n in nodes.values():
+        n["max"], n["cost"] = TREE_LEVELS[n["kind"]], TREE_COST[n["kind"]]
+    return nodes
+
+
+TREE_NODES = _tree_nodes()
+
+
+def tree_levels(state):
+    return state.get("quest_tree", {})
+
+
+def tree_points(state):
+    """Points left to spend: one for every TREE_EVERY quests done, less what the levels taken cost."""
+    spent = sum(TREE_NODES[n]["cost"] * lvl for n, lvl in tree_levels(state).items() if n in TREE_NODES)
+    return quests_done(state) // TREE_EVERY - spent
+
+
+def tree_problem(state, node_id):
+    """Why the next level of this node can't be taken, or None."""
+    node = TREE_NODES.get(node_id)
+    if not node or node["ideology"] != state.get("ideology"):
+        return "Not a perk of your ideology's tree."
+    levels = tree_levels(state)
+    level = levels.get(node_id, 0)
+    if level >= node["max"]:
+        return "At its highest level."
+    if node["kind"] == "fork":
+        if levels.get(node["sibling"], 0):
+            return f"You chose {TREE_NODES[node['sibling']]['name']} instead."
+        if levels.get(node["parent"], 0) < TREE_FORK_AT:
+            return f"Needs {TREE_NODES[node['parent']]['name']} at level {TREE_FORK_AT}."
+    if node["kind"] == "cap" and levels.get(node["parent"], 0) < TREE_NODES[node["parent"]]["max"]:
+        parent = TREE_NODES[node["parent"]]
+        return f"Needs {parent['name']} at level {parent['max']}."
+    if tree_points(state) < node["cost"]:
+        return f"Needs {node['cost']} tree {'point' if node['cost'] == 1 else 'points'}."
+    return None
+
+
+def tree_take(state, now, node_id):
+    problem = tree_problem(state, node_id)
+    if problem:
+        return problem
+    levels = state.setdefault("quest_tree", {})
+    levels[node_id] = levels.get(node_id, 0) + 1
+    node = TREE_NODES[node_id]
+    game.log(state, now, f"{TREES[node['ideology']][0]}: {node['name']} is now level {levels[node_id]} "
+                         f"({', '.join(describe(_scaled(node['per'], levels[node_id])))}).")
+    return None
+
+
+_TREE_TOTALS = {}
+
+
+def tree_effects(state):
+    """Everything the tree's perks give, added up (worked out once for each set of levels)."""
+    levels = tree_levels(state)
+    if not levels:
+        return {}
+    key = tuple(sorted(levels.items()))
+    if key not in _TREE_TOTALS:
+        total = {"speed": {}}
+        for n, lvl in levels.items():
+            if n not in TREE_NODES or not lvl:
+                continue
+            for k, v in _scaled(TREE_NODES[n]["per"], lvl).items():
+                if k == "speed":
+                    for cat, x in v.items():
+                        total["speed"][cat] = total["speed"].get(cat, 0) + x
+                else:
+                    total[k] = total.get(k, 0) + v
+        _TREE_TOTALS[key] = total
+    return _TREE_TOTALS[key]
+
+
+def tree_view(state):
+    ideo_id = state.get("ideology")
+    if ideo_id not in TREES:
+        return None
+    name, branches = TREES[ideo_id]
+    levels = tree_levels(state)
+
+    def card(node_id):
+        n = TREE_NODES[node_id]
+        lvl = levels.get(node_id, 0)
+        return {"id": node_id, "name": n["name"], "kind": n["kind"], "level": lvl, "max": n["max"], "cost": n["cost"],
+                "per": describe(_scaled(n["per"], 1)), "now": describe(_scaled(n["per"], lvl)) if lvl else [],
+                "problem": tree_problem(state, node_id), "not_chosen": n["kind"] != "root" and bool(
+                    levels.get(n["sibling"] if n["kind"] == "fork" else TREE_NODES[n["parent"]]["sibling"], 0))}
+    out = []
+    for b, (bname, (rname, _), forks) in enumerate(branches):
+        rid = f"{ideo_id}.{_slug(rname)}"
+        out.append({"name": bname, "root": card(rid),
+                    "forks": [{"fork": card(f"{ideo_id}.{_slug(f[0][0])}"), "cap": card(f"{ideo_id}.{_slug(f[1][0])}")} for f in forks]})
+    return {"name": name, "points": tree_points(state), "every": TREE_EVERY, "fork_at": TREE_FORK_AT,
+            "branches": out, "total": describe(tree_effects(state)), "done": quests_done(state)}
