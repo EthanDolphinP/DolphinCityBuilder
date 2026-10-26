@@ -3183,6 +3183,8 @@ function placeProblem(area, x, y, bid) {
   if (b.tech > state.tech) return `requires ${defs.tech[b.tech].name} tech`;
   if (b.research && !state.research.includes(b.research)) return `requires research: ${R[b.research].name}`;
   if (b.unique && buildingCount(bid)) return 'a city can only have one';
+  if (b.ideology && b.ideology !== view.ideology.id) return `only for cities of ${defs.ideologies[b.ideology].name}`;
+  if (b.quests && ((view.ideology.quests || {}).done || 0) < b.quests) return `needs ${b.quests} ${((view.ideology.quests || {}).plural || 'quests').toLowerCase()} done`;
   if (!b.terrain.includes(tile.terrain)) return 'needs ' + b.terrain.map(terrainLabel).join(' or ');   // exact terrains only
   const lock = defs.terrains[tile.terrain].research;
   if (lock && !state.research.includes(lock)) return `this land can't be used until you research ${R[lock].name}`;
@@ -4350,6 +4352,7 @@ function renderIdeology() {
                                               : iv.rituals.rank ? `${iv.rituals.rank} of 5 open` : 'need research'],
                   artifacts: ['Artifacts', `${(view.artifacts.shrine || []).length} of ${view.defs.artifacts.slots} enshrined`],
                   ...(iv.quests ? { quests: [iv.quests.plural, `${iv.quests.done} done`] } : {}),
+                  ...(view.wonders && view.wonders.list.length ? { wonders: ['Wonders', `${view.wonders.list.reduce((n, r) => n + r.count, 0)} built`] } : {}),
                   compare: ['Compare all six', ''], all: ['Everything', ''] };
   if (!parts[ideoView]) ideoView = 'mine';
   const show = part => ideoView === 'all' || ideoView === part;
@@ -4403,7 +4406,7 @@ function renderIdeology() {
 
   setHTMLKeep(box, header + (show('mine') ? mine : '') + (show('rituals') ? ritualPanel(i, iv, own) : '') +
     (show('curses') ? cursedPanel(iv) + cursePanel(i, iv, own) : (iv.curses.on_me.length && show('mine') ? cursedPanel(iv) : '')) +
-    (show('perks') ? perkPanel : '') + (show('quests') ? questPanel(i, iv, own) : '') + (show('artifacts') ? artifactPanel(i, iv, own) : '') +
+    (show('perks') ? perkPanel : '') + (show('quests') ? questPanel(i, iv, own) : '') + (show('wonders') ? wonderPanel(i, iv, own) : '') + (show('artifacts') ? artifactPanel(i, iv, own) : '') +
     (show('compare') ? compare : ''));
 }
 // ---- the quest tree, in the Perks part of the Ideology tab ----
@@ -4441,6 +4444,26 @@ function treePanel(i, iv, own) {
     (tr.endless ? `<div class="qbranch"><h3>Beyond both branches</h3>` +
       `<p class="dim small" style="margin-top:0">Opens once the first perk of <span class="hi">both</span> branches is at its highest. ` +
       `It has no top level: level it as long as you keep earning tree points.</p>${treeNode(tr.endless, own)}</div>` : '') + `</div>`;
+}
+function wonderPanel(i, iv, own) {
+  const w = view.wonders, C = view.defs.categories, T = view.defs.tech, pct = x => `${Math.round(x * 1000) / 10}%`;
+  if (!w || !w.list.length) return '';
+  const name = c => c === 'all' ? 'All buildings' : `${C[c]} buildings`;
+  const said = (eff, s) => [...Object.entries(eff.speed || {}).map(([c, x]) => `${name(c)} ${pct(x * s)} faster`),
+                            ...Object.entries(eff.yield || {}).map(([c, x]) => `${name(c)} make ${pct(x * s)} more`)];
+  const total = said(w, 1);
+  return `<div class="panel" style="--ideo:${esc(i.color)}"><h2>Wonders</h2>` +
+    `<p class="dim small" style="margin-top:0">Wonders are ${esc(i.name)}'s own great buildings, built on the map like any other (they have a section of their own in the build menu). ` +
+    `Each opens at a tech level and a number of ${esc((iv.quests ? iv.quests.plural : 'quests').toLowerCase())} done. Most make nothing themselves: they make your other buildings faster and give more each cycle. ` +
+    `They are very dear, and <span class="hi">each copy of the same wonder gives ${Math.round((1 - w.decay) * 100)}% less than the one before</span> (never nothing). ` +
+    `Your city's other bonuses don't make wonders any better.</p>` +
+    `<p>Your wonders give now: ${total.length ? `<span class="good">${total.map(esc).join(', ')}</span>` : '<span class="dim">nothing yet</span>'}</p>` +
+    `<div class="scroll"><table><tr><th>Wonder</th><th>Opens at</th><th>Built</th><th>Gives now</th><th>The next one adds</th><th>Costs</th></tr>` +
+    w.list.map(r => `<tr><td class="hi">${esc(r.name)}</td>` +
+      `<td class="${r.open ? 'good' : 'dim'}">${esc(T[r.tech].name)}, ${r.quests} done${r.open ? '' : ` <span class="small">(${w.done} so far)</span>`}</td>` +
+      `<td class="n">${r.count}</td><td class="small">${r.count ? said(r.wonder, r.now).map(esc).join(', ') : '<span class="dim">-</span>'}</td>` +
+      `<td class="small good">${said(r.wonder, r.next).map(esc).join(', ')}</td><td class="small">${plain(r.cost)}</td></tr>`).join('') +
+    `</table></div></div>`;
 }
 // ---- quests: the ideology's own kind, paid in resources, every one dearer than the last, each won for good ----
 function questPanel(i, iv, own) {

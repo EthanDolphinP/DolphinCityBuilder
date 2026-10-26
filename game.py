@@ -348,6 +348,7 @@ CATEGORIES = {
     "knowledge": "Knowledge",
     "power": "Power",
     "support": "Support",
+    "wonder": "Wonders",
 }
 
 # Building fields (all optional except name/glyph/tech/terrain/cost):
@@ -1532,6 +1533,151 @@ BUILDINGS = {
         "terrain": ["plains", "desert", "hill"], "cost": {"stone": 500, "tools": 250, "electronics": 100, "gold": 800},
         "cauldron_power": 0.3,
         "desc": "Towers of glass coils that wring every last drop of power from a brew: Cauldron brews are much stronger. A city can have one.",
+    },
+    # ---- wonders: one set for each ideology, opened at big milestones (see WONDER_* below) ----
+    "shrine_of_plenty": {
+        "name": "Shrine of Plenty", "glyph": "\u0411", "tech": 2, "category": "wonder", "ideology": "faith", "quests": 2,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 4000, "gold": 4000, "knowledge": 3000},
+        "wonder": {"speed": {"food": 0.08}, "yield": {}},
+        "desc": "Offerings laid before every harvest: food buildings 8% faster. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "great_cathedral": {
+        "name": "Great Cathedral", "glyph": "\u0413", "tech": 3, "category": "wonder", "ideology": "faith", "quests": 5,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 15000, "tools": 6000, "gold": 20000, "knowledge": 15000}, "workers": 2, "time": 30 * MIN, "produces": {"knowledge": 40},
+        "wonder": {"speed": {}, "yield": {"knowledge": 0.08}},
+        "desc": "Monks copy and teach day and night: knowledge buildings make 8% more. It also makes 40 Knowledge every 30 minutes. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "pilgrims_basilica": {
+        "name": "Pilgrims' Basilica", "glyph": "\u0414", "tech": 4, "category": "wonder", "ideology": "faith", "quests": 8,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 60000, "tools": 30000, "gold": 90000, "knowledge": 60000},
+        "wonder": {"speed": {"trade": 0.1}, "yield": {"trade": 0.1}},
+        "desc": "Pilgrims from every land come to buy and pray: trade buildings 10% faster and trade buildings make 10% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "celestial_temple": {
+        "name": "Celestial Temple", "glyph": "\u0416", "tech": 5, "category": "wonder", "ideology": "faith", "quests": 12,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
+        "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
+        "desc": "A temple whose spire is said to touch the heavens: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "patent_office": {
+        "name": "Patent Office", "glyph": "\u0417", "tech": 2, "category": "wonder", "ideology": "progress", "quests": 2,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 4000, "gold": 4000, "knowledge": 3000},
+        "wonder": {"speed": {"knowledge": 0.08}, "yield": {}},
+        "desc": "Every new idea written down and protected: knowledge buildings 8% faster. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "grand_exhibition": {
+        "name": "Grand Exhibition Hall", "glyph": "\u0418", "tech": 3, "category": "wonder", "ideology": "progress", "quests": 5,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 15000, "tools": 6000, "gold": 20000, "knowledge": 15000}, "workers": 2, "time": 30 * MIN, "produces": {"tools": 20},
+        "wonder": {"speed": {}, "yield": {"materials": 0.08}},
+        "desc": "The newest machines shown off to the world: materials buildings make 8% more. It also makes 20 Tools every 30 minutes. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "industrial_exchange": {
+        "name": "Industrial Exchange", "glyph": "\u041b", "tech": 4, "category": "wonder", "ideology": "progress", "quests": 8,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 60000, "tools": 30000, "gold": 90000, "knowledge": 60000},
+        "wonder": {"speed": {"materials": 0.1}, "yield": {"materials": 0.1}},
+        "desc": "Where factories trade parts, power and know-how: materials buildings 10% faster and materials buildings make 10% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "world_science_forum": {
+        "name": "World Science Forum", "glyph": "\u041f", "tech": 5, "category": "wonder", "ideology": "progress", "quests": 12,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
+        "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
+        "desc": "The greatest minds of the age under one roof: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "merchants_guildhall": {
+        "name": "Merchants' Guildhall", "glyph": "\u0424", "tech": 2, "category": "wonder", "ideology": "commerce", "quests": 2,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 4000, "gold": 4000, "knowledge": 3000}, "workers": 2, "time": 30 * MIN, "produces": {"gold": 60},
+        "wonder": {"speed": {"trade": 0.08}, "yield": {}},
+        "desc": "The guilds set fair prices and settle every quarrel: trade buildings 8% faster. It also makes 60 Gold every 30 minutes. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "royal_mint": {
+        "name": "Royal Mint", "glyph": "\u0426", "tech": 3, "category": "wonder", "ideology": "commerce", "quests": 5,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 15000, "tools": 6000, "gold": 20000, "knowledge": 15000},
+        "wonder": {"speed": {}, "yield": {"trade": 0.08}},
+        "desc": "Coins everyone trusts, struck by the million: trade buildings make 8% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "stock_exchange": {
+        "name": "Stock Exchange", "glyph": "\u0427", "tech": 4, "category": "wonder", "ideology": "commerce", "quests": 8,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 60000, "tools": 30000, "gold": 90000, "knowledge": 60000},
+        "wonder": {"speed": {"materials": 0.1}, "yield": {"trade": 0.1}},
+        "desc": "Money flows to whatever works best: materials buildings 10% faster and trade buildings make 10% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "world_trade_centre": {
+        "name": "World Trade Centre", "glyph": "\u0428", "tech": 5, "category": "wonder", "ideology": "commerce", "quests": 12,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
+        "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
+        "desc": "Twin towers of glass where the world's deals are made: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "standing_stones": {
+        "name": "Standing Stones", "glyph": "\u0429", "tech": 2, "category": "wonder", "ideology": "wild", "quests": 2,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 4000, "gold": 4000, "knowledge": 3000},
+        "wonder": {"speed": {"food": 0.08}, "yield": {}},
+        "desc": "An old circle where the seasons are kept: food buildings 8% faster. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "great_menagerie": {
+        "name": "Great Menagerie", "glyph": "\u042d", "tech": 3, "category": "wonder", "ideology": "wild", "quests": 5,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 15000, "tools": 6000, "gold": 20000, "knowledge": 15000}, "workers": 2, "time": 30 * MIN, "produces": {"livestock": 1},
+        "wonder": {"speed": {}, "yield": {"food": 0.08}},
+        "desc": "Every kind of beast cared for, and some bred: food buildings make 8% more. It also makes 1 Livestock every 30 minutes. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "heart_of_the_forest": {
+        "name": "Heart of the Forest", "glyph": "\u042e", "tech": 4, "category": "wonder", "ideology": "wild", "quests": 8,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 60000, "tools": 30000, "gold": 90000, "knowledge": 60000},
+        "wonder": {"speed": {"materials": 0.1}, "yield": {"food": 0.1}},
+        "desc": "A glade where the land gives freely to those who ask: materials buildings 10% faster and food buildings make 10% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "gaia_sanctum": {
+        "name": "Gaia Sanctum", "glyph": "\u042f", "tech": 5, "category": "wonder", "ideology": "wild", "quests": 12,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
+        "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
+        "desc": "Where the city and the wild are one: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "waystone_circle": {
+        "name": "Waystone Circle", "glyph": "\u0496", "tech": 2, "category": "wonder", "ideology": "wayfarers", "quests": 2,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 4000, "gold": 4000, "knowledge": 3000},
+        "wonder": {"speed": {"trade": 0.08}, "yield": {}},
+        "desc": "Marked stones that guide every traveller home: trade buildings 8% faster. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "grand_caravan_hall": {
+        "name": "Grand Caravan Hall", "glyph": "\u049a", "tech": 3, "category": "wonder", "ideology": "wayfarers", "quests": 5,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 15000, "tools": 6000, "gold": 20000, "knowledge": 15000}, "workers": 2, "time": 30 * MIN, "produces": {"gold": 50},
+        "wonder": {"speed": {}, "yield": {"trade": 0.08}},
+        "desc": "Caravans from a hundred roads rest and trade here: trade buildings make 8% more. It also makes 50 Gold every 30 minutes. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "cartographers_spire": {
+        "name": "Cartographers' Spire", "glyph": "\u04a2", "tech": 4, "category": "wonder", "ideology": "wayfarers", "quests": 8,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 60000, "tools": 30000, "gold": 90000, "knowledge": 60000},
+        "wonder": {"speed": {"knowledge": 0.1}, "yield": {"knowledge": 0.1}},
+        "desc": "Maps of every land ever walked: knowledge buildings 10% faster and knowledge buildings make 10% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "gate_of_all_roads": {
+        "name": "Gate of All Roads", "glyph": "\u04b0", "tech": 5, "category": "wonder", "ideology": "wayfarers", "quests": 12,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
+        "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
+        "desc": "A great arch that every road in the world leads to: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "common_hall": {
+        "name": "Common Hall", "glyph": "\u04ae", "tech": 2, "category": "wonder", "ideology": "community", "quests": 2,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 4000, "gold": 4000, "knowledge": 3000},
+        "wonder": {"speed": {"food": 0.08}, "yield": {}},
+        "desc": "Where neighbours meet, share and plan: food buildings 8% faster. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "builders_guild": {
+        "name": "Builders' Guild", "glyph": "\u04ba", "tech": 3, "category": "wonder", "ideology": "community", "quests": 5,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 15000, "tools": 6000, "gold": 20000, "knowledge": 15000}, "workers": 2, "time": 30 * MIN, "produces": {"stone": 60},
+        "wonder": {"speed": {}, "yield": {"materials": 0.08}},
+        "desc": "Every wall raised by many hands: materials buildings make 8% more. It also makes 60 Stone every 30 minutes. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "peoples_forum": {
+        "name": "People's Forum", "glyph": "\u04d8", "tech": 4, "category": "wonder", "ideology": "community", "quests": 8,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 60000, "tools": 30000, "gold": 90000, "knowledge": 60000},
+        "wonder": {"speed": {"knowledge": 0.1}, "yield": {"food": 0.1}},
+        "desc": "Everyone has a say, and good ideas spread fast: knowledge buildings 10% faster and food buildings make 10% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    "grand_commons": {
+        "name": "Grand Commons", "glyph": "\u04e8", "tech": 5, "category": "wonder", "ideology": "community", "quests": 12,
+        "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
+        "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
+        "desc": "A city that works as one: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
     },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
@@ -4476,6 +4622,15 @@ def tile_cycle(state, area, x, y, bid):
     if b.get("livestock_speed"):
         herd = int(state["resources"]["livestock"])
         factors.append((max(0.2, min(2.0, herd / LIVESTOCK_FOR_FULL_SPEED)), f"{herd} livestock owned"))
+    if b.get("category") == "wonder":       # wonders take no part in the city's other bonuses
+        speed = 1.0
+        for factor, _ in factors:
+            speed *= factor
+        return round(b["time"] / speed), [f"{label} x{factor:.2f}" for factor, label in factors]
+    # The city's wonders.
+    built = wonder_bonus(state, b.get("category"), "speed")
+    if built:
+        factors.append((1 + built, "Wonders"))
     # The city's active beast.
     favour = beasts.speed_bonus(state, b.get("category"))
     if favour:
@@ -4541,6 +4696,10 @@ def placement_problem(state, area, x, y, bid):
         return f"requires research: {RESEARCH[b['research']]['name']}"
     if b.get("unique") and has_building(state, bid):
         return "a city can only have one"
+    if b.get("ideology") and b["ideology"] != state.get("ideology"):
+        return f"only for cities of {ideology.IDEOLOGIES[b['ideology']]['name']}"
+    if b.get("quests") and ideology.quests_done(state) < b["quests"]:
+        return f"needs {b['quests']} {ideology.IDEOLOGIES[b['ideology']]['quest_plural'].lower()} done"
     if tile["terrain"] not in b["terrain"]:      # exact terrains only (see LANDS)
         return "needs " + " or ".join(terrain_label(t) for t in b["terrain"])
     lock = TERRAINS[tile["terrain"]].get("research")
@@ -4662,7 +4821,7 @@ def _work_plan(state):
                     "area": ai, "x": x, "y": y, "tile": tile, "b": b,
                     "cycle": cycle,             # None for a generator that needs no fuel
                     "notes": notes, "need": need, "priority": tile.get("priority", 0),
-                    "produces": tile_output(tile),
+                    "produces": _with_wonders(state, b, tile_output(tile)),
                     "feeds": "food" in b.get("produces", {}) or "food" in b.get("per_head", {}),
                     "herd": tile_stat(tile, "herd"),
                     "herd_before": herd_room,   # pasture room in the buildings ahead of this one
@@ -4671,6 +4830,12 @@ def _work_plan(state):
                 })
                 herd_room += tile_stat(tile, "herd")
     return jobs, housing, _staff(jobs, state["population"], herd_room)
+
+
+def _with_wonders(state, b, out):
+    """What a building makes each cycle once the city's wonders have added theirs."""
+    more = wonder_bonus(state, b.get("category"), "yield")
+    return {k: round(v * (1 + more), 2) for k, v in out.items()} if more else out
 
 
 def _staff(jobs, free, herd_room):
@@ -4871,10 +5036,78 @@ def _tile_totals(state):
             continue
         for f, v in _numbers("b", t["building"]).items():
             out[f] = out.get(f, 0) + v
+        if BUILDINGS[t["building"]].get("category") == "wonder":
+            out["#" + t["building"]] = out.get("#" + t["building"], 0) + 1
         for aid in t["additions"]:
             for f, v in _numbers("a", aid).items():
                 out[f] = out.get(f, 0) + v
     return out
+
+
+# ---- wonders ----
+# Buildings of an ideology's own, opened at big milestones (a tech level and a number of its quests done), and very
+# dear. Most make nothing: they make the city's other buildings faster ("speed") and give more each cycle
+# ("yield"), by building category ("all" for every one). The same wonder built again counts for less each time:
+# the n-th copy gives WONDER_DECAY ** (n - 1) of the first's bonus, so never nothing. Wonders take no part in
+# most of the city's bonuses themselves (ideology, beasts, brews, artifacts, research, training).
+WONDER_DECAY = 0.85
+_WONDER_MEMO = {}
+
+
+def wonder_counts(state):
+    """{wonder id: how many the city has}, for the wonders of the city's own ideology (others do nothing)."""
+    ideo = state.get("ideology")
+    totals = _STAT_CACHE.get((id(state), None)) if _STAT_CACHE is not None else None
+    if totals is None:
+        totals = _tile_totals(state) if _STAT_CACHE is None else _STAT_CACHE.setdefault((id(state), None), _tile_totals(state))
+    return {bid: int(totals.get("#" + bid, 0)) for bid, b in BUILDINGS.items()
+            if b.get("category") == "wonder" and b.get("ideology") == ideo and totals.get("#" + bid)}
+
+
+def wonder_share(n):
+    """What n copies of one wonder give, in first copies: 1 + d + d^2 + ..."""
+    return sum(WONDER_DECAY ** k for k in range(n))
+
+
+def wonder_effects(state):
+    """{"speed": {category: x}, "yield": {category: x}} from all the city's wonders."""
+    counts = wonder_counts(state)
+    key = tuple(sorted(counts.items()))
+    if key not in _WONDER_MEMO:
+        out = {"speed": {}, "yield": {}}
+        for bid, n in counts.items():
+            share = wonder_share(n)
+            for kind in ("speed", "yield"):
+                for cat, x in BUILDINGS[bid]["wonder"].get(kind, {}).items():
+                    out[kind][cat] = out[kind].get(cat, 0) + x * share
+        if len(_WONDER_MEMO) > 5000:
+            _WONDER_MEMO.clear()
+        _WONDER_MEMO[key] = out
+    return _WONDER_MEMO[key]
+
+
+def wonder_bonus(state, category, kind):
+    if category == "wonder":
+        return 0.0
+    eff = wonder_effects(state)[kind]
+    return eff.get(category, 0) + eff.get("all", 0)
+
+
+def wonder_view(state):
+    ideo = state.get("ideology")
+    counts = wonder_counts(state)
+    done = ideology.quests_done(state)
+    rows = []
+    for bid, b in BUILDINGS.items():
+        if b.get("category") != "wonder" or b.get("ideology") != ideo:
+            continue
+        n = counts.get(bid, 0)
+        rows.append({"id": bid, "name": b["name"], "tech": b["tech"], "quests": b["quests"], "count": n,
+                     "open": state["tech"] >= b["tech"] and done >= b["quests"],
+                     "now": round(wonder_share(n), 3), "next": round(WONDER_DECAY ** n, 3), "wonder": b["wonder"], "cost": b["cost"]})
+    eff = wonder_effects(state)
+    return {"list": rows, "decay": WONDER_DECAY, "done": done, "speed": eff["speed"], "yield": eff["yield"]}
+
 
 
 def city_attracts(state, when=None):
@@ -5904,6 +6137,7 @@ def _view(state, ai, detail):
         "cauldron": cauldron.view(state),
         "artifacts": artifacts.view(state),
         "mastery": mastery_view(state),
+        "wonders": wonder_view(state),
         "training": training_view(state),
         "reports": state["reports"],
         "explore": {
