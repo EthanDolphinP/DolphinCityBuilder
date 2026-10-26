@@ -4873,6 +4873,37 @@ def job_output(state, job):
     return out
 
 
+def output_notes(state, job):
+    """What sets how much this building makes each cycle, step by step (the same steps as job_output and
+    _with_wonders): for the tile panel, like the notes on its speed."""
+    tile, b = job["tile"], job["b"]
+    goods = lambda out: ", ".join(f"+{_num(v)} {RESOURCES[k]}" for k, v in out.items() if v)
+    notes = []
+    if b.get("produces"):
+        notes.append(f"{b['name']}: {goods(b['produces'])}")
+    for aid in tile["additions"]:
+        if ADDITIONS[aid].get("produces"):
+            notes.append(f"{ADDITIONS[aid]['name']} (addition): {goods(ADDITIONS[aid]['produces'])}")
+    more = wonder_bonus(state, b.get("category"), "yield")
+    if more:
+        notes.append(f"Wonders: x{1 + more:.2f} ({goods(job['produces'])} in all)")
+    if "herd" in b:
+        herd = job_herd(state, job)
+        extra = {k: int(herd * v) for k, v in b.get("per_head", {}).items() if int(herd * v)}
+        notes.append(f"{herd} livestock kept here: {goods(extra) or 'nothing yet'}")
+        if herd >= 2 and state["resources"]["livestock"] < job["herd_room"] and _researched(state, "breeding"):
+            notes.append("The herd breeds: +1 Livestock")
+    if state.get("mastery"):
+        for k in job_output(state, job):
+            if mastery_bonus(state, k):
+                notes.append(f"Mastery of {RESOURCES[k]}: x{1 + mastery_bonus(state, k):.2f}")
+    return notes
+
+
+def _num(v):
+    return f"{v:,.2f}".rstrip("0").rstrip(".") if isinstance(v, float) else f"{v:,}"
+
+
 def _out_of_inputs(state, job):
     """True if the building has finished a cycle and can't pay for it (e.g. no fuel)."""
     return (job["cycle"] is not None and job["tile"]["progress"] >= job["cycle"]
@@ -6042,7 +6073,7 @@ def _view(state, ai, detail):
                 cell.update(cycle=job["cycle"], notes=job["notes"], speed=job["speed"],
                             staff=job["staff"], need=job["need"], waiting=job["waiting"],
                             priority=job["priority"], status=job["status"],
-                            produces=job["output"],
+                            produces=job["output"], output_notes=output_notes(state, job),
                             power_in=job["power_in"], power_out=round(job["power_out"] * job.get("power_env", 1), 1))
                 if "herd" in job["b"]:
                     cell["herd"], cell["herd_room"] = job_herd(state, job), job["herd"]

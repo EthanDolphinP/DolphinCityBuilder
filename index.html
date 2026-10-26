@@ -3290,7 +3290,8 @@ function renderTile() {
         const button = `<button data-priority="${p}" aria-pressed="${info.priority === p}" class="${info.priority === p ? 'on' : ''}">${label}</button>`;
         return p === -1 ? `<span class="staffing-off">${button}<span class="help-tip"><button type="button" aria-label="Staffing help" aria-expanded="false" aria-controls="staffingHelp">?</button><span class="help-popup" id="staffingHelp" hidden><span>First: gets workers before every other building. High: next, before Normal. Normal: whatever is left. Off: gets none.</span></span></span></span>` : button;
       }).join('') + `</div>`;
-    html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) + `</div></details>`;
+    html += fold('speed', 'What changes its speed here', (info.notes || []).map(esc)) +
+      fold('amount', 'What changes how much it makes here', (info.output_notes || []).map(esc)) + `</div></details>`;
 
     // ---- additions ----
     const A = defs.additions;
