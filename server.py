@@ -356,6 +356,9 @@ def flush(names=None):
         names = set(DIRTY)
     for name in set(names):
         if name in CITIES:
+            news = CITIES[name].pop("tags_news", None)      # tags just earned: the rare ones are posted on Discord
+            if news:
+                discord_bot.milestone_tags(name, news)
             _write(SAVES / f"{name}.json", CITIES[name])
             SAVED_AT[name] = CITIES[name]["updated"]
         DIRTY.discard(name)
@@ -437,6 +440,8 @@ def run_bills(now):
     market.tidy(MARKET, now, lambda name: find_city(name, now))
     deliver_presents(now)
     deliver_tags(now)
+    if discord_bot.weekly_due(now):        # Sunday's recap on Discord (the first time, last week's numbers are taken)
+        discord_bot.weekly(leaderboard(now), now)
 
 
 def deliver_presents(now):
@@ -834,12 +839,18 @@ def handle_post(path, data, token, now):
             if action == "ban" and not error:
                 market.drop_proposals(MARKET, target, name)
     else:
-        tech, belief = state["tech"], state.get("ideology")
+        tech, belief, quests = state["tech"], state.get("ideology"), game.ideology.quests_done(state)
         error = game.apply_action(state, now, action, data)
         if not error and state["tech"] > tech:
             discord_bot.announce(f"\U0001F389 **{name}** is now a **{game.TECH_LEVELS[state['tech']]['name']}**!")
         if not error and state.get("ideology") and not belief:
             discord_bot.announce(f"\U0001F54A\uFE0F **{name}** has taken up **{game.ideology.IDEOLOGIES[state['ideology']]['name']}**.")
+        if not error and (state["tech"] > tech or state.get("ideology") != belief):
+            discord_bot.sync_city(name, state)          # the player's Discord roles follow the city
+        if not error and action == "build" and game.BUILDINGS.get(data.get("building"), {}).get("category") == "wonder":
+            discord_bot.milestone_wonder(name, state, data["building"])
+        if not error and game.ideology.quests_done(state) > quests:
+            discord_bot.milestone_quests(name, state, game.ideology.quests_done(state))
     if action == "restart":
         TOUCHED.add(name)
     flush(TOUCHED)

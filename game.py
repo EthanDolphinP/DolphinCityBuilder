@@ -6672,6 +6672,7 @@ def summary(state):
         "beast": max((b["level"] for b in state["beasts"]), default=0),
         "areas": len(state["areas"]),
         "buildings": sum(1 for t in all_tiles(state) if t["building"]),
+        "wonders": sum(1 for t in all_tiles(state) if t["building"] and BUILDINGS[t["building"]].get("category") == "wonder"),
         "resources": {k: int(state["resources"].get(k, 0)) for k in RESOURCES},
         "tags": tags.board(state),
     }

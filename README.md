@@ -293,6 +293,31 @@ someone else use them without making them a server admin, add their Discord
 user ID in `python discord_bot.py setup`. Run `python discord_bot.py register`
 once more so Discord learns about them.
 
+**More, without anyone looking after it:**
+
+- **Milestones** go to the announcements channel by themselves: the first of
+  each wonder built in the game (and every Metropolis or Megacity wonder), every
+  fifth ideology quest a city completes, and the first city to earn each rare
+  tag (and every epic or legendary one).
+- **A weekly recap** is posted every Sunday at 17:00 UTC: new cities, new tech
+  levels, and who grew, researched, built and quested most that week. The game
+  posts it itself. `python discord_bot.py weekly` posts one at once.
+- **Roles that follow the game.** A player who has used `/claim` gets a role for
+  their city's tech level (Village ... Megacity) and one for its ideology, and
+  they change by themselves when the city does. The roles are made if missing.
+  The bot's own role must be above them in the role list. `/syncroles` (admin)
+  brings everyone up to date.
+- **`/claimtag tag:`** (admin): a game tag, such as `alpha`, that everyone gets
+  when they claim their city. `off` stops it.
+- **`/suggest` and `/bug`** turn a title and details into a post in a forum
+  channel, with who sent it, their city and (for bugs) the game's version.
+  Choose the forums once with `/setforum` (admin). The bot needs to see each
+  forum and create posts in it.
+- **`/profile city:`** shows a city's tags, wonders and standing.
+
+Run `python discord_bot.py register` (on the server: `sudo dolphincity discord
+register`) after an update that adds commands.
+
 **"Too Many Requests" (429).** Discord sometimes turns away PythonAnywhere,
 whose accounts share one internet address. The bot waits when Discord says how
 long and tries again; if Discord is blocking the address for a while it says

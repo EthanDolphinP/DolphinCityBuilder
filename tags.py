@@ -131,6 +131,8 @@ def check(state, now):
     if new:
         import game
         book = _book(state)
+        if len(new) <= 3:              # a backlog (the first check after tags came in) is not news
+            state.setdefault("tags_news", []).extend(new)
         for tag_id in new:
             book["have"][tag_id] = now
             game.log(state, now, f"New tag earned: {TAGS[tag_id]['name']} ({TAGS[tag_id]['how'].lower()}). "

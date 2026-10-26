@@ -62,7 +62,7 @@ dolphincity reset-password City        the next person to sign in to City picks 
 dolphincity tag City alpha             give a tag (alpha, beta, founder, developer, moderator, tester,
                                        bug_hunter, supporter, event_winner, or any name in quotes); "all" for every city
 dolphincity untag City alpha           take a tag back
-dolphincity discord setup|register|test|daily   the Discord bot (see README.md, "Discord")
+dolphincity discord setup|register|test|daily|weekly   the Discord bot (see README.md, "Discord")
 dolphincity backup                     save a backup now (one is made every night; 14 are kept)
 dolphincity restore file.tar.gz        replace the game's data with a backup
 dolphincity merge-market file.tar.gz   put the market from a backup back, keeping trades made since

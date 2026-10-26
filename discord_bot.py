@@ -223,6 +223,24 @@ COMMANDS = [
                   "choices": [{"name": "Block", "value": "add"}, {"name": "Unblock", "value": "remove"}]}]},
     {"name": "badnames", "description": "Admin: list city and area names the filter does not allow", "dm_permission": False,
      "default_member_permissions": str(ADMINISTRATOR)},
+    {"name": "profile", "description": "A city's tags, wonders and standing",
+     "options": [{"type": 3, "name": "city", "description": "The city's name", "required": True}]},
+    {"name": "suggest", "description": "Suggest something for the game (posted in the suggestions forum)", "dm_permission": False,
+     "options": [{"type": 3, "name": "title", "description": "Your idea in a few words", "required": True, "max_length": 90},
+                 {"type": 3, "name": "details", "description": "What it is and why it would be good", "required": True, "max_length": 1500}]},
+    {"name": "bug", "description": "Report a bug (posted in the bug forum, with your city and the game's version)", "dm_permission": False,
+     "options": [{"type": 3, "name": "title", "description": "What went wrong, in a few words", "required": True, "max_length": 90},
+                 {"type": 3, "name": "details", "description": "What you did, what happened, and what you expected", "required": True, "max_length": 1500}]},
+    {"name": "setforum", "description": "Admin: choose the forum channel /suggest or /bug posts go to", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "kind", "description": "Which command", "required": True,
+                  "choices": [{"name": "Suggestions (/suggest)", "value": "suggest"}, {"name": "Bugs (/bug)", "value": "bug"}]},
+                 {"type": 7, "name": "channel", "description": "The forum channel", "required": True, "channel_types": [15]}]},
+    {"name": "claimtag", "description": "Admin: a game tag everyone gets when they /claim their city (e.g. alpha), or off", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "tag", "description": "alpha, beta, ... any name, or off", "required": True}]},
+    {"name": "syncroles", "description": "Admin: give every claimed city's player the roles for its tech level and ideology", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR)},
     {"name": "claim", "description": f"Get the {ROLE_NAME} role for your city", "dm_permission": False,
      "options": [{"type": 3, "name": "city", "description": "Your city's name", "required": True},
                  {"type": 3, "name": "code", "description": "The Discord code on your city's Settings tab in the game", "required": True}]},
@@ -377,7 +395,11 @@ def handle(body, headers, now):
         return 200, _reply(_game(server, now))
     if name == "claim":
         return 200, _claim(server, now, request, str(options.get("city") or "")[:24], str(options.get("code") or ""))
-    if name in ("present", "tag", "announce", "resetpassword", "renamecity", "removecity", "blockword", "badnames"):
+    if name == "profile":
+        return 200, _reply(_profile(server, now, str(options.get("city") or "")[:24]))
+    if name in ("suggest", "bug"):
+        return 200, _forum_post(server, now, request, name, str(options.get("title") or ""), str(options.get("details") or ""))
+    if name in ("present", "tag", "setforum", "claimtag", "syncroles", "announce", "resetpassword", "renamecity", "removecity", "blockword", "badnames"):
         if not is_admin(request, settings):
             return 200, _reply(_embed("Not for you", "Only the game's admins can use that."), private=True)
         return 200, _reply(_admin(server, now, name, options), private=True)
@@ -404,6 +426,29 @@ def _admin(server, now, name, options):
         words = [str(options.get("to") or "").strip(), str(options.get("message") or "")] + str(options.get("gifts") or "").split()
         # the same checks and wording as `python server.py --present`; it is handed out on the game's next request
         return _embed("Present", server.send_present(words))
+    if name == "setforum":
+        settings = config()
+        settings[f"{options.get('kind')}_forum"] = str(options.get("channel") or "")
+        _save(settings)
+        return _embed("Forum chosen", f"/{options.get('kind')} now posts in <#{options.get('channel')}>. The bot needs to see it and create posts there.")
+    if name == "claimtag":
+        settings, tag = config(), str(options.get("tag") or "").strip()[:30]
+        if tag.lower() in ("off", "none", ""):
+            settings.pop("claim_tag", None)
+            _save(settings)
+            return _embed("Claim tag off", "Claiming a city gives no tag now.")
+        settings["claim_tag"] = tag
+        _save(settings)
+        return _embed("Claim tag set", f"Everyone who claims their city from now on gets the **{tag}** tag. For cities claimed "
+                                       f"before, use /tag with to: all, or `dolphincity tag all {tag}`.")
+    if name == "syncroles":
+        pairs = []
+        for user, city in members()["cities"].items():
+            state = server.get_city(city, now)
+            if state:
+                pairs.append((user, city_roles(state)))
+        sync_roles(pairs)
+        return _embed("Roles", f"Giving {len(pairs)} players the roles for their city's tech level and ideology. This takes a minute.")
     if name == "tag":
         words = [str(options.get("to") or "").strip(), str(options.get("tag") or "").strip()]
         return _embed("Tag", server.send_tag(words, take=options.get("action") == "take"))
@@ -479,6 +524,19 @@ def _claim(server, now, request, name, code):
         return _reply(_embed("Not set up", "The bot has no token: run python discord_bot.py setup."), private=True)
     state = server.get_city(match, now)
     state["discord_user"] = member                 # remembered, for whoever looks after the game
+    known = members()
+    known["guild"] = guild
+    known["cities"] = {u: c for u, c in known["cities"].items() if c != match}
+    known["cities"][str(member)] = match
+    _store(MEMBERS_FILE, known)
+    claim_tag = settings.get("claim_tag")
+    if claim_tag:
+        import tags
+        tag_id = claim_tag if claim_tag in tags.GIVEN else "custom_" + tags._slug(claim_tag)
+        if tag_id not in state.get("tags", {}).get("have", {}):
+            tags.give(state, now, claim_tag)
+    server.DIRTY.add(match)
+    sync_roles([(str(member), city_roles(state))])
     token, app = request.get("token"), request.get("application_id") or settings.get("application_id")
     threading.Thread(target=_give_role, args=(settings, guild, member, match, app, token), daemon=True).start()
     return {"type": 5, "data": {"flags": 64}}      # "thinking...", seen only by the member
@@ -559,6 +617,281 @@ def announce(text):
         except Exception as error:      # Discord unreachable, or refusing: the game carries on
             print(f"Discord announcement failed: {error}", file=sys.stderr)
     threading.Thread(target=send, daemon=True).start()
+
+
+# ------------------------------------------------------ game-side extras --
+# Files next to discord.json, written by the game server:
+#   discord_members.json  {Discord user id: city} for every /claim, and the server's id ("guild")
+#   discord_firsts.json   which "first in the game" milestones have happened, so each is posted once
+#   discord_weekly.json   last week's numbers for every city, for the weekly recap
+
+MEMBERS_FILE = _data_dir() / "discord_members.json"
+FIRSTS_FILE = _data_dir() / "discord_firsts.json"
+WEEKLY_FILE = _data_dir() / "discord_weekly.json"
+WEEK = 7 * 24 * 3600
+WEEKLY_AT = (6, 17)          # Sunday (weekday 6), 17:00 UTC: when the weekly recap is posted
+ROLE_COLOURS = [0x95A5A6, 0x7F8C8D, 0x3498DB, 0x2ECC71, 0x9B59B6, 0xE6C35C]     # Tribe ... Megacity
+
+
+def _load(path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def _store(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(value, indent=1), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def members():
+    return _load(MEMBERS_FILE, {"guild": None, "cities": {}})
+
+
+def member_city(user):
+    return members()["cities"].get(str(user))
+
+
+def first(key):
+    """True the first time `key` happens in the whole game (and remembers it)."""
+    seen = _load(FIRSTS_FILE, {})
+    if key in seen:
+        return False
+    seen[key] = time.time()
+    _store(FIRSTS_FILE, seen)
+    return True
+
+
+def _call(settings, method, url, payload=None):
+    """One call to Discord's API as the bot."""
+    request = urllib.request.Request(f"{API}{url}", data=None if payload is None else json.dumps(payload).encode("utf-8"),
+                                     method=method, headers={"Authorization": f"Bot {settings['bot_token']}",
+                                                             "Content-Type": "application/json", "User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        body = response.read()
+        return json.loads(body) if body else None
+
+
+# ---- roles that follow the game: one for the tech level, one for the ideology ----
+
+def _role_names():
+    import game
+    import ideology
+    tech = [(lvl["name"], ROLE_COLOURS[i % len(ROLE_COLOURS)]) for i, lvl in enumerate(game.TECH_LEVELS)]
+    ideo = [(i["name"], int(ideology.COLOURS[k].lstrip("#"), 16)) for k, i in ideology.IDEOLOGIES.items()]
+    return tech, ideo
+
+
+def city_roles(state):
+    """The names of the roles a city's player should have: its tech level and its ideology."""
+    import game
+    import ideology
+    out = [game.TECH_LEVELS[state["tech"]]["name"]]
+    if ideology.chosen(state):
+        out.append(ideology.chosen(state)["name"])
+    return out
+
+
+def sync_roles(pairs):
+    """Give each (Discord user, wanted role names) the roles for their city, taking away the other tech and
+    ideology roles. In the background: it takes calls to Discord, and the game must not wait for them."""
+    settings, guild = config(), members().get("guild")
+    if not (settings.get("bot_token") and guild and pairs) or settings.get("auto_roles") == "off":
+        return
+    def run():
+        try:
+            tech, ideo = _role_names()
+            managed = {n.lower(): colour for n, colour in tech + ideo}
+            roles = {r["name"].lower(): r for r in _call(settings, "GET", f"/guilds/{guild}/roles")}
+            for user, wanted in pairs:
+                for name in wanted:
+                    if name.lower() not in roles:
+                        roles[name.lower()] = _call(settings, "POST", f"/guilds/{guild}/roles",
+                                                    {"name": name, "color": managed.get(name.lower(), COLOUR), "hoist": False})
+                try:
+                    have = set(_call(settings, "GET", f"/guilds/{guild}/members/{user}")["roles"])
+                except urllib.error.HTTPError:
+                    continue            # no longer in the server
+                want = {roles[n.lower()]["id"] for n in wanted}
+                for name in managed:
+                    role = roles.get(name)
+                    if not role:
+                        continue
+                    if role["id"] in want and role["id"] not in have:
+                        _call(settings, "PUT", f"/guilds/{guild}/members/{user}/roles/{role['id']}")
+                    elif role["id"] in have and role["id"] not in want:
+                        _call(settings, "DELETE", f"/guilds/{guild}/members/{user}/roles/{role['id']}")
+        except Exception as error:
+            print(f"Discord roles failed: {error}. The bot needs Manage Roles, and its role above the tech and ideology roles.",
+                  file=sys.stderr)
+    threading.Thread(target=run, daemon=True).start()
+
+
+def sync_city(name, state):
+    """After a city's tech level or ideology changed: its player's roles follow."""
+    users = [u for u, c in members()["cities"].items() if c == name]
+    if users:
+        sync_roles([(u, city_roles(state)) for u in users])
+
+
+# ---- milestones posted to the announcements channel ----
+
+def milestone_wonder(city, state, bid):
+    """A city built a wonder: the first of its kind in the game, or (from Metropolis up) its own first."""
+    import game
+    b = game.BUILDINGS[bid]
+    if first("wonder:" + bid):
+        announce(f"\U0001F3DB️ **{city}** has built the first **{b['name']}** in the game!")
+    elif b["tech"] >= 4 and game.wonder_counts(state).get(bid, 0) == 1:
+        announce(f"\U0001F3DB️ **{city}** has built a **{b['name']}**.")
+
+
+def milestone_quests(city, state, done):
+    """A city finished an ideology quest: every fifth is posted, and the first city to reach each number."""
+    import ideology
+    ideo = ideology.chosen(state)
+    word = ideo["quest_plural"] if ideo else "quests"
+    if done % 5 == 0 and first(f"quests:{done}"):
+        announce(f"\U0001F3C6 **{city}** is the first city to complete **{done} {word.lower()}**!")
+    elif done % 5 == 0:
+        announce(f"\U0001F3C6 **{city}** has completed **{done} {word.lower()}**.")
+
+
+def milestone_tags(city, earned):
+    """New tags: the first city to earn each rare-or-better tag, and every epic or legendary one."""
+    import tags
+    for tag_id in earned:
+        t = tags.TAGS.get(tag_id)
+        if not t or t["rarity"] in ("common", "uncommon"):
+            continue
+        if first("tag:" + tag_id):
+            announce(f"\U0001F3F7️ **{city}** is the first city to earn the **{t['name']}** tag ({t['how'].lower()})!")
+        elif t["rarity"] in ("epic", "legendary"):
+            announce(f"\U0001F3F7️ **{city}** has earned the {t['rarity']} tag **{t['name']}** ({t['how'].lower()}).")
+
+
+# ---- the weekly recap ----
+
+def _snapshot(cities):
+    return {c["name"]: {k: c.get(k, 0) for k in ("tech", "population", "research", "buildings", "quests", "wonders", "areas")}
+            for c in cities}
+
+
+def weekly_embed(cities, before):
+    """This week in the game, from every city's summary now and last week's numbers."""
+    import game
+    now = _snapshot(cities)
+    new = [n for n in now if n not in before]
+    grew = lambda key: sorted(((now[n][key] - before[n].get(key, 0), n) for n in now if n in before), reverse=True)
+    lines = []
+    ups = [(n, now[n]["tech"]) for n in now if n in before and now[n]["tech"] > before[n].get("tech", 0)]
+    if ups:
+        lines.append("**New tech levels:** " + ", ".join(f"{n} ({game.TECH_LEVELS[t]['name']})" for n, t in ups[:10]))
+    if new:
+        lines.append(f"**New cities:** {', '.join(new[:10])}" + (f" and {len(new) - 10} more" if len(new) > 10 else ""))
+    for key, label in (("population", "Most new people"), ("research", "Most research done"), ("buildings", "Most building"),
+                       ("quests", "Most ideology quests"), ("wonders", "Most wonders raised")):
+        top = [(d, n) for d, n in grew(key) if d > 0][:3]
+        if top:
+            lines.append(f"**{label}:** " + ", ".join(f"{n} (+{short(d)})" for d, n in top))
+    lead = _ranked(cities, "tech")[:3]
+    lines.append("**At the top:** " + ", ".join(f"{c['name']} ({c['tech_name']}, {short(c['population'])} people)" for c in lead))
+    total = sum(c["population"] for c in cities)
+    return _embed("\U0001F4F0 This week in Dolphin City", "\n".join(lines) or "A quiet week.",
+                  footer=f"{len(cities)} cities, {short(total)} people in all")
+
+
+def weekly_due(now):
+    """True when a weekly recap is due (and remembers it). The first time, it only takes the numbers."""
+    import datetime
+    data = _load(WEEKLY_FILE, None)
+    t = datetime.datetime.fromtimestamp(now, datetime.timezone.utc)
+    day, hour = WEEKLY_AT
+    mark = (t - datetime.timedelta(days=(t.weekday() - day) % 7)).replace(hour=hour, minute=0, second=0, microsecond=0)
+    if mark > t:
+        mark -= datetime.timedelta(days=7)
+    return data is None or data.get("at", 0) < mark.timestamp()
+
+
+def weekly(cities, now, post=True):
+    """Post the recap (if `post` and there are last week's numbers) and keep this week's numbers for the next."""
+    data = _load(WEEKLY_FILE, None)
+    if post and data and config().get("webhook"):
+        embed = weekly_embed(cities, data.get("cities", {}))
+        hook = config()["webhook"]
+        def send():
+            try:
+                _post(hook, {"embeds": [embed], "allowed_mentions": {"parse": []}})
+            except Exception as error:
+                print(f"Discord weekly recap failed: {error}", file=sys.stderr)
+        threading.Thread(target=send, daemon=True).start()
+    _store(WEEKLY_FILE, {"at": now, "cities": _snapshot(cities)})
+
+
+# ---- /suggest and /bug: a post in a forum channel ----
+
+def _forum_post(server, now, request, kind, title, details):
+    settings = config()
+    forum = settings.get(f"{kind}_forum")
+    if not forum:
+        return _reply(_embed("Not set up yet", f"An admin has to choose the forum first, with /setforum."), private=True)
+    if not settings.get("bot_token"):
+        return _reply(_embed("Not set up", "The bot has no token: run python discord_bot.py setup."), private=True)
+    user = ((request.get("member") or {}).get("user") or request.get("user") or {}).get("id")
+    city = member_city(user) if user else None
+    try:
+        version = server.page()["version"][:10]
+    except Exception:
+        version = "unknown"
+    footer = [f"From <@{user}>" if user else "", f"City: **{city}**" if city else "City: not claimed (/claim)",
+              f"Game version {version}" if kind == "bug" else ""]
+    content = f"{details.strip()}\n\n-# " + " · ".join(x for x in footer if x)
+    token, app = request.get("token"), request.get("application_id") or settings.get("application_id")
+    guild = request.get("guild_id")
+    def run():
+        try:
+            thread = _call(settings, "POST", f"/channels/{forum}/threads",
+                           {"name": title.strip()[:100] or "Untitled", "message": {"content": content[:1900], "allowed_mentions": {"parse": []}}})
+            link = f"https://discord.com/channels/{guild}/{thread['id']}"
+            result = _embed("Posted", f"Thanks! It is here: {link}")
+        except Exception as error:
+            print(f"Discord /{kind} failed: {error}", file=sys.stderr)
+            result = _embed("Could not post it", f"The bot needs to be able to see the forum and create posts in it. ({error})")
+        try:
+            _post(f"{API}/webhooks/{app}/{token}/messages/@original", {"embeds": [result]}, method="PATCH")
+        except Exception as error:
+            print(f"Discord /{kind} reply failed: {error}", file=sys.stderr)
+    threading.Thread(target=run, daemon=True).start()
+    return {"type": 5, "data": {"flags": 64}}
+
+
+# ---- /profile ----
+
+def _profile(server, now, name):
+    import game
+    import tags
+    names = server.all_city_names()
+    match = name if name in names else next((n for n in names if n.lower() == str(name).lower()), None)
+    state = server.get_city(match, now) if match else None
+    if not state:
+        return _embed("No such city", f"There is no city called **{name}**. Names are as on the leaderboard.")
+    c = game.summary(state)
+    cities = _cities(server, now)
+    rank = 1 + sum(1 for o in cities if (o["tech"], o["population"]) > (c["tech"], c["population"]))
+    shown = c.get("tags", [])
+    tag_text = (", ".join(f"**{t[0]}**" for t in shown[:3]) + (f" and {len(shown) - 3} more" if len(shown) > 3 else "")) if shown else "none yet"
+    counts = game.wonder_counts(state)
+    wonders = ", ".join(f"{game.BUILDINGS[b]['name']}" + (f" x{n}" if n > 1 else "") for b, n in counts.items()) or "none yet"
+    rare = sum(1 for t in shown if t[1] in ("epic", "legendary", "special"))
+    return _embed(f"{c['name']}", f"A **{c['tech_name']}**" + (f" following **{c['ideology']}**" if c["ideology"] else "") +
+                  f". Rank #{rank} of {len(cities)}.",
+                  [("Tags", f"{tag_text}\n-# {len(shown)} in all" + (f", {rare} of them epic, legendary or special" if rare else ""), False),
+                   ("Wonders", wonders, False),
+                   ("Ideology quests", short(c.get("quests", 0)), True), ("Population", short(c["population"]), True),
+                   ("Research", short(c["research"]), True), ("Areas", short(c["areas"]), True)])
 
 
 # ------------------------------------------------------------- console --
@@ -652,6 +985,13 @@ def _main(command):
         _register()
     elif command == "daily":
         _daily()
+    elif command == "weekly":       # post the weekly recap now (the game posts one itself every Sunday)
+        import game
+        saves = _data_dir() / "saves"
+        cities = [game.summary(s) for s in (_load(p, None) for p in sorted(saves.glob("*.json"))) if s]
+        weekly(cities, time.time())
+        time.sleep(5)
+        print("Posted the weekly recap (if there were last week's numbers; otherwise it took this week's, for next time).")
     elif command == "update":
         _update(" ".join(sys.argv[2:]).strip())
     elif command == "test":
