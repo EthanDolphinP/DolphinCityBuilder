@@ -4409,16 +4409,17 @@ function renderIdeology() {
 // ---- the quest tree, in the Perks part of the Ideology tab ----
 let perkTab = settings.perkTab || 'perks';     // 'perks' (by tech level) or 'tree' (from quests): remembered
 function treeNode(n, own) {
-  const pips = Array.from({ length: n.max }, (_, k) => `<i class="${k < n.level ? 'on' : ''}"></i>`).join('');
-  const kind = { root: 'Start of the branch', fork: 'Fork: one of two', cap: 'Final perk' }[n.kind];
-  return `<div class="qnode ${n.level ? 'has' : ''} ${n.level >= n.max ? 'full' : ''} ${n.not_chosen ? 'closed' : ''}">` +
-    `<span class="qlvl">Level ${n.level} of ${n.max}</span><div class="qname">${esc(n.name)}</div>` +
+  const endless = n.max == null, full = !endless && n.level >= n.max;
+  const pips = endless ? '' : Array.from({ length: n.max }, (_, k) => `<i class="${k < n.level ? 'on' : ''}"></i>`).join('');
+  const kind = { root: 'Start of the branch', fork: 'Fork: one of two', cap: 'Final perk', endless: 'Endless perk: no top level' }[n.kind];
+  return `<div class="qnode ${n.level ? 'has' : ''} ${full ? 'full' : ''} ${n.not_chosen ? 'closed' : ''}">` +
+    `<span class="qlvl">${endless ? `Level ${n.level}` : `Level ${n.level} of ${n.max}`}</span><div class="qname">${esc(n.name)}</div>` +
     `<div class="dim small">${kind} &middot; ${n.cost} ${n.cost === 1 ? 'point' : 'points'} a level</div>` +
     `<div class="qpips">${pips}</div>` +
     `<div class="small">Each level: <span class="good">${n.per.map(esc).join(', ')}</span></div>` +
     (n.level ? `<div class="small">Now: <span class="good">${n.now.map(esc).join(', ')}</span></div>` : '') +
     (n.not_chosen ? `<div class="small bad">Closed: the other path of this fork was chosen.</div>`
-      : n.level >= n.max ? `<div class="small good">Complete</div>`
+      : full ? `<div class="small good">Complete</div>`
       : own ? (n.problem && !/tree point/.test(n.problem) ? `<div class="small dim">${esc(n.problem)}</div>`
         : `<button data-tree-take="${esc(n.id)}" ${n.problem ? 'disabled' : ''} title="${esc(n.problem || '')}">Take level ${n.level + 1}</button>`) : '') +
     `</div>`;
@@ -4436,7 +4437,10 @@ function treePanel(i, iv, own) {
       `<div class="qbranch"><h3>${esc(b.name)}</h3>${treeNode(b.root, own)}<div class="qdown">|<br>v</div>` +
       `<div class="qforkhead">Choose one path</div><div class="qfork">` +
       b.forks.map(f => `<div>${treeNode(f.fork, own)}<div class="qdown">|<br>v</div>${treeNode(f.cap, own)}</div>`).join('') +
-      `</div></div>`).join('') + `</div>`;
+      `</div></div>`).join('') +
+    (tr.endless ? `<div class="qbranch"><h3>Beyond both branches</h3>` +
+      `<p class="dim small" style="margin-top:0">Opens once the first perk of <span class="hi">both</span> branches is at its highest. ` +
+      `It has no top level: level it as long as you keep earning tree points.</p>${treeNode(tr.endless, own)}</div>` : '') + `</div>`;
 }
 // ---- quests: the ideology's own kind, paid in resources, every one dearer than the last, each won for good ----
 function questPanel(i, iv, own) {

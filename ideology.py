@@ -1084,6 +1084,20 @@ TREES = {      # (name, [(branch name, (root name, per level), [((fork name, per
 }
 
 
+# The endless perk: one per tree, open once BOTH branches' first perks are at their highest, with no top level
+# (quests never end, so neither does this). Each level costs TREE_COST["endless"] points.
+TREE_ENDLESS = {
+    "faith": ("Ascension", {"speed": {"all": 0.01, "knowledge": 0.01}}),
+    "progress": ("Singularity", {"speed": {"all": 0.01, "materials": 0.01}}),
+    "commerce": ("Compound Interest", {"speed": {"all": 0.01, "trade": 0.01}}),
+    "wild": ("World Tree", {"speed": {"all": 0.01, "food": 0.01}}),
+    "wayfarers": ("Beyond the Horizon", {"speed": {"all": 0.01, "knowledge": 0.01}}),
+    "community": ("Golden Age", {"speed": {"all": 0.01, "food": 0.01}}),
+}
+TREE_LEVELS["endless"] = None
+TREE_COST["endless"] = 2
+
+
 def _slug(text):
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
@@ -1102,6 +1116,10 @@ def _tree_nodes():
                                   "parent": rid, "sibling": fids[1 - k]}
                 nodes[cid] = {"ideology": ideo_id, "name": cname, "kind": "cap", "per": cper, "branch": b, "fork": k,
                               "parent": fids[k], "sibling": None}
+    for ideo_id, (ename, eper) in TREE_ENDLESS.items():
+        roots = [f"{ideo_id}.{_slug(b[1][0])}" for b in TREES[ideo_id][1]]
+        nodes[f"{ideo_id}.{_slug(ename)}"] = {"ideology": ideo_id, "name": ename, "kind": "endless", "per": eper, "branch": None,
+                                              "fork": None, "parent": None, "sibling": None, "needs": roots}
     for n in nodes.values():
         n["max"], n["cost"] = TREE_LEVELS[n["kind"]], TREE_COST[n["kind"]]
     return nodes
@@ -1127,7 +1145,7 @@ def tree_problem(state, node_id):
         return "Not a perk of your ideology's tree."
     levels = tree_levels(state)
     level = levels.get(node_id, 0)
-    if level >= node["max"]:
+    if node["max"] is not None and level >= node["max"]:
         return "At its highest level."
     if node["kind"] == "fork":
         if levels.get(node["sibling"], 0):
@@ -1137,6 +1155,10 @@ def tree_problem(state, node_id):
     if node["kind"] == "cap" and levels.get(node["parent"], 0) < TREE_NODES[node["parent"]]["max"]:
         parent = TREE_NODES[node["parent"]]
         return f"Needs {parent['name']} at level {parent['max']}."
+    if node["kind"] == "endless":
+        short = [TREE_NODES[r] for r in node["needs"] if levels.get(r, 0) < TREE_NODES[r]["max"]]
+        if short:
+            return "Needs " + " and ".join(f"{r['name']} at level {r['max']}" for r in short) + "."
     if tree_points(state) < node["cost"]:
         return f"Needs {node['cost']} tree {'point' if node['cost'] == 1 else 'points'}."
     return None
@@ -1190,12 +1212,13 @@ def tree_view(state):
         lvl = levels.get(node_id, 0)
         return {"id": node_id, "name": n["name"], "kind": n["kind"], "level": lvl, "max": n["max"], "cost": n["cost"],
                 "per": describe(_scaled(n["per"], 1)), "now": describe(_scaled(n["per"], lvl)) if lvl else [],
-                "problem": tree_problem(state, node_id), "not_chosen": n["kind"] != "root" and bool(
+                "problem": tree_problem(state, node_id), "not_chosen": n["kind"] in ("fork", "cap") and bool(
                     levels.get(n["sibling"] if n["kind"] == "fork" else TREE_NODES[n["parent"]]["sibling"], 0))}
     out = []
     for b, (bname, (rname, _), forks) in enumerate(branches):
         rid = f"{ideo_id}.{_slug(rname)}"
         out.append({"name": bname, "root": card(rid),
                     "forks": [{"fork": card(f"{ideo_id}.{_slug(f[0][0])}"), "cap": card(f"{ideo_id}.{_slug(f[1][0])}")} for f in forks]})
+    endless = card(f"{ideo_id}.{_slug(TREE_ENDLESS[ideo_id][0])}") if ideo_id in TREE_ENDLESS else None
     return {"name": name, "points": tree_points(state), "every": TREE_EVERY, "fork_at": TREE_FORK_AT,
-            "branches": out, "total": describe(tree_effects(state)), "done": quests_done(state)}
+            "branches": out, "endless": endless, "total": describe(tree_effects(state)), "done": quests_done(state)}
