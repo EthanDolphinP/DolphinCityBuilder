@@ -3183,7 +3183,7 @@ function placeProblem(area, x, y, bid) {
   if (b.tech > state.tech) return `requires ${defs.tech[b.tech].name} tech`;
   if (b.research && !state.research.includes(b.research)) return `requires research: ${R[b.research].name}`;
   if (b.unique && buildingCount(bid)) return 'a city can only have one';
-  if (!b.terrain.some(k => terrainIs(tile.terrain, k))) return 'needs ' + b.terrain.map(terrainLabel).join(' or ');
+  if (!b.terrain.includes(tile.terrain)) return 'needs ' + b.terrain.map(terrainLabel).join(' or ');   // exact terrains only
   const lock = defs.terrains[tile.terrain].research;
   if (lock && !state.research.includes(lock)) return `this land can't be used until you research ${R[lock].name}`;
   if ('max_height' in b && tile.height > b.max_height) return `too steep (height ${tile.height}, max ${b.max_height})`;

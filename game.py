@@ -2504,6 +2504,146 @@ def _price_buildings():
 _price_buildings()
 _price_research()
 
+# ---- where each building fits ----
+# A building fits only the terrains its list names. In BUILDINGS a group name (plains, forest, hill, desert, water,
+# fresh) is spread out once, below, into every terrain of that group, so old lists keep meaning what they meant;
+# a list in LANDS names exact terrains and replaces the building's own.
+# The generic buildings that used to fit every plains-, desert- or hill-like tile now have short lists of their
+# own (October 2026): each kind of land has its own set of buildings, so a tile's menu is shorter and a city has
+# to use the land it has instead of filling it with one building.
+_FLAT = ["plains", "meadow", "savanna", "steppe", "floodplain"]
+LANDS = {
+    # housing
+    "house": _FLAT + ["heath", "tundra", "volcanic", "forest", "taiga", "jungle", "hill", "foothills", "desert", "oasis", "scrubland"],
+    "tavern": ["plains", "meadow", "steppe", "savanna", "hill", "foothills", "oasis", "forest", "beach"],
+    "townhouses": ["plains", "meadow", "floodplain", "forest", "hill", "foothills", "oasis"],
+    "apartments": ["plains", "savanna", "steppe", "desert", "scrubland", "tundra"],
+    "high_rise": ["plains", "steppe", "savanna", "desert", "scrubland"],
+    "arcology": ["desert", "scrubland", "tundra", "steppe", "hill"],
+    # food
+    "butcher": ["plains", "meadow", "savanna", "steppe", "forest", "hill", "foothills"],
+    "pasture": ["plains", "meadow", "steppe", "savanna", "heath", "foothills"],
+    "dairy": ["plains", "meadow", "foothills", "floodplain"],
+    "breeding_pen": ["plains", "meadow", "savanna"],
+    "greenhouse": ["desert", "hill", "tundra", "scrubland", "steppe"],
+    "cannery": ["plains", "steppe", "scrubland"],
+    "meat_packing": ["plains", "savanna", "steppe", "scrubland"],
+    "industrial_farm": ["plains", "meadow", "floodplain", "savanna", "volcanic"],
+    "livestock_complex": ["plains", "savanna", "meadow", "scrubland", "steppe"],
+    "vertical_farm": ["desert", "scrubland", "tundra", "hill"],
+    "tree_plantation": ["plains", "meadow", "savanna", "steppe", "heath"],
+    # materials
+    "quarry": ["hill", "mountain", "canyon", "mesa", "foothills", "cliffs", "cave", "lava_field"],
+    "mine": ["hill", "mountain", "canyon", "mesa", "cliffs", "cave", "lava_field"],
+    "deep_mine": ["hill", "mountain", "cliffs", "cave", "canyon"],
+    "cement_works": ["hill", "foothills", "mesa", "canyon"],
+    "smithy": ["plains", "hill", "foothills"],
+    "steel_mill": ["hill", "foothills", "desert", "steppe"],
+    "sawmill": ["forest", "taiga", "jungle", "dense_forest"],
+    "timber_yard": ["forest", "taiga", "dense_forest"],
+    "harvester_fleet": ["forest", "taiga", "dense_forest", "jungle"],
+    "factory": ["steppe", "savanna", "desert", "scrubland"],
+    "electronics_plant": ["steppe", "desert", "scrubland"],
+    "robotics_factory": ["plains", "steppe", "desert", "scrubland"],
+    "precision_works": ["plains", "steppe"],
+    "recycling_centre": ["desert", "scrubland", "tundra"],
+    "electronics_workshop": ["plains", "desert", "hill"],
+    "ewaste_recycler": ["desert", "scrubland", "tundra"],
+    "chip_fab": ["desert", "steppe"],
+    "nano_assembler": ["desert", "hill", "tundra"],
+    "bio_timber_vats": ["desert", "scrubland", "tundra", "steppe"],
+    "geopolymer_plant": ["desert", "steppe", "scrubland"],
+    "open_pit_mine": ["hill", "mountain", "mesa", "canyon", "foothills", "desert"],
+    "aggregate_plant": ["hill", "mountain", "cliffs", "canyon", "foothills", "desert"],
+    "deep_core_drill": ["hill", "mountain", "mesa", "canyon", "lava_field"],
+    "autonomous_quarry": ["hill", "mountain", "cliffs", "canyon", "foothills"],
+    # trade
+    "trading_post": ["plains", "desert", "savanna", "steppe", "scrubland", "oasis"],
+    "weaver": ["plains", "meadow", "steppe", "savanna", "hill", "foothills"],
+    "tannery": ["savanna", "steppe", "desert", "scrubland"],
+    "leatherworks": ["savanna", "steppe", "desert"],
+    "cattle_market": ["plains", "savanna", "steppe", "meadow"],
+    "glassworks": ["desert", "sand_dunes", "beach", "scrubland"],
+    "zoo": ["plains", "forest", "savanna", "jungle", "meadow"],
+    "department_store": ["plains", "meadow", "floodplain"],
+    "stadium": ["plains", "steppe", "savanna"],
+    "shopping_mall": ["plains", "scrubland", "meadow"],
+    "drone_port": ["plains", "desert", "hill", "steppe", "scrubland", "tundra"],
+    "night_market": ["desert", "scrubland", "oasis", "savanna"],
+    "aquarium": ["beach", "plains", "meadow"],
+    "theme_park": ["plains", "beach", "meadow"],
+    "tinkers_stall": ["plains", "hill", "foothills", "steppe"],
+    "hardware_store": ["plains", "hill", "foothills"],
+    "electronics_store": ["plains", "meadow"],
+    "export_terminal": ["desert", "beach", "scrubland"],
+    "smart_device_factory": ["desert", "scrubland", "steppe"],
+    # knowledge
+    "school": _FLAT + ["heath", "tundra", "desert", "scrubland", "oasis", "hill", "foothills"],
+    "university": ["plains", "meadow", "floodplain", "oasis"],
+    "laboratory": ["desert", "hill", "steppe", "tundra", "scrubland", "meadow"],
+    "museum": ["plains", "meadow", "oasis"],
+    "research_institute": ["desert", "steppe", "tundra", "scrubland", "hill"],
+    "data_centre": ["tundra", "steppe", "hill", "mountain", "desert", "taiga"],
+    "planetarium": ["desert", "hill", "mesa"],
+    "quantum_lab": ["tundra", "glacier", "mountain", "hill", "desert"],
+    "weather_station": ["hill", "mountain", "cliffs", "mesa", "tundra", "heath", "steppe"],
+    "observatory": ["hill", "mountain", "cliffs", "mesa", "canyon", "glacier", "lava_field", "foothills"],
+    # power
+    "steam_engine": ["plains", "hill", "foothills", "steppe"],
+    "wind_turbine": ["steppe", "hill", "foothills", "heath", "tundra", "beach", "cliffs", "mesa", "savanna"],
+    "coal_plant": ["desert", "hill", "foothills", "steppe"],
+    "power_plant": ["desert", "steppe", "scrubland"],
+    "solar_farm": ["desert", "scrubland", "savanna", "steppe"],
+    "nuclear_plant": ["desert", "steppe", "scrubland", "beach"],
+    "fusion_plant": ["desert", "steppe", "scrubland", "beach"],
+    # support
+    "salt_lick": ["plains", "forest", "savanna", "meadow", "steppe", "taiga"],
+    "beast_den": ["plains", "forest", "hill", "savanna", "jungle", "taiga", "mountain", "cave"],
+    "well": ["plains", "meadow", "savanna", "steppe", "floodplain", "heath", "tundra", "desert", "scrubland", "oasis"],
+    "windmill": ["plains", "hill", "steppe", "meadow", "heath", "foothills", "floodplain"],
+    "stable": ["plains", "meadow", "savanna", "steppe", "scrubland", "oasis"],
+    "incubator": ["plains", "forest", "hill", "meadow"],
+    "nesting_ground": ["plains", "forest", "hill", "foothills", "meadow"],
+    "lighthouse": ["hill", "beach", "cliffs", "foothills"],
+    "training_ground": ["plains", "savanna", "steppe"],
+    "beast_sanctuary": ["plains", "forest", "savanna", "jungle", "meadow", "dense_forest"],
+    "city_hall": ["plains", "meadow", "floodplain"],
+    "train_station": ["plains", "steppe", "savanna", "meadow"],
+    "waterworks": ["plains", "hill", "foothills", "meadow", "floodplain", "oasis"],
+    "hospital": ["plains", "meadow", "floodplain", "hill"],
+    "airport": ["desert", "steppe", "scrubland", "salt_flat"],
+    "maglev_hub": ["plains", "steppe", "savanna"],
+    "desalination_plant": ["desert", "beach", "scrubland", "sand_dunes"],
+    "storm_barrier": ["floodplain", "hill", "cliffs", "beach", "foothills"],
+    "spaceport": ["desert", "scrubland", "salt_flat", "steppe"],
+    "orbital_mirror": ["desert", "hill", "mesa", "mountain"],
+    "weather_control": ["hill", "mountain", "glacier"],
+    "witchs_garden": ["meadow", "forest", "dense_forest", "jungle", "ancient_grove", "marsh", "swamp", "heath"],
+    "alchemists_workshop": ["plains", "hill", "forest"],
+    "grand_apothecary": ["meadow", "forest", "jungle", "oasis"],
+    "arcane_distillery": ["volcanic", "lava_field", "crystal_cavern", "mountain", "ancient_grove"],
+    "expedition_camp": ["plains", "forest", "desert", "hill", "foothills", "steppe"],
+    "explorers_guild": ["plains", "hill", "beach", "foothills"],
+}
+
+
+def _spread(names):
+    """Every terrain the names cover: a terrain itself, or every terrain of a group."""
+    out = []
+    for name in names:
+        for t, d in TERRAINS.items():
+            if (t == name or name in d.get("groups", ())) and t not in out:
+                out.append(t)
+    return out
+
+
+def _place_buildings():
+    for bid, b in BUILDINGS.items():      # a list in LANDS names exact terrains: it is not spread
+        b["terrain"] = list(LANDS[bid]) if bid in LANDS else _spread(b["terrain"])
+
+
+_place_buildings()
+
 # Additions are attached to a building that is already standing. Fields:
 #   for       building ids it can be attached to
 #   cost      resources paid to attach it
@@ -4401,7 +4541,7 @@ def placement_problem(state, area, x, y, bid):
         return f"requires research: {RESEARCH[b['research']]['name']}"
     if b.get("unique") and has_building(state, bid):
         return "a city can only have one"
-    if not any(terrain_is(tile["terrain"], t) for t in b["terrain"]):
+    if tile["terrain"] not in b["terrain"]:      # exact terrains only (see LANDS)
         return "needs " + " or ".join(terrain_label(t) for t in b["terrain"])
     lock = TERRAINS[tile["terrain"]].get("research")
     if lock and lock not in state["research"]:
