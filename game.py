@@ -1430,6 +1430,37 @@ BUILDINGS = {
         "produces": {"ore": 60, "electronics": 4},
         "desc": "Robot dredgers lift metal-rich nodules from the deep sea floor: a great deal of ore, and rare metals for electronics.",
     },
+    # ---- turning surplus tools and electronics into gold ----
+    "tinkers_stall": {
+        "name": "Tinker's Stall", "glyph": "\u0174", "tech": 2, "category": "trade",
+        "terrain": ["plains", "desert", "hill"], "cost": {"wood": 60, "stone": 40}, "workers": 2, "time": 15 * MIN,
+        "consumes": {"tools": 4}, "produces": {"gold": 19},
+        "desc": "Mends and sells pots, locks and little gadgets: tools turned into gold.",
+    },
+    "hardware_store": {
+        "name": "Hardware Store", "glyph": "\u0176", "tech": 3, "category": "trade", "power": 1,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 120, "tools": 30, "gold": 60}, "workers": 3, "time": 20 * MIN,
+        "consumes": {"tools": 10}, "produces": {"gold": 50},
+        "desc": "Shelves of nails, saws and spanners for every builder in the land: tools turned into gold.",
+    },
+    "electronics_store": {
+        "name": "Electronics Store", "glyph": "\u0164", "tech": 4, "category": "trade", "power": 3,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 200, "tools": 80, "gold": 200}, "workers": 3, "time": 20 * MIN,
+        "consumes": {"electronics": 8}, "produces": {"gold": 100},
+        "desc": "Radios, phones and games for the whole region: electronics turned into gold.",
+    },
+    "export_terminal": {
+        "name": "Export Terminal", "glyph": "\u015e", "tech": 4, "category": "trade", "power": 4,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 300, "tools": 120, "gold": 250}, "workers": 4, "time": 20 * MIN,
+        "consumes": {"tools": 20, "electronics": 5}, "produces": {"gold": 140},
+        "desc": "Crates finished goods for buyers far away: tools and electronics turned into a great deal of gold.",
+    },
+    "smart_device_factory": {
+        "name": "Smart Device Factory", "glyph": "\u0158", "tech": 5, "category": "trade", "power": 10,
+        "terrain": ["plains", "desert", "hill"], "cost": {"stone": 500, "tools": 250, "electronics": 100, "gold": 600}, "workers": 4, "time": 15 * MIN,
+        "consumes": {"electronics": 20, "tools": 10}, "produces": {"gold": 260},
+        "desc": "Builds the gadgets everyone wants this year: electronics and tools turned into gold by the cartload.",
+    },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
     # Hot springs
@@ -3450,6 +3481,34 @@ for _aid, _more in {
     "battery_bank": ["floating_solar", "run_of_river_turbines"],
     "sea_wall": ["run_of_river_turbines"],
     "clean_room": ["ocean_mining_rig"],
+}.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
+
+# Shops that turn tools and electronics into gold: additions of their own, and old ones that fit them.
+ADDITIONS.update({
+    "showroom": {"name": "Showroom", "for": [],
+                 "cost": {"stone": 100, "tools": 40, "gold": 100}, "produces": {"gold": 15}, "desc": "Goods on show where buyers pass: 15 more gold each cycle."},
+    "online_shop": {"name": "Online Shop", "research": "computing", "for": [],
+                    "cost": {"tools": 60, "electronics": 30, "gold": 150}, "speed": 1.3, "desc": "Sells to the whole world at once: 30% faster."},
+    "bulk_contracts": {"name": "Bulk Contracts", "research": "bookkeeping", "for": [],
+                       "cost": {"gold": 120}, "speed": 1.2, "desc": "Big buyers who take all you make: 20% faster."},
+})
+for _aid, _more in {
+    "showroom": ["hardware_store", "electronics_store", "smart_device_factory"],
+    "online_shop": ["electronics_store", "export_terminal", "smart_device_factory", "hardware_store"],
+    "bulk_contracts": ["tinkers_stall", "hardware_store", "export_terminal", "electronics_store"],
+    "market_stalls": ["tinkers_stall", "hardware_store"],
+    "counting_house": ["tinkers_stall", "export_terminal"],
+    "window_displays": ["tinkers_stall", "hardware_store", "electronics_store"],
+    "advertising": ["hardware_store", "electronics_store", "smart_device_factory"],
+    "lanterns": ["tinkers_stall"],
+    "labour_saving": ["hardware_store", "export_terminal"],
+    "automation": ["smart_device_factory", "export_terminal"],
+    "smart_meters": ["smart_device_factory"],
+    "assembly_line": ["smart_device_factory", "export_terminal"],
+    "crane": ["export_terminal"],
+    "delivery_vans": ["hardware_store", "electronics_store"],
+    "clean_room": ["smart_device_factory"],
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
