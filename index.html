@@ -43,6 +43,18 @@
   #tutorCoach.small .tut-body { display: none; }
   html.mobile #tutorCoach { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 45vh; }
   /* ---- the quest tree: two branches side by side, each forking into two paths of which one may be taken ---- */
+  .tagchip { display: inline-block; font-size: 11px; line-height: 1.5; padding: 0 6px; margin: 2px 3px 0 0; border-radius: 9px;
+             border: 1px solid currentColor; white-space: nowrap; }
+  .tagchip.common { color: var(--dim); } .tagchip.uncommon { color: #6fbf73; } .tagchip.rare { color: #5aa9e6; }
+  .tagchip.epic { color: #b884e8; } .tagchip.legendary { color: #e8b04a; } .tagchip.special { color: #ff7a7a; font-weight: bold; }
+  .tagline { display: block; white-space: normal; min-width: 250px; max-width: 360px; }
+  .tagline .tagmore { display: none; }
+  td:hover > .tagline .tagmore, .tagline:focus-within .tagmore { display: inline; }
+  .tagline .tagcount { font-size: 11px; color: var(--dim); }
+  td:hover > .tagline .tagcount { display: none; }
+  .tagcard { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--inset); }
+  .tagcard.locked { opacity: .55; }
+  .taggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 8px; }
   .qtree { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 10px; }     /* a branch a row: each path gets room */
   .qfork > div { min-width: 0; }
   .qbranch { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
@@ -1352,6 +1364,10 @@
           <button>Send</button>
         </form>
         <div id="socThread" style="max-height:320px;overflow-y:auto;margin-top:8px"></div>
+      </details>
+      <details class="panel" open data-soc="tags">
+        <summary class="cat">Tags</summary>
+        <div id="socTags"></div>
       </details>
       <details class="panel" open id="socHistPanel" data-soc="history">
         <summary class="cat">History <span id="socHistCount" class="count"></span></summary>
@@ -4194,6 +4210,38 @@ function showSocial(part) {          // used by the buttons on a city's row, whi
   if (socView !== 'all') socView = part;
   renderSocial();
 }
+// ---- tags: earned like achievements, three shown under the city's name on the leaderboard ----
+function tagChips(list, cut = 3) {
+  if (!list || !list.length) return '';
+  const chip = ([name, rarity, how]) => `<span class="tagchip ${esc(rarity)}" title="${esc(how)}">${esc(name)}</span>`;
+  const more = list.slice(cut);
+  return `<span class="tagline">${list.slice(0, cut).map(chip).join('')}` +
+    (more.length ? `<span class="tagcount">+${more.length}</span><span class="tagmore">${more.map(chip).join('')}</span>` : '') + `</span>`;
+}
+function tagPanel() {
+  const tv = view.tags;
+  if (!tv) return '';
+  const own = !visiting, R = tv.rarities, have = tv.list.filter(t => t.have), byId = Object.fromEntries(tv.list.map(t => [t.id, t]));
+  const order = (a, b) => R.indexOf(b.rarity) - R.indexOf(a.rarity) || a.name.localeCompare(b.name);
+  const card = t => {
+    const pinned = tv.shown.indexOf(t.id);
+    return `<div class="tagcard ${t.have ? '' : 'locked'}"><span class="tagchip ${esc(t.rarity)}">${esc(t.name)}</span> ` +
+      `<span class="dim small">${esc(t.rarity)}</span><div class="small">${esc(t.how)}</div>` +
+      (t.have ? `<div class="small dim">Earned ${t.when ? esc(new Date(t.when * 1000).toLocaleDateString()) : ''}</div>` +
+        (own ? (pinned >= 0 ? `<button data-tag-unpin="${esc(t.id)}">Shown ${pinned + 1} of ${tv.max}: stop showing first</button>`
+                            : `<button data-tag-pin="${esc(t.id)}" ${tv.shown.length >= tv.max ? 'disabled title="Take one off first"' : ''}>Show first</button>`) : '')
+        : `<div class="meter" style="margin-top:4px"><div style="width:${Math.round(Math.min(1, t.now / t.need) * 100)}%"></div></div>` +
+          `<div class="small dim">${num(Math.floor(t.now))} / ${num(t.need)}</div>`) + `</div>`;
+  };
+  const locked = tv.list.filter(t => !t.have).sort((a, b) => R.indexOf(a.rarity) - R.indexOf(b.rarity) || (b.now / b.need) - (a.now / a.need));
+  return `<p class="dim small" style="margin-top:0">Tags are earned by playing, like achievements, and some are given by the game's admin. ` +
+    `Under your name on the leaderboard everyone sees ${tv.max} of them; the rest show when the pointer is over them. ` +
+    `Choose which ${tv.max} come first; if you choose fewer, your rarest fill the rest.</p>` +
+    `<p>Shown first on the leaderboard: ${tagChips(tv.order.map(id => byId[id]).filter(Boolean).map(t => [t.name, t.rarity, t.how]), tv.max) || '<span class="dim">no tags yet</span>'}</p>` +
+    `<div class="cat">Yours (${have.length})</div>` +
+    (have.length ? `<div class="taggrid">${have.sort(order).map(card).join('')}</div>` : `<p class="dim">None yet: the ones below show how to earn them.</p>`) +
+    `<div class="cat">Not earned yet (${locked.length})</div><div class="taggrid">${locked.map(card).join('')}</div>`;
+}
 function renderSocial() {
   const { state } = view, book = state.social || {}, lists = book.lists || {}, history = book.history || [];
   // ---- the buttons along the top, each with what is waiting there ----
@@ -4201,11 +4249,13 @@ function renderSocial() {
   const listed = Object.keys(lists).length;
   const parts = { cities: ['Cities', `${listed} on your lists` + (onlineNow ? `, <span class="good">${onlineNow} online</span>` : '')],
                   messages: ['Messages', newMail ? `<span class="good">${newMail} new</span>` : ''],
-                  history: ['History', `${history.length}`], all: ['Everything', ''] };
+                  history: ['History', `${history.length}`],
+                  tags: ['Tags', view.tags ? `${view.tags.list.filter(t => t.have).length} of ${view.tags.list.length}` : ''], all: ['Everything', ''] };
   if (!parts[socView]) socView = 'cities';
   setHTML($('socViews'), Object.entries(parts).map(([k, [label, note]]) =>
     `<button data-soc-view="${k}" class="${socView === k ? 'on' : ''}">${label}${note ? ` <span class="dim small">${note}</span>` : ''}</button>`).join(''));
   for (const panel of document.querySelectorAll('#tab-social [data-soc]')) panel.hidden = socView !== 'all' && panel.dataset.soc !== socView;
+  if (socView === 'tags' || socView === 'all') setHTMLKeep($('socTags'), tagPanel());
   const stat = (k, v, r) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="r">${r || '&nbsp;'}</div></div>`;
   // Everything known about each other city: its list, how many dealings of each kind, and the latest one.
   const online = new Set((view.online || []).filter(c => c !== state.name)), idle = new Set((view.idle || []).filter(c => c !== state.name));
@@ -5447,7 +5497,7 @@ function renderBoard() {
     (withIdeology ? `<th>Ideology</th>` : '') + `<th></th></tr>` +
     rows.map(c => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${rank.get(c.name)}</td>` +
       `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${c.name === city ? '' : online.has(c.name) ? ' <span class="good small">online</span>' : idle.has(c.name) ? ' <span class="dim small">idle</span>' : ''}` +
-      `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}</td>` +
+      `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}${tagChips(c.tags)}</td>` +
       cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
       (withIdeology ? `<td class="dim">${c.ideology ? esc(c.ideology) : '-'}</td>` : '') +
       `<td class="${c.name === city ? 'mine' : 'acts'}">` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
@@ -6251,6 +6301,13 @@ document.addEventListener('click', e => {
 $('pplTraining').addEventListener('click', e => {
   const b = e.target.closest('[data-train-share]');
   if (b && !visiting) act('training_set', { share: Number(b.dataset.trainShare) });
+});
+$('socTags').addEventListener('click', e => {
+  const pin = e.target.closest('[data-tag-pin]'), unpin = e.target.closest('[data-tag-unpin]');
+  if (visiting || !(pin || unpin)) return;
+  const shown = view.tags.shown.slice();
+  const next = pin ? [...shown, pin.dataset.tagPin].slice(0, view.tags.max) : shown.filter(id => id !== unpin.dataset.tagUnpin);
+  act('tags_show', { tags: next });
 });
 $('board').onclick = e => {
   const d = e.target.dataset;

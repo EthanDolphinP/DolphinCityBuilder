@@ -197,6 +197,12 @@ COMMANDS = [
      "options": [{"type": 3, "name": "to", "description": "A city's name, or all", "required": True},
                  {"type": 3, "name": "message", "description": "Shown when the present is opened", "required": True},
                  {"type": 3, "name": "gifts", "description": "e.g. wood=500 gold=200 egg=rare people=5", "required": False}]},
+    {"name": "tag", "description": "Admin: give a city a tag (Alpha, Beta, ... or any name), or take one back", "dm_permission": False,
+     "default_member_permissions": str(ADMINISTRATOR),
+     "options": [{"type": 3, "name": "to", "description": "A city's name, or all", "required": True},
+                 {"type": 3, "name": "tag", "description": "alpha, beta, founder, developer, moderator, tester, bug_hunter, supporter, event_winner, or any name", "required": True},
+                 {"type": 3, "name": "action", "description": "Give it (the default) or take it back", "required": False,
+                  "choices": [{"name": "Give", "value": "give"}, {"name": "Take back", "value": "take"}]}]},
     {"name": "announce", "description": "Admin: post a message to the announcements channel", "dm_permission": False,
      "default_member_permissions": str(ADMINISTRATOR),
      "options": [{"type": 3, "name": "message", "description": "What to say", "required": True}]},
@@ -371,7 +377,7 @@ def handle(body, headers, now):
         return 200, _reply(_game(server, now))
     if name == "claim":
         return 200, _claim(server, now, request, str(options.get("city") or "")[:24], str(options.get("code") or ""))
-    if name in ("present", "announce", "resetpassword", "renamecity", "removecity", "blockword", "badnames"):
+    if name in ("present", "tag", "announce", "resetpassword", "renamecity", "removecity", "blockword", "badnames"):
         if not is_admin(request, settings):
             return 200, _reply(_embed("Not for you", "Only the game's admins can use that."), private=True)
         return 200, _reply(_admin(server, now, name, options), private=True)
@@ -398,6 +404,9 @@ def _admin(server, now, name, options):
         words = [str(options.get("to") or "").strip(), str(options.get("message") or "")] + str(options.get("gifts") or "").split()
         # the same checks and wording as `python server.py --present`; it is handed out on the game's next request
         return _embed("Present", server.send_present(words))
+    if name == "tag":
+        words = [str(options.get("to") or "").strip(), str(options.get("tag") or "").strip()]
+        return _embed("Tag", server.send_tag(words, take=options.get("action") == "take"))
     if name == "announce":
         message = str(options.get("message") or "").strip()
         if not message:

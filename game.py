@@ -39,6 +39,7 @@ import beasts
 import cauldron
 import ideology
 import moderation
+import tags
 import weather
 
 MIN = 60  # seconds
@@ -5172,6 +5173,7 @@ def advance_time(state, now, coarse=False):
             log(state, trip["arrive"], f"The next expedition set out {where(nxt['rx'], nxt['ry'])} of home.")
         trip = state["expedition"]
     beasts.tick(state, now)
+    tags.check(state, now)
 
 
 def _advance(state, now, remaining, coarse=False):
@@ -5820,6 +5822,8 @@ def apply_action(state, now, action, data):
         return beasts.deliver(state, now)
     if action == "egg_deliver":
         return beasts.deliver(state, now, data.get("beast"))
+    if action == "tags_show":
+        return tags.set_shown(state, data.get("tags"))
     if action == "training_set":
         return set_training(state, now, data.get("share"))
     if action == "tree_take":
@@ -6139,6 +6143,7 @@ def _view(state, ai, detail):
         "mastery": mastery_view(state),
         "wonders": wonder_view(state),
         "training": training_view(state),
+        "tags": tags.view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -6588,4 +6593,5 @@ def summary(state):
         "areas": len(state["areas"]),
         "buildings": sum(1 for t in all_tiles(state) if t["building"]),
         "resources": {k: int(state["resources"].get(k, 0)) for k in RESOURCES},
+        "tags": tags.board(state),
     }

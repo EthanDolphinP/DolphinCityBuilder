@@ -50,6 +50,7 @@ import discord_bot
 import game
 import market
 import moderation
+import tags
 import weather
 
 ROOT = Path(__file__).parent
@@ -61,6 +62,7 @@ REMOVED = DATA / "removed"     # saves of cities an admin removed (kept, never d
 moderation.EXTRA_FILE = DATA / "blocked_words.json"   # words an admin blocked with /blockword
 MARKET_FILE = DATA / "market.json"
 PRESENTS_FILE = DATA / "presents.json"   # presents sent from the console, waiting to be handed out
+TAGS_FILE = DATA / "tags.json"           # tags given or taken from the console or Discord, waiting to be done
 CITY_NAME = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 BAD_NAME = "City names are 1-24 letters, digits, - or _."
 AUTOSAVE_SECONDS = 60
@@ -434,6 +436,7 @@ def run_bills(now):
     market.collect_debts(MARKET, now, lambda name: find_city(name, now))
     market.tidy(MARKET, now, lambda name: find_city(name, now))
     deliver_presents(now)
+    deliver_tags(now)
 
 
 def deliver_presents(now):
@@ -457,6 +460,55 @@ def deliver_presents(now):
                 game.give_present(state, now, present["message"], present["gifts"], present.get("egg"),
                                   present.get("people", 0))
     flush()
+
+
+def deliver_tags(now):
+    """Give and take tags the admin chose from the console or Discord (see send_tag), like deliver_presents."""
+    if not TAGS_FILE.exists():
+        return
+    taken = TAGS_FILE.with_suffix(".taken")
+    try:
+        os.replace(TAGS_FILE, taken)
+        waiting = json.loads(taken.read_text(encoding="utf-8"))
+        taken.unlink()
+    except (OSError, ValueError):
+        return
+    for job in waiting:
+        names = all_city_names() if job["to"] == "all" else [job["to"]]
+        for name in names:
+            state = find_city(name, now)
+            if not state:
+                continue
+            if job.get("take"):
+                tags.take(state, job["tag"])
+            else:
+                tags.give(state, now, job["tag"])
+            DIRTY.add(name)
+            BOARD["done"].pop(name, None)       # its leaderboard row is worked out again
+    flush()
+
+
+def send_tag(args, take=False):
+    """The --tag / --untag command (and /tag on Discord). Returns what to print."""
+    usage = (f"Usage: python server.py --{'untag' if take else 'tag'} CityName|all tag\n"
+             f"  tags only the admin gives: {', '.join(tags.GIVEN)}\n"
+             "  or any name in quotes for a tag of its own, e.g. \"Event Winner 2026\"")
+    if len(args) != 2 or not args[1].strip():
+        return usage
+    to, tag = args[0], args[1].strip()[:30]
+    if to != "all":
+        match = next((n for n in all_city_names() if n.lower() == to.lower()), None)
+        if not match:
+            return f"There is no city called {to}."
+        to = match
+    if not take and tag not in tags.GIVEN and moderation.check_name(tag):
+        return f"That tag can't be used: {moderation.check_name(tag)}"
+    waiting = json.loads(TAGS_FILE.read_text(encoding="utf-8")) if TAGS_FILE.exists() else []
+    waiting.append({"to": to, "tag": tag, "take": take})
+    _write(TAGS_FILE, waiting)
+    name = tags.GIVEN[tag][0] if tag in tags.GIVEN else tag
+    return (f"{'Taking' if take else 'Giving'} the tag {name} {'from' if take else 'to'} {'every city' if to == 'all' else to}. "
+            "It happens the next time anyone uses the game.")
 
 
 def send_present(args):
@@ -925,6 +977,8 @@ if __name__ == "__main__":
         sys.exit(f"{sys.argv[2]} has no password now. Whoever signs in to it next chooses the new one.")
     if sys.argv[1:2] == ["--present"]:
         sys.exit(send_present(sys.argv[2:]))
+    if sys.argv[1:2] in (["--tag"], ["--untag"]):
+        sys.exit(send_tag(sys.argv[2:], take=sys.argv[1] == "--untag"))
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("DCB_PORT", 8000))
     host = os.environ.get("DCB_HOST", "0.0.0.0")      # 127.0.0.1 behind a web server such as Caddy
     # A service manager stops the game with SIGTERM: treat it like Ctrl+C, so everything is saved first.

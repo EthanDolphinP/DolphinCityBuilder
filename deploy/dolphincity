@@ -17,6 +17,8 @@ case "${1:-}" in
   status)  systemctl status dolphincity --no-pager ;;
   logs)    journalctl -u dolphincity -n 100 --no-pager ;;
   present) shift; game --present "$@" ;;          # handed out while the game runs
+  tag)     shift; game --tag "$@" ;;              # given while the game runs
+  untag)   shift; game --untag "$@" ;;
   discord) shift; sudo -u dolphin env DCB_DATA="$DATA" python3 "$CODE/discord_bot.py" "$@" ;;   # setup | register | test | daily
   reset-password)                                 # the game must be stopped, or it would save over the change
     [[ -n "${2:-}" ]] || { echo "Usage: dolphincity reset-password CityName"; exit 1; }
@@ -57,6 +59,9 @@ dolphincity update                     get the latest code from GitHub and resta
 dolphincity restart | status | logs    the game service
 dolphincity present City "message" wood=100 egg=rare people=5   (or "all" instead of a city)
 dolphincity reset-password City        the next person to sign in to City picks its password
+dolphincity tag City alpha             give a tag (alpha, beta, founder, developer, moderator, tester,
+                                       bug_hunter, supporter, event_winner, or any name in quotes); "all" for every city
+dolphincity untag City alpha           take a tag back
 dolphincity discord setup|register|test|daily   the Discord bot (see README.md, "Discord")
 dolphincity backup                     save a backup now (one is made every night; 14 are kept)
 dolphincity restore file.tar.gz        replace the game's data with a backup
