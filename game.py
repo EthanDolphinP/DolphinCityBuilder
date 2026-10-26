@@ -1461,6 +1461,21 @@ BUILDINGS = {
         "consumes": {"electronics": 20, "tools": 10}, "produces": {"gold": 260},
         "desc": "Builds the gadgets everyone wants this year: electronics and tools turned into gold by the cartload.",
     },
+    # ---- stone for a Megacity, whose buildings take it by the thousand ----
+    "autonomous_quarry": {
+        "name": "Autonomous Quarry", "glyph": "\u0147", "tech": 5, "category": "materials", "power": 12, "research": "robotics",
+        "terrain": ["hill", "mountain", "cliffs", "canyon", "foothills"],
+        "cost": {"stone": 400, "tools": 250, "electronics": 80, "gold": 400}, "workers": 3, "time": 15 * MIN,
+        "produces": {"stone": 120},
+        "desc": "Robot diggers and cutters that work a whole hillside day and night: more stone than any quarry.",
+    },
+    "geopolymer_plant": {
+        "name": "Geopolymer Plant", "glyph": "\u010c", "tech": 5, "category": "materials", "power": 15, "research": "robotics",
+        "terrain": ["plains", "desert", "hill"],
+        "cost": {"stone": 300, "tools": 250, "electronics": 100, "gold": 500}, "workers": 4, "time": 15 * MIN,
+        "produces": {"stone": 100}, "sheltered": True,
+        "desc": "Binds ash and clay into blocks as hard as granite, on any flat ground: a great deal of stone without a hill to quarry.",
+    },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
     # Hot springs
@@ -3509,6 +3524,26 @@ for _aid, _more in {
     "crane": ["export_terminal"],
     "delivery_vans": ["hardware_store", "electronics_store"],
     "clean_room": ["smart_device_factory"],
+}.items():
+    ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
+
+# Stone for a Megacity: additions of their own, and old ones that fit.
+ADDITIONS.update({
+    "rock_crushers": {"name": "Rock Crushers", "for": [],
+                      "cost": {"stone": 200, "tools": 120}, "produces": {"stone": 20}, "desc": "Nothing goes to waste: 20 more stone each cycle."},
+    "diamond_wire_saws": {"name": "Diamond Wire Saws", "research": "robotics", "for": [],
+                          "cost": {"tools": 200, "electronics": 50, "gold": 200}, "speed": 1.3, "desc": "Cut through rock like butter: 30% faster."},
+})
+for _aid, _more in {
+    "rock_crushers": ["autonomous_quarry", "geopolymer_plant", "aggregate_plant"],
+    "diamond_wire_saws": ["autonomous_quarry", "aggregate_plant", "cement_works"],
+    "automation": ["autonomous_quarry", "geopolymer_plant"],
+    "smart_meters": ["autonomous_quarry", "geopolymer_plant"],
+    "labour_saving": ["geopolymer_plant"],
+    "work_lights": ["autonomous_quarry"],
+    "support_beams": ["autonomous_quarry"],
+    "aggregate_pit": ["autonomous_quarry"],
+    "rotary_kiln": ["geopolymer_plant"],
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
