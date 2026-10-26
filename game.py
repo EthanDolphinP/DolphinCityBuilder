@@ -2582,6 +2582,12 @@ RESEARCH.update({
         "desc": "A whole town under one roof, planned down to the last pipe.",
     },
 })
+RESEARCH["urban_renewal"] = {
+    "name": "Urban Renewal", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
+    "clear_out": True,
+    "effect": "on the Settings tab (under Account), every ordinary building of one tech level can be pulled down at once",
+    "desc": "Whole districts of old buildings cleared in a day, to make room for the new.",
+}
 RESEARCH_SCALE = [2, 3, 4.5, 6, 7.5, 10]     # raised in October 2026 (was 2, 3, 4, 5, 6, 8)
 IMPORTANT_EFFECTS = ("explore_range", "explore_discount", "exp_queue", "taming", "surveying", "breeding", "forecast")
 RESEARCH_MATERIALS = [{"wood": 1.0, "stone": 0.5},
@@ -5293,6 +5299,47 @@ def demolish(state, now, area, x, y):
     return None
 
 
+CLEAR_OUT_TECH = 5       # a Megacity, with Urban Renewal researched
+
+
+def clear_out_keeps(b):
+    """Buildings a clear-out never pulls down: wonders and one-per-city buildings."""
+    return b.get("category") == "wonder" or b.get("unique")
+
+
+def clear_out(state, now, tech, category="all"):
+    """Pull down every ordinary building of one tech level (of one kind, or all), with the usual refund."""
+    if state["tech"] < CLEAR_OUT_TECH or "urban_renewal" not in state["research"]:
+        return "Clearing out needs a Megacity and the Urban Renewal research."
+    if not isinstance(tech, int) or isinstance(tech, bool) or not 0 <= tech < len(TECH_LEVELS):
+        return "Pick a tech level."
+    if category != "all" and category not in CATEGORIES:
+        return "Pick a kind of building."
+    refund, n = {}, 0
+    for area in state["areas"]:
+        for row in area["tiles"]:
+            for tile in row:
+                bid = tile["building"]
+                if not bid:
+                    continue
+                b = BUILDINGS[bid]
+                if b["tech"] != tech or clear_out_keeps(b) or (category != "all" and b.get("category") != category):
+                    continue
+                for part in [b] + [ADDITIONS[aid] for aid in tile["additions"]]:
+                    for k, v in part["cost"].items():
+                        refund[k] = refund.get(k, 0) + int(v * DEMOLISH_REFUND)
+                tile.update(building=None, progress=0, additions=[], priority=0)
+                n += 1
+    if not n:
+        return "There are no such buildings to pull down."
+    for k, v in refund.items():
+        state["resources"][k] += v
+    tally(state, "demolished", n)
+    kind = "" if category == "all" else f" {CATEGORIES[category].lower()}"
+    log(state, now, f"Cleared out {n:,} {TECH_LEVELS[tech]['name']}{kind} buildings, getting back {fmt_goods(refund)}.")
+    return None
+
+
 PRIORITIES = {2: "first", 1: "high", 0: "normal", -1: "off"}   # who gets workers first; see work_plan
 PRIORITY_VERSION = 2          # saves from before "high" had first as 1: migrate() moves it to 2
 
@@ -5919,6 +5966,8 @@ def apply_action(state, now, action, data):
         if not (isinstance(target, int) and 0 <= target < len(state["areas"])):
             return "Unknown area."
         return tame_all(state, now, [state["areas"][target]])
+    if action == "clear_out":
+        return clear_out(state, now, data.get("tech"), data.get("category", "all"))
     if action in ("build", "demolish", "add", "tame", "priority"):
         ai, x, y = data.get("area", 0), data.get("x"), data.get("y")
         if not (isinstance(ai, int) and 0 <= ai < len(state["areas"])):

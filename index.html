@@ -1271,6 +1271,10 @@
           <button>Ban this city</button>
         </form>
       </div>
+      <details class="panel own" data-set="account" id="clearOut">
+        <summary class="cat">Clear out old buildings</summary>
+        <div id="clearOutBody"></div>
+      </details>
       <div class="panel own" style="border-color:var(--bad)" data-set="account">
         <h2>Start again</h2>
         <p class="dim small" style="margin-top:0">Wipes this city and gives it a new map. Its market offers and bills
@@ -5062,8 +5066,44 @@ function renderSetViews() {
     (words.length && !Object.values(counts).some(Boolean) ? `<span class="dim small">No setting matches.</span>` : ''));
 }
 let discordCode = null;      // this city's code for /claim, while the game has a Discord bot
+// ---- clearing out: every ordinary building of one tech level pulled down at once (Megacity + Urban Renewal) ----
+let clearPick = { tech: 0, category: 'all' };
+const clearKept = b => b.category === 'wonder' || b.unique;
+function clearCount() {
+  const B = view.defs.buildings, out = { n: 0, refund: {} };
+  for (const a of view.state.areas) for (const row of a.tiles) for (const t of row) {
+    const b = t.building && B[t.building];
+    if (!b || b.tech !== clearPick.tech || clearKept(b) || (clearPick.category !== 'all' && b.category !== clearPick.category)) continue;
+    out.n++;
+    for (const part of [b, ...(t.additions || []).map(x => view.defs.additions[x])])
+      for (const [k, v] of Object.entries(part.cost)) out.refund[k] = (out.refund[k] || 0) + Math.floor(v * 0.5);
+  }
+  return out;
+}
+function renderClearOut() {
+  const { state, defs } = view, box = $('clearOutBody');
+  if (!box || !$('clearOut').open) return;
+  const ready = state.tech >= 5 && state.research.includes('urban_renewal');
+  if (!ready) {
+    setHTML(box, `<p class="dim small">Pull down every ordinary building of one tech level at once, for the usual half-price refund. ` +
+      `This opens once your city is a <span class="hi">Megacity</span> and has researched <span class="hi">Urban Renewal</span> ` +
+      `(${state.tech >= 5 ? 'Megacity: done' : 'not a Megacity yet'}, ${state.research.includes('urban_renewal') ? 'researched' : 'not researched yet'}).</p>`);
+    return;
+  }
+  const c = clearCount();
+  setHTMLKeep(box, `<p class="dim small" style="margin-top:0">Pull down every building of one tech level at once (of one kind, or all of them), ` +
+      `with the same half-price refund as demolishing one. Wonders and one-per-city buildings are never touched. This cannot be undone.</p>` +
+    `<div class="bar"><label class="pick"><span>Tech level</span><select id="clearTech">` +
+      defs.tech.map((l, i) => `<option value="${i}" ${clearPick.tech === i ? 'selected' : ''}>${esc(l.name)}</option>`).join('') + `</select></label>` +
+    `<label class="pick"><span>Kind</span><select id="clearCat"><option value="all">Every kind</option>` +
+      Object.entries(defs.categories).filter(([k]) => k !== 'wonder').map(([k, name]) => `<option value="${k}" ${clearPick.category === k ? 'selected' : ''}>${esc(name)}</option>`).join('') + `</select></label></div>` +
+    `<p>${c.n ? `<span class="hi">${num(c.n)}</span> ${c.n === 1 ? 'building' : 'buildings'} would come down, giving back <span class="good">${plain(c.refund)}</span>.`
+              : '<span class="dim">You have no such buildings.</span>'}</p>` +
+    `<button id="clearGo" style="border-color:var(--bad)" ${c.n && !visiting ? '' : 'disabled'}>Pull them all down</button>`);
+}
 function renderSettings() {
   renderSetViews();
+  renderClearOut();
   $('discordPanel').hidden = !discordCode || !!visiting;
   if (discordCode) $('discordCode').textContent = `/claim city:${view.state.name} code:${discordCode}`;
   // Fill the menus once, then show the current choices.
@@ -5883,6 +5923,19 @@ $('duels').onclick = async e => {
 };
 $('beastSort').onchange = () => { beastSort = $('beastSort').value; renderBeast(); };
 $('switch').onclick = async () => { try { await api('sign_out'); } catch {} signOut(''); };
+$('clearOut').addEventListener('toggle', renderClearOut);
+$('clearOutBody').addEventListener('change', e => {
+  if (e.target.id === 'clearTech') clearPick.tech = Number(e.target.value);
+  if (e.target.id === 'clearCat') clearPick.category = e.target.value;
+  renderClearOut();
+});
+$('clearOutBody').addEventListener('click', e => {
+  if (e.target.id !== 'clearGo' || visiting) return;
+  const c = clearCount(), D = view.defs;
+  const what = `${D.tech[clearPick.tech].name}${clearPick.category === 'all' ? '' : ' ' + D.categories[clearPick.category].toLowerCase()}`;
+  if (c.n && confirm(`Pull down all ${c.n.toLocaleString()} ${what} buildings? You get back ${plain(c.refund)}. This cannot be undone.`))
+    act('clear_out', { tech: clearPick.tech, category: clearPick.category });
+});
 $('restart').onclick = () => {
   if (confirm('Wipe this city and start over on a new map? Its market offers are removed too.')) { sel = null; areaIdx = 0; act('restart'); }
 };
