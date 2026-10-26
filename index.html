@@ -508,7 +508,7 @@
   .ideology-description { color: var(--dim); max-width: 680px; margin-top: 6px; }
   .ideology-points { padding: 14px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--inset); }
   .ideology-points strong { display: block; color: var(--ideo); font-size: 30px; line-height: 1.2; }
-  .ideology-points span { font-size: 12px; color: var(--dim); }
+  .ideology-points span { display: block; font-size: 12px; color: var(--dim); }
   .ideology-hero > .bar { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
   .ideology-bonus { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin: 8px 0; background: var(--inset); border: 1px solid var(--line); border-radius: 10px; }
   .ideology-bonus .ui-icon { width: 18px; height: 18px; flex-shrink: 0; }
@@ -4450,7 +4450,7 @@ function renderIdeology() {
   const header = `<div class="panel ideology-hero" style="--ideo:${esc(i.color)}">` + `<div class="ideology-identity">${ideologyArt(iv.id, i.art)}<div class="ideology-intro"><h2>Your city's ideology</h2>` +
       `<div class="ideology-title">${esc(i.name)}</div><div class="ideology-description">${esc(i.desc)}</div></div>` +
       (own ? `<div class="ideology-points"><strong>${num(iv.points + (iv.tree ? iv.tree.points : 0))}</strong><span>${iv.points + (iv.tree ? iv.tree.points : 0) === 1 ? 'point' : 'points'} to spend</span>` +
-        (iv.tree ? `<span class="small">${num(iv.points)} ${esc(i.perk_plural.toLowerCase())}, ${num(iv.tree.points)} tree</span>` : '') + `</div>` : '') + `</div>` +
+        (iv.tree && iv.points + iv.tree.points ? `<span>${num(iv.points)} for ${esc(i.perk_plural.toLowerCase())}, ${num(iv.tree.points)} for the tree</span>` : '') + `</div>` : '') + `</div>` +
     `<div class="bar">` + Object.entries(parts).map(([k, [label, note]]) =>
       `<button data-ideo-view="${k}" class="${ideoView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join('') + `</div></div>`;
 
