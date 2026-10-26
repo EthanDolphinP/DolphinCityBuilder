@@ -325,16 +325,17 @@ AWAY_TIME = 5 * MIN         # unwatched for this long -> the player gets a "whil
 # Each level's cost includes livestock: the feast that marks the city's new standing.
 TECH_LEVELS = [
     {"name": "Tribe"},
-    {"name": "Village", "population": 18, "research": 4,
-     "cost": {"food": 300, "wood": 500, "stone": 300, "knowledge": 150, "livestock": 4}},
-    {"name": "Town", "population": 70, "research": 15, "areas": 3,
-     "cost": {"wood": 1500, "stone": 1500, "ore": 500, "gold": 500, "knowledge": 600, "livestock": 15}},
-    {"name": "City", "population": 250, "research": 30, "areas": 5,
-     "cost": {"stone": 8000, "ore": 3000, "tools": 1500, "gold": 5000, "knowledge": 4000, "livestock": 50}},
-    {"name": "Metropolis", "population": 700, "research": 50, "areas": 8,
-     "cost": {"stone": 25000, "ore": 8000, "tools": 8000, "gold": 30000, "knowledge": 15000, "livestock": 150}},
-    {"name": "Megacity", "population": 1600, "research": 70, "areas": 14,
-     "cost": {"food": 50000, "tools": 25000, "electronics": 8000, "gold": 120000, "knowledge": 60000, "livestock": 400}},
+    {"name": "Village", "population": 20, "research": 5,
+     "cost": {"food": 300, "wood": 600, "stone": 350, "knowledge": 180, "livestock": 4}},
+    # Raised in October 2026: every level from Town on asks for about half as much again (Megacity twice as much).
+    {"name": "Town", "population": 90, "research": 19, "areas": 3,
+     "cost": {"wood": 2250, "stone": 2250, "ore": 750, "gold": 750, "knowledge": 900, "livestock": 20}},
+    {"name": "City", "population": 340, "research": 37, "areas": 6,
+     "cost": {"stone": 13000, "ore": 5000, "tools": 2500, "gold": 8000, "knowledge": 6500, "livestock": 70}},
+    {"name": "Metropolis", "population": 1000, "research": 58, "areas": 10,
+     "cost": {"stone": 45000, "ore": 14000, "tools": 14000, "gold": 52000, "knowledge": 26000, "livestock": 220}},
+    {"name": "Megacity", "population": 2300, "research": 76, "areas": 17,
+     "cost": {"food": 100000, "tools": 50000, "electronics": 16000, "gold": 240000, "knowledge": 120000, "livestock": 600}},
 ]
 
 # Groups the build menu is divided into, in the order they are shown. Every
@@ -2392,7 +2393,49 @@ RESEARCH = {
 #   if it is important (opens a building, or is one of IMPORTANT_EFFECTS), materials of its era as well:
 #     RESEARCH_MATERIALS[tech level], each a share of that knowledge, but never one the buildings it opens make;
 #   if it is about animals (ANIMAL_RESEARCH), livestock: RESEARCH_LIVESTOCK[tech level].
-RESEARCH_SCALE = [2, 3, 4, 5, 6, 8]
+RESEARCH.update({
+    # ---- research for buildings that used to need none ----
+    "alchemy": {
+        "name": "Alchemy", "tech": 1, "building": "school", "cost": {"knowledge": 40},
+        "desc": "Herbs, salts and patience: the first steps towards a better brew.",
+    },
+    "distillation": {
+        "name": "Distillation", "tech": 3, "building": "university", "cost": {"knowledge": 140},
+        "desc": "Boil it, catch the steam, and keep only what matters.",
+    },
+    "pharmacology": {
+        "name": "Pharmacology", "tech": 4, "building": "laboratory", "cost": {"knowledge": 340},
+        "desc": "Measured doses, tested remedies and a shelf for every one.",
+    },
+    "transmutation": {
+        "name": "Transmutation", "tech": 5, "building": "research_institute", "cost": {"knowledge": 950},
+        "desc": "What the old alchemists dreamt of, done with machines.",
+    },
+    "oceanography": {
+        "name": "Oceanography", "tech": 4, "building": "university", "cost": {"knowledge": 300},
+        "boost": {"tide_watchers": 1.15, "freshwater_lab": 1.15},
+        "desc": "Currents, depths and the life of open water, mapped and measured.",
+    },
+    "deep_sea_engineering": {
+        "name": "Deep Sea Engineering", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
+        "desc": "Hulls and pumps that hold against the weight of the whole sea.",
+    },
+    "consumer_electronics": {
+        "name": "Consumer Electronics", "tech": 4, "building": "laboratory", "cost": {"knowledge": 320},
+        "boost": {"hardware_store": 1.15},
+        "desc": "Gadgets for every home, and shops to sell them.",
+    },
+    "geothermal_engineering": {
+        "name": "Geothermal Engineering", "tech": 5, "building": "research_institute", "cost": {"knowledge": 850},
+        "boost": {"geothermal_plant": 1.2},
+        "desc": "Drilling down to where the earth itself is hot enough to work.",
+    },
+    "arcology_design": {
+        "name": "Arcology Design", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
+        "desc": "A whole town under one roof, planned down to the last pipe.",
+    },
+})
+RESEARCH_SCALE = [2, 3, 4.5, 6, 7.5, 10]     # raised in October 2026 (was 2, 3, 4, 5, 6, 8)
 IMPORTANT_EFFECTS = ("explore_range", "explore_discount", "exp_queue", "taming", "surveying", "breeding", "forecast")
 RESEARCH_MATERIALS = [{"wood": 1.0, "stone": 0.5},
                       {"wood": 0.8, "stone": 0.8},
@@ -2434,6 +2477,31 @@ def _price_research():
         r["cost"] = cost
 
 
+# Buildings past the first tech level cost more the higher their level (raised in October 2026): every resource
+# but livestock times BUILD_PRICE_SCALE[tech], rounded to a number that reads well.
+BUILD_PRICE_SCALE = [1, 1.25, 1.5, 1.75, 2, 2.25]
+# Buildings that needed no research before and now need one (the research is in RESEARCH above).
+NEW_LOCKS = {
+    "witchs_garden": "alchemy", "alchemists_workshop": "distillation", "grand_apothecary": "pharmacology",
+    "arcane_distillery": "transmutation",
+    "limnology_station": "oceanography", "oceanographic_institute": "oceanography",
+    "deep_sea_lab": "deep_sea_engineering", "ocean_mining_rig": "deep_sea_engineering", "reef_biolab": "deep_sea_engineering",
+    "electronics_store": "consumer_electronics", "smart_device_factory": "consumer_electronics",
+    "deep_geothermal_well": "geothermal_engineering", "magma_tap": "geothermal_engineering",
+    "arcology": "arcology_design", "undercity": "arcology_design",
+}
+
+
+def _price_buildings():
+    for bid, rid in NEW_LOCKS.items():
+        BUILDINGS[bid]["research"] = rid
+    for b in BUILDINGS.values():
+        scale = BUILD_PRICE_SCALE[b["tech"]]
+        if scale != 1:
+            b["cost"] = {k: (v if k == "livestock" else _nice(v * scale)) for k, v in b["cost"].items()}
+
+
+_price_buildings()
 _price_research()
 
 # Additions are attached to a building that is already standing. Fields:
