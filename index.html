@@ -4945,12 +4945,13 @@ function renderPeople() {
   setHTML($('pplTraining'), !tr ? '' :
     `<p class="dim small" style="margin-top:0">Send some of each meal's newcomers to training instead of letting them join the city. ` +
     `Trained people don't eat or need a home: each one makes every building with workers a little faster, for good ` +
-    `(20 trained: +5%, 60: +10%, 140: +15%, then +5% more each time the number doubles). Only people who would really have ` +
-    `arrived are trained, so a city whose homes are full trains nobody.</p>` +
+    `(${tr.unit} trained: +${pct(tr.step)}, ${tr.unit * 3}: +${pct(tr.step * 2)}, ${tr.unit * 7}: +${pct(tr.step * 3)}, then +${pct(tr.step)} more each time the number doubles). ` +
+    `Only people who would really have arrived are trained, so a city whose homes are full trains nobody, and at most ` +
+    `${pct(tr.shares[tr.shares.length - 1])} can be sent: the rest join and fill your homes, so build more to keep training.</p>` +
     `<p><span class="hi">${num(tr.trained)}</span> trained: every building with workers is <span class="good">${pct(tr.bonus)}</span> faster. ` +
     `<span class="dim small">Next: ${pct(tr.next_bonus)} at ${num(tr.next_at)} trained.</span></p>` +
     `<div class="bar"><span class="dim small">Newcomers sent to training:</span>` +
-    tr.shares.map(s => `<button data-train-share="${s}" class="${tr.share === s ? 'on' : ''}" ${visiting ? 'disabled' : ''}>${s === 0 ? 'None' : s === 1 ? 'All' : Math.round(s * 100) + '%'}</button>`).join('') + `</div>`);
+    tr.shares.map(s => `<button data-train-share="${s}" class="${tr.share === s ? 'on' : ''}" ${visiting ? 'disabled' : ''}>${s === 0 ? 'None' : Math.round(s * 100) + '%'}</button>`).join('') + `</div>`);
   // Food
   const fullHousingFood = status.housing * perHour;
   const potentialFood = status.food_potential;

@@ -4486,11 +4486,13 @@ def _speed(state, job, power=1.0, env=1.0):
 # ---- training: newcomers sent to train instead of joining the city make every worker better ----
 # A city can send a share of each meal's newcomers (TRAINING_SHARES) to training. They don't join the city (so they
 # don't eat or need a home): each one adds to the city's trained count, and every building with workers is faster by
-# TRAINING_STEP for each doubling of it (in TRAINING_UNIT steps): 20 trained +5%, 60 +10%, 140 +15%, 300 +20%...
-# Only people who would really have come are trained, so a city whose homes are all full trains nobody.
-TRAINING_SHARES = (0, 0.25, 0.5, 1.0)
-TRAINING_STEP = 0.05
-TRAINING_UNIT = 20
+# TRAINING_STEP for each doubling of it (in TRAINING_UNIT steps): 30 trained +4%, 90 +8%, 210 +12%, 450 +16%...
+# Only people who would really have come are trained, so a city whose homes are all full trains nobody. At most 90%
+# can be sent: the rest join and fill the homes, so training stops unless the city keeps building homes.
+TRAINING_SHARES = (0, 0.25, 0.5, 0.75, 0.9)
+TRAINING_MAX = 0.9
+TRAINING_STEP = 0.04
+TRAINING_UNIT = 30
 
 
 def training_bonus(state, trained=None):
@@ -4514,7 +4516,7 @@ def _train(state, arrivals):
     t = state.get("training")
     if not t or not t.get("share") or not arrivals:
         return 0
-    t["carry"] = t.get("carry", 0.0) + arrivals * t["share"]
+    t["carry"] = t.get("carry", 0.0) + arrivals * min(t["share"], TRAINING_MAX)     # (a city that chose "all" before the cap: 90%)
     sent = min(arrivals, int(t["carry"]))
     t["carry"] -= sent
     t["trained"] = t.get("trained", 0) + sent
@@ -4525,7 +4527,8 @@ def training_view(state):
     t = state.get("training", {})
     trained = t.get("trained", 0)
     next_at = TRAINING_UNIT * (2 ** (math.floor(math.log2(1 + trained / TRAINING_UNIT)) + 1) - 1)
-    return {"share": t.get("share", 0), "trained": trained, "bonus": round(training_bonus(state), 4), "shares": list(TRAINING_SHARES),
+    return {"share": min(t.get("share", 0), TRAINING_MAX), "trained": trained, "bonus": round(training_bonus(state), 4), "shares": list(TRAINING_SHARES),
+            "step": TRAINING_STEP, "unit": TRAINING_UNIT,
             "next_at": int(next_at), "next_bonus": round(training_bonus(state, next_at), 4)}
 
 
