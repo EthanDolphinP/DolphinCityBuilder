@@ -3070,7 +3070,7 @@ function buildingRows(b, cycle, produces, live) {
   if (b.speed_aura) rows.push(['Nearby', `${b.speed_aura.for.map(f => esc(view.defs.buildings[f].name)).join(', ')} ${Math.round(b.speed_aura.bonus * 100)}% faster`]);
   if (cycle && !b.generates) {
     const made = Object.keys(produces || {}).length ? `<span class="good">+${plain(produces)}</span>` : 'nothing yet';
-    rows.push(['Makes', made + (b.consumes ? ` from ${plain(b.consumes)}` : '')]);
+    rows.push(['Makes', made + (b.consumes ? ` from ${plain((live && live.consumes) || b.consumes)}` : '')]);
   }
   if (b.herd) rows.push(['Livestock', (live ? `holds ${num(live.herd)} of ${num(live.herd_room)}; ` : `holds up to ${b.herd}; `) +
     `each adds ${Object.entries(b.per_head).map(([k, v]) => `${v} ${esc(R[k])}`).join(', ')} per cycle`]);

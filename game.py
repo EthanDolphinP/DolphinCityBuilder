@@ -4605,14 +4605,36 @@ def _need_research(state, field, what):
     return f"{what} requires research: {names[0]}" if names else f"{what} is not possible"
 
 
+# The fastest a building's cycle can get. Speed bonuses past it make the building give more each cycle instead,
+# at OVERFLOW_YIELD of the rate (x1.03 more speed than the limit allows: about 2% more). So a building that is
+# already at its limit gains less from more speed bonuses, and one with a longer cycle has more room to speed up.
+MIN_CYCLE = 2 * MIN
+OVERFLOW_YIELD = 2 / 3
+
+
 def tile_cycle(state, area, x, y, bid):
     """Seconds one cycle of `bid` takes on this tile at full staff: (seconds, notes).
 
     Returns (None, []) for buildings that don't work in cycles (housing etc).
     """
+    return tile_timing(state, area, x, y, bid)[:2]
+
+
+def _capped(b, speed, notes):
+    """(seconds, notes, output multiple): the cycle, held at MIN_CYCLE, and what the speed past it gives instead."""
+    raw = b["time"] / speed
+    if raw >= MIN_CYCLE or b["time"] <= MIN_CYCLE:
+        return round(raw), notes, 1.0
+    past = MIN_CYCLE / raw                       # how much faster than the limit it would have been
+    more = 1 + (past - 1) * OVERFLOW_YIELD
+    return MIN_CYCLE, notes + [f"At its fastest ({MIN_CYCLE // MIN} minutes): the other x{past:.2f} of speed gives x{more:.2f} output"], more
+
+
+def tile_timing(state, area, x, y, bid):
+    """tile_cycle, with what the speed past the fastest cycle gives: (seconds, notes, output multiple)."""
     b = BUILDINGS[bid]
     if "time" not in b:
-        return None, []
+        return None, [], 1.0
     factors = [MODIFIERS[m](area, x, y) for m in b.get("modifiers", [])]
     # Neighbouring buildings that help this kind of building (e.g. windmills).
     for nx, ny in neighbors(area, x, y):
@@ -4633,7 +4655,7 @@ def tile_cycle(state, area, x, y, bid):
         speed = 1.0
         for factor, _ in factors:
             speed *= factor
-        return round(b["time"] / speed), [f"{label} x{factor:.2f}" for factor, label in factors]
+        return _capped(b, speed, [f"{label} x{factor:.2f}" for factor, label in factors])
     # The city's wonders.
     built = wonder_bonus(state, b.get("category"), "speed")
     if built:
@@ -4671,7 +4693,7 @@ def tile_cycle(state, area, x, y, bid):
     for factor, label in factors:
         speed *= factor
         notes.append(f"{label} x{factor:.2f}")
-    return round(b["time"] / speed), notes
+    return _capped(b, speed, notes)
 
 
 def tile_output(tile):
@@ -4815,7 +4837,7 @@ def _work_plan(state):
                     continue
                 b = BUILDINGS[tile["building"]]
                 housing += tile_housing(tile)
-                cycle, notes = tile_cycle(state, area, x, y, tile["building"])
+                cycle, notes, more = tile_timing(state, area, x, y, tile["building"])
                 if cycle is None and "generates" not in b:
                     continue
                 # Additions can save labour and power, but a staffed building keeps at least one worker.
@@ -4828,7 +4850,9 @@ def _work_plan(state):
                     "area": ai, "x": x, "y": y, "tile": tile, "b": b,
                     "cycle": cycle,             # None for a generator that needs no fuel
                     "notes": notes, "need": need, "priority": tile.get("priority", 0),
-                    "produces": _with_wonders(state, b, tile_output(tile)),
+                    "produces": {k: round(v * more, 2) for k, v in _with_wonders(state, b, tile_output(tile)).items()},
+                    "consumes": {k: round(v * more, 2) for k, v in b.get("consumes", {}).items()},
+                    "overflow": more,           # output (and inputs) per cycle past the fastest cycle
                     "feeds": "food" in b.get("produces", {}) or "food" in b.get("per_head", {}),
                     "herd": tile_stat(tile, "herd"),
                     "herd_before": herd_room,   # pasture room in the buildings ahead of this one
@@ -4892,7 +4916,14 @@ def output_notes(state, job):
             notes.append(f"{ADDITIONS[aid]['name']} (addition): {goods(ADDITIONS[aid]['produces'])}")
     more = wonder_bonus(state, b.get("category"), "yield")
     if more:
-        notes.append(f"Wonders: x{1 + more:.2f} ({goods(job['produces'])} in all)")
+        notes.append(f"Wonders: x{1 + more:.2f}")
+    if job.get("overflow", 1) > 1:
+        notes.append(f"Speed past its fastest cycle: x{job['overflow']:.2f}" +
+                     (f" (it uses x{job['overflow']:.2f} the inputs too)" if b.get("consumes") else ""))
+    if more or job.get("overflow", 1) > 1:
+        notes.append(f"In all: {goods(job['produces'])}")
+    if job.get("boost", 1) > 1:
+        notes.append(f"Right now (day, night and weather) it is past its fastest cycle too: x{job['boost']:.2f} more this cycle")
     if "herd" in b:
         herd = job_herd(state, job)
         extra = {k: int(herd * v) for k, v in b.get("per_head", {}).items() if int(herd * v)}
@@ -4913,7 +4944,7 @@ def _num(v):
 def _out_of_inputs(state, job):
     """True if the building has finished a cycle and can't pay for it (e.g. no fuel)."""
     return (job["cycle"] is not None and job["tile"]["progress"] >= job["cycle"]
-            and bool(_missing(state, job["b"].get("consumes", {}))))
+            and bool(_missing(state, job["consumes"])))
 
 
 def power_status(state, jobs, env=None):
@@ -4923,6 +4954,25 @@ def power_status(state, jobs, env=None):
                  if j["power_out"] and not _out_of_inputs(state, j))
     demand = sum(j["power_in"] for j in jobs if j["power_in"] and j["ratio"])
     return supply, demand, (min(1.0, supply / demand) if demand else 1.0)
+
+
+def _flow(state, job, power=1.0, env=1.0):
+    """(speed, output multiple) right now: _speed, held so a cycle never takes less than MIN_CYCLE (a building
+    whose cycle is shorter than that to start with is held at full speed), with what is past it given as more
+    output (and inputs) per cycle at OVERFLOW_YIELD of the rate."""
+    speed = _speed(state, job, power, env)
+    if not job["cycle"] or speed <= 0:
+        return speed, 1.0
+    top = max(1.0, job["cycle"] / MIN_CYCLE)
+    if speed <= top:
+        return speed, 1.0
+    return top, 1 + (speed / top - 1) * OVERFLOW_YIELD
+
+
+def _rate(state, job, power=1.0, env=1.0):
+    """Cycles' worth of output per second of work, right now (speed x output multiple from _flow)."""
+    speed, more = _flow(state, job, power, env)
+    return speed * more
 
 
 def _speed(state, job, power=1.0, env=1.0):
@@ -5226,21 +5276,22 @@ def _advance(state, now, remaining, coarse=False):
         remaining -= dt
         power = power_status(state, jobs, env)[2]
         for i, job in enumerate(jobs):
-            speed = _speed(state, job, power, env[i][0])
+            speed, more = _flow(state, job, power, env[i][0])
             if not speed or job["cycle"] is None:
                 continue
             tile, b = job["tile"], job["b"]
             tile["progress"] += dt * speed
+            uses = job["consumes"] if more == 1 else {k: v * more for k, v in job["consumes"].items()}
             while tile["progress"] >= job["cycle"]:
-                if _missing(state, b.get("consumes", {})):
+                if _missing(state, uses):
                     tile["progress"] = job["cycle"]   # finished, waiting for inputs
                     break
-                _pay(state, b.get("consumes", {}))
-                for k, v in b.get("consumes", {}).items():
+                _pay(state, uses)
+                for k, v in uses.items():
                     totals["used:" + k] = totals.get("used:" + k, 0) + v
                 for k, v in job_output(state, job).items():
-                    res[k] += v
-                    totals["made:" + k] = totals.get("made:" + k, 0) + v
+                    res[k] += v * more
+                    totals["made:" + k] = totals.get("made:" + k, 0) + v * more
                 tile["progress"] -= job["cycle"]
         state["meal"] += dt
         while state["meal"] >= MEAL_TIME:
@@ -6056,12 +6107,12 @@ def unpaused_projection(state, plan=None, env=None):
         rates = {k: 0.0 for k in RESOURCES}
         rates["food"] = -housing * 3600 / MEAL_TIME
         for i, job in enumerate(jobs):
-            if not job["cycle"] or _missing(state, job["b"].get("consumes", {})):
+            if not job["cycle"] or _missing(state, job["consumes"]):
                 continue
-            per_hour = 3600 / job["cycle"] * _speed(state, job, power, env[i][0])
+            per_hour = 3600 / job["cycle"] * _rate(state, job, power, env[i][0])
             for k, v in job_output(state, job).items():
                 rates[k] += v * per_hour
-            for k, v in job["b"].get("consumes", {}).items():
+            for k, v in job["consumes"].items():
                 rates[k] -= v * per_hour
         return {"rates": {k: round(v, 1) for k, v in rates.items()},
                 "power": {"supply": round(supply, 1), "demand": demand}}
@@ -6092,18 +6143,18 @@ def _view(state, ai, detail):
         job["env"], job["power_env"] = env[i][0], env[i][1]
         job["notes"] = job["notes"] + env[i][2]
         job["env_notes"] = env[i][2]
-        job["speed"] = _speed(state, job, power, env[i][0])
-        job["waiting"] = list(_missing(state, job["b"].get("consumes", {})))
+        job["speed"], job["boost"] = _flow(state, job, power, env[i][0])
+        job["waiting"] = list(_missing(state, job["consumes"]))
         job["output"] = job_output(state, job)
         if job["cycle"]:
             food_potential += job["output"].get("food", 0) * 3600 / job["cycle"] * env[i][0]
         job["status"] = job_status(state, job, power)
         if job["speed"] and not job["waiting"] and job["cycle"]:
-            per_hour = 3600 / job["cycle"] * job["speed"]
+            per_hour = 3600 / job["cycle"] * job["speed"] * job["boost"]
             for k, v in job["output"].items():
                 rates[k] += v * per_hour
             food_made += job["output"].get("food", 0) * per_hour
-            for k, v in job["b"].get("consumes", {}).items():
+            for k, v in job["consumes"].items():
                 rates[k] -= v * per_hour
         if job["area"] == ai:
             here[(job["x"], job["y"])] = job
@@ -6122,7 +6173,7 @@ def _view(state, ai, detail):
                 cell.update(cycle=job["cycle"], notes=job["notes"], speed=job["speed"],
                             staff=job["staff"], need=job["need"], waiting=job["waiting"],
                             priority=job["priority"], status=job["status"],
-                            produces=job["output"], output_notes=output_notes(state, job),
+                            produces=job["output"], consumes=job["consumes"], output_notes=output_notes(state, job),
                             power_in=job["power_in"], power_out=round(job["power_out"] * job.get("power_env", 1), 1))
                 if "herd" in job["b"]:
                     cell["herd"], cell["herd_room"] = job_herd(state, job), job["herd"]
@@ -6249,7 +6300,7 @@ def job_status(state, job, power):
         return "switched off"
     if job["need"] and not job["staff"]:
         return "no workers"
-    missing = _missing(state, job["b"].get("consumes", {}))
+    missing = _missing(state, job["consumes"])
     if missing:
         return "waiting for " + ", ".join(RESOURCES[k] for k in missing)
     if job["power_in"] and power <= 0:
@@ -6447,15 +6498,15 @@ def _city_stats(state, now, rates):
     made, used = {k: 0.0 for k in RESOURCES}, {k: 0.0 for k in RESOURCES}
     by_building = {}
     for i, job in enumerate(jobs):
-        speed = _speed(state, job, power, env[i][0])
-        if not speed or not job["cycle"] or _missing(state, job["b"].get("consumes", {})):
+        speed = _rate(state, job, power, env[i][0])
+        if not speed or not job["cycle"] or _missing(state, job["consumes"]):
             continue
         per_hour = 3600 / job["cycle"] * speed
         for k, v in job_output(state, job).items():
             made[k] += v * per_hour
             key = (k, job["tile"]["building"])
             by_building[key] = by_building.get(key, 0) + v * per_hour
-        for k, v in job["b"].get("consumes", {}).items():
+        for k, v in job["consumes"].items():
             used[k] += v * per_hour
     used["food"] += state["population"] * 3600 / MEAL_TIME
     section("resources", "Resources", {"head": ["Resource", "In store", "Made per hour", "Used per hour", "Change per hour", "Runs out in"],
