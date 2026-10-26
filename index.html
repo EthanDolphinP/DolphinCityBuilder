@@ -2774,11 +2774,14 @@ function render() {
   });
   const pop = state.population, working = pop - status.idle, unfilled = Math.max(0, status.jobs - working);
   const short = status.power.supply < status.power.demand;
-  const free = status.housing - pop, growth = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
+  const free = status.housing - pop, growthAll = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
+  const trShare = trainingShare(), growth = growthAll * (1 - trShare);     // newcomers sent to training don't join
   setHTML($('people'),
     stat('Population', `${pop} / ${num(status.housing)}`,
       free <= 0 ? '<span class="bad">housing full</span>' : `${free} ${free === 1 ? 'place' : 'places'} free` +
-        ` &middot; <span class="good" title="With enough food for ${num(status.arrivals_max)} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal">${rateText(growth)}</span>`) +
+        ` &middot; <span class="good" title="With enough food for ${num(status.arrivals_max)} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal` +
+        (trShare ? `; ${rateText(growthAll)} before ${Math.round(trShare * 100)}% go to training (People tab)` : '') + `">${rateText(growth)}</span>` +
+        (trShare ? ` <span class="dim small">(-${Math.round(trShare * 100)}%, training)</span>` : '')) +
     stat('Workers', `${working} / ${num(status.jobs)} jobs`,
       unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${num(status.idle)} idle` : 'all filled') +
     (status.power.supply || status.power.demand || status.unpaused_power?.demand || status.unpaused_power?.supply ? stat('Power', powerCoverage(status.power),
@@ -4905,6 +4908,14 @@ function renderSettings() {
 }
 
 let pplView = settings.pplView || 'all';   // which part of the People tab shows (remembered)
+// Newcomers sent to training (see Training on the People tab) don't join the city. The share sent, and how a meal's
+// `n` arrivals split, worked out as the server does (a running remainder, so 25% of 1 a meal is 1 every fourth meal).
+const trainingShare = () => (!visiting && view.training && view.training.share) || 0;
+function trainingSplit(n) {
+  const share = trainingShare(), carry = ((view.state.training || {}).carry) || 0;
+  const sent = share ? Math.min(n, Math.floor(carry + n * share)) : 0;
+  return { join: n - sent, sent, share };
+}
 function renderPeople() {
   const { state, status } = view, pop = state.population, food = Math.floor(state.resources.food);
   // ---- the buttons along the top, each saying in a word or two how that part is doing ----
@@ -4913,7 +4924,7 @@ function renderPeople() {
     const free = status.housing - pop, gap = Math.max(0, status.jobs - (pop - status.idle));
     const parts = {
       all: ['Overview', ''],
-      growth: ['Growth', growing ? `<span class="good">+${num(status.arrivals_next)} next meal</span>` : '<span class="bad">not growing</span>'],
+      growth: ['Growth', growing ? `<span class="good">+${num(trainingSplit(status.arrivals_next).join)} next meal</span>` : '<span class="bad">not growing</span>'],
       food: ['Food', `<span class="${net >= 0 ? 'good' : 'bad'}">${net >= 0 ? '+' : ''}${num(net)} / hour</span>`],
       housing: ['Housing', free > 0 ? `${free} free` : '<span class="bad">full</span>'],
       work: ['Work', gap ? `<span class="bad">${gap} jobs empty</span>` : status.idle ? `${num(status.idle)} idle` : '<span class="good">all filled</span>'],
@@ -4930,10 +4941,14 @@ function renderPeople() {
   const ready = status.growth.every(g => g.ok);
   setHTML($('pplGrowth'),
     `<p class="big ${ready ? 'good' : 'bad'}">` + (state.hungry ? 'Hungry - the city cannot grow'
-      : ready ? `+${num(status.arrivals_next)} ${status.arrivals_next === 1 ? 'person' : 'people'} at the next meal` : 'Not growing') +
+      : ready ? (() => { const s = trainingSplit(status.arrivals_next);
+          return `+${num(s.join)} ${s.join === 1 ? 'person' : 'people'} at the next meal` +
+            (s.share ? ` <span class="dim small">(${num(s.sent)} more ${s.sent === 1 ? 'goes' : 'go'} to training: ${Math.round(s.share * 100)}% of newcomers)</span>` : ''); })()
+      : 'Not growing') +
     ` <span class="dim">(next meal in <span data-timer="meal"></span>)</span></p>` +
     `<p class="dim">A meal happens every ${duration(status.meal_time)}. At each meal everyone eats 1 food, ` +
-    `and if both things below are true one new person joins - so at best ${num(perHour * status.arrivals_max)} people per hour.` +
+    `and if both things below are true one new person joins - so at best ${num(perHour * status.arrivals_max * (1 - trainingShare()))} people per hour` +
+    (trainingShare() ? ` (${num(perHour * status.arrivals_max)} before ${Math.round(trainingShare() * 100)}% of them go to training)` : '') + `.` +
     (status.arrivals_max > 1 ? ` Your taverns let up to <span class="hi">${num(status.arrivals_max)}</span> arrive per meal; each extra arrival needs ` +
       `its own free place to live and enough food in store to cover one more mouth.` :` A Tavern (Village) lets one more arrive per meal.`) + `</p>` +
     status.growth.map(g => `<div class="opt"><span class="${g.ok ? 'good' : 'bad'}">[${g.ok ? 'x' : ' '}]</span> ${esc(g.text)}` +
