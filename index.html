@@ -2855,11 +2855,14 @@ function render() {
   const ready = !visiting && status.advance && status.advance.ready;
   setHTML(document.querySelector('[data-tab=city]'), (gfx() ? icon('house') : '') + 'City' +
     (ready ? (gfx() ? ' <span class="nav-badge">Ready</span>' : ' <span class="good">(ready)</span>') : ''));
-  const iv = view.ideology, ideoTodo = !visiting && state.tech >= 1 && (!iv.id || iv.points > 0);
+  const iv = view.ideology, ideoPoints = iv.points + (iv.tree ? iv.tree.points : 0), questReady = !visiting && questCanFinish(iv);
+  const ideoTodo = !visiting && state.tech >= 1 && (!iv.id || ideoPoints > 0 || questReady);
   const cursedNow = !visiting && iv.curses && iv.curses.on_me.length;
   setHTML(document.querySelector('[data-tab=ideology]'), (gfx() ? icon('shaman') : '') + 'Ideology' +
-    (!ideoTodo ? '' : gfx() ? ` <span class="nav-badge">${iv.id ? iv.points : 'Choose'}</span>`
-      : ` <span class="good">(${iv.id ? iv.points + (iv.points === 1 ? ' point' : ' points') : 'choose'})</span>`) +
+    (!ideoTodo ? '' : gfx() ? (!iv.id ? ` <span class="nav-badge">Choose</span>` : (questReady ? ` <span class="nav-badge">${esc(iv.quests.word)} ready</span>` : '') +
+        (ideoPoints ? ` <span class="nav-badge">${ideoPoints}</span>` : ''))
+      : !iv.id ? ` <span class="good">(choose)</span>` : (questReady ? ` <span class="good">(${esc(iv.quests.word.toLowerCase())} ready)</span>` : '') +
+        (ideoPoints ? ` <span class="good">(${ideoPoints} ${ideoPoints === 1 ? 'point' : 'points'})</span>` : '')) +
     (cursedNow ? ` <span class="bad">(hindered)</span>` : ''));
   // The browser tab's title: the city, and how many things are waiting, so it shows from another tab.
   const waitingCount = visiting ? 0 : (state.messages || []).filter(m => !m.read).length + (state.sales || []).length +
@@ -4436,7 +4439,7 @@ function renderIdeology() {
                   rituals: [i.ritual_plural, Object.keys(iv.rituals.active).length ? `<span class="good">${Object.keys(iv.rituals.active).length} running</span>`
                                               : iv.rituals.rank ? `${iv.rituals.rank} of 5 open` : 'need research'],
                   artifacts: ['Artifacts', `${(view.artifacts.shrine || []).length} of ${view.defs.artifacts.slots} enshrined`],
-                  ...(iv.quests ? { quests: [iv.quests.plural, `${iv.quests.done} done`] } : {}),
+                  ...(iv.quests ? { quests: [iv.quests.plural, questCanFinish(iv) && own ? `<span class="good">ready to finish</span>` : `${iv.quests.done} done`] } : {}),
                   ...(view.wonders && view.wonders.list.length ? { wonders: ['Wonders', `${view.wonders.list.reduce((n, r) => n + r.count, 0)} built`] } : {}),
                   compare: ['Compare all six', ''], all: ['Everything', ''] };
   if (!parts[ideoView]) ideoView = 'mine';
@@ -4444,7 +4447,8 @@ function renderIdeology() {
 
   const header = `<div class="panel ideology-hero" style="--ideo:${esc(i.color)}">` + `<div class="ideology-identity">${ideologyArt(iv.id, i.art)}<div class="ideology-intro"><h2>Your city's ideology</h2>` +
       `<div class="ideology-title">${esc(i.name)}</div><div class="ideology-description">${esc(i.desc)}</div></div>` +
-      (own ? `<div class="ideology-points"><strong>${num(iv.points)}</strong><span>${iv.points === 1 ? 'point' : 'points'} to spend</span></div>` : '') + `</div>` +
+      (own ? `<div class="ideology-points"><strong>${num(iv.points + (iv.tree ? iv.tree.points : 0))}</strong><span>${iv.points + (iv.tree ? iv.tree.points : 0) === 1 ? 'point' : 'points'} to spend</span>` +
+        (iv.tree ? `<span class="small">${num(iv.points)} ${esc(i.perk_plural.toLowerCase())}, ${num(iv.tree.points)} tree</span>` : '') + `</div>` : '') + `</div>` +
     `<div class="bar">` + Object.entries(parts).map(([k, [label, note]]) =>
       `<button data-ideo-view="${k}" class="${ideoView === k ? 'on' : ''}">${label}${note ? ` <span class="small">${note}</span>` : ''}</button>`).join('') + `</div></div>`;
 
@@ -4496,6 +4500,12 @@ function renderIdeology() {
 }
 // ---- the quest tree, in the Perks part of the Ideology tab ----
 let perkTab = settings.perkTab || 'perks';     // 'perks' (by tech level) or 'tree' (from quests): remembered
+// True when what is in store covers everything the current quest still asks for.
+function questCanFinish(iv) {
+  const q = iv && iv.quests, have = view.state.resources;
+  return !!q && Object.entries(q.need).every(([r, need]) => have[r] >= need - (q.given[r] || 0)) &&
+    Object.entries(q.need).some(([r, need]) => need - (q.given[r] || 0) > 0);
+}
 function treeNode(n, own) {
   const endless = n.max == null, full = !endless && n.level >= n.max;
   const pips = endless ? '' : Array.from({ length: n.max }, (_, k) => `<i class="${k < n.level ? 'on' : ''}"></i>`).join('');
@@ -4569,6 +4579,7 @@ function questPanel(i, iv, own) {
     `there is no time limit. Each one asks for ${Math.round((q.growth - 1) * 100)}% more than the last, and each one done gives a prize for good, ` +
     `a little bigger every time.</p>` +
     `<div class="cat">${esc(q.word)} ${q.done + 1}</div>` +
+    (own && questCanFinish(iv) ? `<p class="good" style="margin:4px 0">You have everything this ${esc(q.word.toLowerCase())} still asks for: press "Give all I can" to finish it.</p>` : '') +
     `<div class="scroll"><table><tr><th>Asks for</th><th>Given</th><th></th><th>You have</th><th></th></tr>${rows}</table></div>` +
     (own ? `<div class="bar"><button data-quest-all>Give all I can</button></div>` : '') +
     `<p>Prize, for good: <span class="good">${q.prize.map(esc).join(', ')}</span></p>` +
@@ -4943,6 +4954,21 @@ function renderCauldron() {
           : 'Each hour at x1: ' + plain(x.ingredients)}</div>` +
         (open ? brewDetail(id, x) : '') + `</div>`;
     }).join('') + `</div></div>`;
+  // where the cheaper and stronger brews come from
+  const src = pot.sources || [], pc = x => `${Math.round(x * 1000) / 10}%`;
+  const thrift = src.reduce((n, s) => n + s.cost, 0), power = src.reduce((n, s) => n + s.power, 0);
+  html += `<details class="panel" data-fold="brewBoosts" ${isOpen('brewBoosts', true) ? 'open' : ''}><summary class="cat">What changes your brews` +
+    ` <span class="dim small">ingredients x${(pot.cost_mult || 1).toFixed(2)}, strength x${(pot.power_mult || 1).toFixed(2)}</span></summary>` +
+    (src.length ? `<div class="scroll"><table><tr><th>From</th><th class="n">Fewer ingredients</th><th class="n">Stronger</th></tr>` +
+      src.map(s => `<tr><td>${esc(s.from)}</td><td class="n ${s.cost ? 'good' : 'dim'}">${s.cost ? '+' + pc(s.cost) : '-'}</td>` +
+        `<td class="n ${s.power ? 'good' : 'dim'}">${s.power ? '+' + pc(s.power) : '-'}</td></tr>`).join('') +
+      `<tr><td class="hi">In all</td><td class="n hi">+${pc(thrift)}</td><td class="n hi">+${pc(power)}</td></tr></table></div>` +
+      `<p class="small" style="margin-bottom:0">Strength: the bonuses add up, so brews are <span class="good">${pc(power)}</span> stronger ` +
+      `(x${(pot.power_mult || 1).toFixed(2)}).` + (thrift ? ` Ingredients: the bonuses add up to ${pc(thrift)}, and a brew takes 1 / (1 + ${pc(thrift)}) of what it would, ` +
+      `so <span class="good">${pc(1 - (pot.cost_mult || 1))}</span> fewer (x${(pot.cost_mult || 1).toFixed(2)}): each bonus helps a little less than the last, ` +
+      `and brews are never free.` : '') + `</p>`
+      : `<p class="dim small">Nothing makes your brews cheaper or stronger yet. Cauldron buildings (Witch's Garden, Alchemist's Workshop, ` +
+        `Grand Apothecary, Arcane Distillery) and their additions, some ideology perks and Cauldron artifacts do.</p>`) + `</details>`;
   setHTMLKeep($('cauldronBody'), html);
   drawPot();
 }

@@ -577,6 +577,23 @@ def own_effects(state):
     return total
 
 
+def effect_parts(state):
+    """What own_effects adds up, one part at a time: [(where it comes from, effects)], for breakdowns."""
+    ideo = chosen(state)
+    if not ideo:
+        return []
+    parts = [(ideo["name"], ideo["effects"])]
+    parts += [(f"{ideo['perks'][p]['name']} ({ideo['perk_word'].lower() if 'perk_word' in ideo else 'perk'})", ideo["perks"][p]["effects"])
+              for p in state.get("perks", []) if p in ideo["perks"]]
+    parts += [(f"{ideo['rituals'][rid]['name']} (running)", _scaled(ideo["rituals"][rid]["effects"], r["scale"]))
+              for rid, r in active_rituals(state)]
+    parts.append((f"{ideo.get('quest_plural', 'Quest')} prizes", quest_effects(state)))
+    for n, lvl in tree_levels(state).items():      # each perk of the tree on a line of its own
+        if n in TREE_NODES and lvl:
+            parts.append((f"{TREE_NODES[n]['name']} level {lvl} ({TREES[TREE_NODES[n]['ideology']][0]})", _scaled(TREE_NODES[n]["per"], lvl)))
+    return parts
+
+
 # ---- rituals ----
 
 def ritual_rank(state):

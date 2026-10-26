@@ -85,6 +85,34 @@ def boosts(state):
     return 1 / (1 + max(0.0, thrift)), 1 + max(0.0, power)
 
 
+def boost_sources(state):
+    """Everything that makes brews cheaper or stronger, one line each: [{"from", "cost", "power"}] (the same
+    sources boosts() adds up)."""
+    import artifacts
+    import game
+    rows, count = [], {}
+    for t in game.all_tiles(state):
+        if not t["building"]:
+            continue
+        for kind, key in [("b", t["building"])] + [("a", aid) for aid in t["additions"]]:
+            d = (game.BUILDINGS if kind == "b" else game.ADDITIONS)[key]
+            if d.get("cauldron_cost") or d.get("cauldron_power"):
+                count[(kind, key)] = count.get((kind, key), 0) + 1
+    for (kind, key), n in count.items():
+        d = (game.BUILDINGS if kind == "b" else game.ADDITIONS)[key]
+        rows.append({"from": f"{d['name']}{' (addition)' if kind == 'a' else ''}" + (f" x{n}" if n > 1 else ""),
+                     "cost": d.get("cauldron_cost", 0) * n, "power": d.get("cauldron_power", 0) * n})
+    for label, eff in ideology.effect_parts(state):
+        if eff.get("cauldron_cost") or eff.get("cauldron_power"):
+            rows.append({"from": label, "cost": eff.get("cauldron_cost", 0), "power": eff.get("cauldron_power", 0)})
+    for art in artifacts.enshrined(state):
+        eff = artifacts.effects_of(art, state)
+        if eff.get("cauldron_cost") or eff.get("cauldron_power"):
+            rows.append({"from": artifacts.ARTIFACTS[art["kind"]]["name"] + " (artifact)",
+                         "cost": eff.get("cauldron_cost", 0), "power": eff.get("cauldron_power", 0)})
+    return [{**r, "cost": round(r["cost"], 4), "power": round(r["power"], 4)} for r in rows]
+
+
 def cost(rid, times, state=None):
     """What one brew (an hour) of `times` the recipe takes (less, for a city with cheaper-brews bonuses)."""
     mult = boosts(state)[0]
@@ -233,5 +261,6 @@ def view(state):
             "until": pot.get("until"), "brewing": bool(now),
             "cost": cost(rid, pot["times"], state) if rid else None,
             "cost_mult": round(boosts(state)[0], 4), "power_mult": round(boosts(state)[1], 4),
+            "sources": boost_sources(state),
             "text": ideology.describe(ideology._scaled(RECIPES[now[0]]["effects"], now[1])) if now else [],
             "locked": {r: locked(state, r) for r in RECIPES}}
