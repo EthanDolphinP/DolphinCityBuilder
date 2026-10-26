@@ -3851,6 +3851,38 @@ def _playable(tiles):
             and 2 <= count("water") <= len(flat) // 3)
 
 
+# ---- the tutorial: every city is taken through the game one step at a time (see TUTOR in index.html, whose
+# steps these are, in the same order). New cities must finish it; cities from before it can skip it. ----
+TUTORIAL_STEPS = ("welcome", "stores", "select", "food", "house", "knowledge", "priority", "addition",
+                  "people", "people_read", "research_open", "research", "explore", "explore_read", "beast", "beast_read",
+                  "market", "market_read", "cauldron", "cauldron_read", "ideology", "ideology_read",
+                  "back_to_city", "advance_read", "finish")
+TUTORIAL_GIFTS = {"research": {"knowledge": 30}}     # handed over when the tutorial reaches that step, once
+
+
+def tutorial_reach(state, now, step):
+    """The tutorial moves on to `step` (never back), or ends ("done")."""
+    tut = state.setdefault("tutorial", {"at": TUTORIAL_STEPS[0], "done": False, "skippable": True, "gifts": []})
+    if step == "done":
+        tut["done"] = True
+        return None
+    if step not in TUTORIAL_STEPS:
+        return "Unknown tutorial step."
+    here = TUTORIAL_STEPS.index(tut["at"]) if tut["at"] in TUTORIAL_STEPS else 0
+    there = TUTORIAL_STEPS.index(step)
+    if there <= here:
+        return None
+    for s in TUTORIAL_STEPS[here + 1:there + 1]:
+        gift = TUTORIAL_GIFTS.get(s)
+        if gift and s not in tut.setdefault("gifts", []):
+            for k, v in gift.items():
+                state["resources"][k] += v
+            tut["gifts"].append(s)
+            log(state, now, f"The tutorial gave you {fmt_goods(gift)} to try it out.")
+    tut["at"] = step
+    return None
+
+
 def new_game(name, now, seed=None):
     rng = random.Random(seed)
     while True:
@@ -3876,6 +3908,7 @@ def new_game(name, now, seed=None):
     }
     state["banned"] = []     # cities that may not view this one or propose bills to it
     state["priorities"] = PRIORITY_VERSION
+    state["tutorial"] = {"at": TUTORIAL_STEPS[0], "done": False, "skippable": False, "gifts": []}   # a new city takes it all
     beasts.setup(state, now, rng)
     ideology.setup(state)
     _remember_seen(state, now)
@@ -3927,6 +3960,8 @@ def migrate(state, now):
         state["priorities"] = PRIORITY_VERSION
     beasts.migrate(state, now)
     ideology.setup(state)
+    # a city from before the tutorial goes through it too, but may skip it
+    state.setdefault("tutorial", {"at": TUTORIAL_STEPS[0], "done": False, "skippable": True, "gifts": []})
     return state
 
 
@@ -5145,6 +5180,14 @@ def apply_action(state, now, action, data):
         return beasts.deliver(state, now)
     if action == "egg_deliver":
         return beasts.deliver(state, now, data.get("beast"))
+    if action == "tutorial":
+        return tutorial_reach(state, now, data.get("reach"))
+    if action == "tutorial_skip":
+        tut = state.get("tutorial") or {}
+        if not tut.get("skippable"):
+            return "A new city goes through the tutorial to the end."
+        tut["done"] = True
+        return None
     if action == "report_seen":     # the player has read the oldest expedition report
         since = data.get("since")
         if isinstance(since, (int, float)) and not isinstance(since, bool):
