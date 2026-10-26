@@ -69,8 +69,8 @@ That makes, in `desktop-app/dist/`:
 
 | File | What it is |
 |---|---|
-| `Dolphin City Builder Setup 1.0.0.exe` | An installer, with Start menu shortcut and uninstaller. |
-| `DolphinCityBuilder-1.0.0-portable.exe` | The same app as one file that runs without installing. |
+| `Dolphin City Builder Setup 1.1.0.exe` | An installer, with Start menu shortcut and uninstaller. |
+| `DolphinCityBuilder-1.1.0-portable.exe` | The same app as one file that runs without installing. |
 | `win-unpacked/` | The app as a plain folder. This is what Steam would want uploaded. |
 
 They are about 105 MB each, mostly Chromium, so they are not kept in git
