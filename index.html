@@ -5322,7 +5322,18 @@ function renderPeople() {
     `<p><span class="hi">${num(tr.trained)}</span> trained: every building with workers is <span class="good">${pct(tr.bonus)}</span> faster. ` +
     `<span class="dim small">Next: ${pct(tr.next_bonus)} at ${num(tr.next_at)} trained.</span></p>` +
     `<div class="bar"><span class="dim small">Newcomers sent to training:</span>` +
-    tr.shares.map(s => `<button data-train-share="${s}" class="${tr.share === s ? 'on' : ''}" ${visiting ? 'disabled' : ''}>${s === 0 ? 'None' : Math.round(s * 100) + '%'}</button>`).join('') + `</div>`);
+    tr.shares.map(s => `<button data-train-share="${s}" class="${tr.share === s ? 'on' : ''}" ${visiting ? 'disabled' : ''}>${s === 0 ? 'None' : Math.round(s * 100) + '%'}</button>`).join('') + `</div>` +
+    // idle workers: sent to training at once, for food up front
+    (visiting || !tr.idle_food ? '' : `<div class="cat">Train idle workers</div>` +
+      `<p class="dim small" style="margin-top:0">Workers with no job can be sent to training too: <span class="hi">${num(tr.idle_food)} Food</span> each now, ` +
+      `and from then on they eat like everyone else (and leave their homes free).</p>` +
+      (status.idle ? `<div class="bar"><span class="dim small">${num(status.idle)} idle:</span>` +
+        [...new Set([Math.floor(status.idle / 4), Math.floor(status.idle / 2), status.idle])].filter(n => n > 0).map(n =>
+          `<button data-train-idle="${n}" ${state.resources.food >= n * tr.idle_food ? '' : 'disabled title="Not enough Food"'}>` +
+          `${n === status.idle ? 'All' : num(n)} <span class="dim small">(${num(n * tr.idle_food)} Food)</span></button>`).join('') +
+        `<input id="trainIdleCount" type="number" min="1" max="${status.idle}" placeholder="how many" style="width:110px">` +
+        `<button data-train-idle="box">Send</button></div>`
+        : `<p class="dim">No workers are idle right now: every one has a job.</p>`)));
   // Food
   const fullHousingFood = status.housing * perHour;
   const potentialFood = status.food_potential;
@@ -6621,6 +6632,14 @@ document.addEventListener('click', e => {
 $('pplTraining').addEventListener('click', e => {
   const b = e.target.closest('[data-train-share]');
   if (b && !visiting) act('training_set', { share: Number(b.dataset.trainShare) });
+  const idle = e.target.closest('[data-train-idle]');
+  if (idle && !visiting) {
+    const n = idle.dataset.trainIdle === 'box' ? Math.floor(Number($('trainIdleCount').value)) : Number(idle.dataset.trainIdle);
+    if (!(n > 0)) { say('Type how many idle workers to send.'); return; }
+    const food = n * view.training.idle_food;
+    if (confirm(`Send ${n.toLocaleString()} idle workers to training for ${food.toLocaleString()} Food? They stop working for good, ` +
+                `and eat like everyone else from then on.`)) act('train_idle', { count: n });
+  }
 });
 $('socTags').addEventListener('click', e => {
   const pin = e.target.closest('[data-tag-pin]'), unpin = e.target.closest('[data-tag-unpin]');

@@ -5014,6 +5014,30 @@ def set_training(state, now, share):
     return None
 
 
+TRAIN_IDLE_FOOD = 10      # food each idle worker sent to training costs up front (they eat as everyone does after)
+
+
+def train_idle(state, now, n):
+    """Send `n` of the city's idle workers to training: they stop being workers (and leave their homes free), and
+    join the trained, for TRAIN_IDLE_FOOD food each now."""
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+        return "Choose how many idle workers to send."
+    idle = work_plan(state)[2]["idle"]
+    if n > idle:
+        return f"Only {idle:,} workers are idle." if idle else "No workers are idle: every one has a job."
+    cost = n * TRAIN_IDLE_FOOD
+    if state["resources"]["food"] < cost:
+        return f"Training {n:,} costs {cost:,} Food; you have {int(state['resources']['food']):,}."
+    state["resources"]["food"] -= cost
+    state["population"] -= n
+    t = state.setdefault("training", {"share": 0, "trained": 0, "carry": 0.0})
+    t["trained"] = t.get("trained", 0) + n
+    tally(state, "trained", n)
+    log(state, now, f"Sent {n:,} idle workers to training for {cost:,} Food. {t['trained']:,} trained now: "
+                    f"every building with workers is {round(training_bonus(state) * 100, 1)}% faster.")
+    return None
+
+
 def _train(state, arrivals):
     """Of this meal's `arrivals`, how many go to training (the rest join the city)."""
     t = state.get("training")
@@ -5031,7 +5055,7 @@ def training_view(state):
     trained = t.get("trained", 0)
     next_at = TRAINING_UNIT * (2 ** (math.floor(math.log2(1 + trained / TRAINING_UNIT)) + 1) - 1)
     return {"share": min(t.get("share", 0), TRAINING_MAX), "trained": trained, "bonus": round(training_bonus(state), 4), "shares": list(TRAINING_SHARES),
-            "step": TRAINING_STEP, "unit": TRAINING_UNIT,
+            "step": TRAINING_STEP, "unit": TRAINING_UNIT, "idle_food": TRAIN_IDLE_FOOD,
             "next_at": int(next_at), "next_bonus": round(training_bonus(state, next_at), 4)}
 
 
@@ -5968,6 +5992,8 @@ def apply_action(state, now, action, data):
         return tags.set_shown(state, data.get("tags"))
     if action == "training_set":
         return set_training(state, now, data.get("share"))
+    if action == "train_idle":
+        return train_idle(state, now, data.get("count"))
     if action == "tree_take":
         return ideology.tree_take(state, now, data.get("node"))
     if action == "quest_give":
