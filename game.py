@@ -4989,8 +4989,9 @@ def _speed(state, job, power=1.0, env=1.0):
 # A city can send a share of each meal's newcomers (TRAINING_SHARES) to training. They don't join the city (so they
 # don't eat or need a home): each one adds to the city's trained count, and every building with workers is faster by
 # TRAINING_STEP for each doubling of it (in TRAINING_UNIT steps): 30 trained +4%, 90 +8%, 210 +12%, 450 +16%...
-# Only people who would really have come are trained, so a city whose homes are all full trains nobody. At most 90%
-# can be sent: the rest join and fill the homes, so training stops unless the city keeps building homes.
+# Trained people live in the city: they count in its population, eat and need a home, but never take a job. Only
+# people who would really have come are trained, so a city whose homes are all full trains nobody. At most 90%
+# can be sent.
 TRAINING_SHARES = (0, 0.25, 0.5, 0.75, 0.9)
 TRAINING_MAX = 0.9
 TRAINING_STEP = 0.04
@@ -5034,9 +5035,19 @@ def training_view(state):
             "next_at": int(next_at), "next_bonus": round(training_bonus(state, next_at), 4)}
 
 
+def trained_people(state):
+    return int(state.get("training", {}).get("trained", 0))
+
+
+def people(state):
+    """Everyone who lives in the city: its workers (state["population"]) and the people sent to training, who eat
+    and need a home like anyone else but never take a job."""
+    return state["population"] + trained_people(state)
+
+
 def _meal(state, housing, when):
     """Everyone eats. Returns True if the population changed."""
-    res, pop = state["resources"], state["population"]
+    res, pop = state["resources"], people(state)
     tally(state, "meals")
     if res["food"] < pop:
         tally(state, "hungry_meals")
@@ -5219,7 +5230,7 @@ def _arrivals(pop, food_left, housing, tries):
 
 def next_arrivals(state, housing):
     """How many people would join at the next meal as things stand."""
-    pop, food = state["population"], state["resources"]["food"]
+    pop, food = people(state), state["resources"]["food"]
     if food < pop:
         return 0
     return _arrivals(pop, food - pop, housing, 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]))
@@ -5544,7 +5555,7 @@ def advance_checks(state):
     if state["tech"] + 1 >= len(TECH_LEVELS):
         return []
     nxt = TECH_LEVELS[state["tech"] + 1]
-    checks = [(state["population"], nxt["population"], "population")]
+    checks = [(people(state), nxt["population"], "population")]
     checks += [(int(state["resources"][k]), v, RESOURCES[k]) for k, v in nxt["cost"].items()]
     if nxt.get("research"):
         checks.append((len(state["research"]), nxt["research"], "things researched"))
@@ -5615,7 +5626,7 @@ def open_present(state, now, present_id):
 
 def _remember_seen(state, when):
     state["seen"] = {"t": when, "resources": dict(state["resources"]),
-                     "population": state["population"]}
+                     "population": people(state)}
 
 
 def check_in(state, now):
@@ -5628,7 +5639,7 @@ def check_in(state, now):
             "since": seen["t"],
             "resources": {k: round(state["resources"][k] - seen["resources"].get(k, 0), 1)
                           for k in RESOURCES},
-            "population": state["population"] - seen["population"],
+            "population": people(state) - seen["population"],
             "hungry": state["hungry"],
             "events": [e for e in state["log"] if e["t"] > seen["t"]],
         }
@@ -6128,7 +6139,7 @@ def _view(state, ai, detail):
     area = state["areas"][ai]
     jobs, housing, totals = work_plan(state)
     rates = {k: 0.0 for k in RESOURCES}   # expected change per hour, whole city
-    rates["food"] -= state["population"] * 3600 / MEAL_TIME
+    rates["food"] -= people(state) * 3600 / MEAL_TIME
     food_made = 0.0
     food_potential = 0.0
     here = {}
@@ -6253,7 +6264,8 @@ def _view(state, ai, detail):
                                        * ideology.curse_factor(state, "explore"), 3)},
             "food_made": round(food_made, 1),
             "food_potential": round(food_potential, 1),
-            "food_eaten": round(state["population"] * 3600 / MEAL_TIME, 1),
+            "food_eaten": round(people(state) * 3600 / MEAL_TIME, 1),
+            "trained": trained_people(state),
             "housing_from": housing_sources(state),
             "growth": growth_checks(state, housing),
             # whole people: _arrivals lets one more in while fewer than this have come, so a fraction counts as one more
@@ -6400,7 +6412,7 @@ def housing_sources(state):
 
 def growth_checks(state, housing):
     """What _meal needs before it adds a person, and whether each is met right now."""
-    pop, food = state["population"], int(state["resources"]["food"])
+    pop, food = people(state), int(state["resources"]["food"])
     return [
         {"ok": food >= 2 * pop,
          "text": f"Food for the next meal with another meal to spare: {2 * pop} needed, {food} in store",
@@ -6463,7 +6475,7 @@ def _city_stats(state, now, rates):
         ["Founded", {"time": state["founded"]}, ""],
         ["Age", {"dur": now - state["founded"]}, ""],
         ["Ideology", ideo["name"] if ideo else "not chosen yet", f"{len(state.get('perks', []))} perks taken, {ideology.points(state)} points to spend" if ideo else ""],
-        ["Population", state["population"], ""],
+        ["Population", people(state), f"{trained_people(state):,} of them trained (they don't work)" if trained_people(state) else ""],
         ["Buildings", len(built), ""],
         ["Areas", len(state["areas"]), ""],
         ["Research done", len(state["research"]), f"of {len(RESEARCH)}"],
@@ -6473,15 +6485,15 @@ def _city_stats(state, now, rates):
     # ---- people
     workers = state["population"] - totals["idle"]
     section("people", "People", {"rows": [
-        ["Population", state["population"], ""],
-        ["Housing", housing, f"{max(0, housing - state['population'])} beds free"],
+        ["Population", people(state), f"{trained_people(state):,} of them trained (they don't work)" if trained_people(state) else ""],
+        ["Housing", housing, f"{max(0, housing - people(state))} beds free"],
         ["Jobs", totals["jobs"], f"{max(0, totals['jobs'] - workers)} unfilled"],
         ["Working", workers, pct(workers / state["population"]) if state["population"] else ""],
         ["Idle", totals["idle"], ""],
         ["Hungry", "yes: buildings that don't make food work at half speed" if state["hungry"] else "no", ""],
-        ["Food eaten per meal", state["population"], f"every {MEAL_TIME // 60} minutes"],
-        ["Food eaten per hour", round(state["population"] * 3600 / MEAL_TIME), ""],
-        ["Food in store lasts", {"dur": state["resources"]["food"] / state["population"] * MEAL_TIME} if state["population"] else "", "with nothing more made"],
+        ["Food eaten per meal", people(state), f"every {MEAL_TIME // 60} minutes"],
+        ["Food eaten per hour", round(people(state) * 3600 / MEAL_TIME), ""],
+        ["Food in store lasts", {"dur": state["resources"]["food"] / people(state) * MEAL_TIME} if people(state) else "", "with nothing more made"],
         ["Next meal in", {"dur": MEAL_TIME - state["meal"]}, ""],
         ["Most arrivals per meal", 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]), ""],
         ["Arrivals at the next meal", next_arrivals(state, housing), ""],
@@ -6508,7 +6520,7 @@ def _city_stats(state, now, rates):
             by_building[key] = by_building.get(key, 0) + v * per_hour
         for k, v in job["consumes"].items():
             used[k] += v * per_hour
-    used["food"] += state["population"] * 3600 / MEAL_TIME
+    used["food"] += people(state) * 3600 / MEAL_TIME
     section("resources", "Resources", {"head": ["Resource", "In store", "Made per hour", "Used per hour", "Change per hour", "Runs out in"],
         "rows": [[RESOURCES[k], int(state["resources"][k]), round(made[k], 1), round(used[k], 1), rates.get(k, 0),
                   {"dur": state["resources"][k] / -rates[k] * 3600} if rates.get(k, 0) < 0 and state["resources"][k] > 0 else ""]
@@ -6714,7 +6726,8 @@ def summary(state):
         "tech": state["tech"],
         "tech_name": TECH_LEVELS[state["tech"]]["name"],
         "ideology": ideology.chosen(state)["name"] if ideology.chosen(state) else None,
-        "population": state["population"],
+        "population": people(state),          # trained people included (see "trained")
+        "trained": trained_people(state),
         # research done, and every Mastery level a Megacity has studied since (each is research too)
         "research": len(state["research"]) + sum(state.get("mastery", {}).values()),
         "researched": len(state["research"]),
