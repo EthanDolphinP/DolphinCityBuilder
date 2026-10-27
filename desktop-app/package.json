@@ -1,7 +1,7 @@
 {
   "name": "dolphin-city-builder",
   "productName": "Dolphin City Builder",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Dolphin City Builder: a real-time multiplayer city builder.",
   "author": "EthanDolphinP",
   "license": "UNLICENSED",
@@ -34,7 +34,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Dolphin City Builder"
+      "shortcutName": "Dolphin City Builder",
+      "artifactName": "DolphinCityBuilder-Setup-${version}.exe"
     },
     "portable": {
       "artifactName": "DolphinCityBuilder-${version}-portable.exe"
@@ -46,10 +47,19 @@
       ],
       "icon": "build/icon.png",
       "category": "Game"
-    }
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/EthanDolphinP/DolphinCityBuilder/releases/latest/download"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^44.7.2",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

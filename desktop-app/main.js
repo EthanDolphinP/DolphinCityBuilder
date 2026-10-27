@@ -7,7 +7,8 @@
 // the player's computer, so it also runs where those are missing (a Steam
 // Deck, for instance, once built for Linux).
 
-const { app, BrowserWindow, Menu, shell, session } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, session } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 const GAME_URL = process.env.DCB_URL || 'https://dolphincitybuilder.duckdns.org/';   // DCB_URL: test against another copy
@@ -70,9 +71,65 @@ function createWindow() {
   win.on('closed', () => { win = null; });
 }
 
+// ---- updating the app itself ----
+// The game updates on the server; this is for the app around it. New versions are published as a GitHub release
+// (the one marked Latest) with latest.yml, the installer and its .blockmap. The installed app downloads a new
+// version quietly, then offers to restart into it (or installs it when the app is next closed). The portable app
+// can't replace itself, so it says a new version is out and opens the download page.
+const RELEASES = 'https://github.com/EthanDolphinP/DolphinCityBuilder/releases/latest';
+const UPDATE_EVERY = 6 * 3600 * 1000;      // checked at start, then every 6 hours
+
+function newer(a, b) {       // is version a newer than b ("1.10.0" > "1.9.2")
+  const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+
+function watchForUpdates() {
+  if (!app.isPackaged) return;
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {          // the portable app: say so, and open the download page
+    let told = false;
+    const check = async () => {
+      if (told) return;
+      try {
+        const text = await (await fetch(`${RELEASES}/download/latest.yml`)).text();
+        const latest = (text.match(/^version:\s*(.+)$/m) || [])[1];
+        if (latest && newer(latest.trim(), app.getVersion())) {
+          told = true;
+          const { response } = await dialog.showMessageBox(win, {
+            type: 'info', buttons: ['Download it', 'Later'], defaultId: 0, cancelId: 1, title: TITLE,
+            message: `Version ${latest.trim()} of the app is out (you have ${app.getVersion()}).`,
+            detail: 'This is the portable app, which cannot update itself. Download the new one and use it instead; your city is kept on the server.' });
+          if (response === 0) shell.openExternal(RELEASES);
+        }
+      } catch (error) { /* offline, or no release yet: try again later */ }
+    };
+    check();
+    setInterval(check, UPDATE_EVERY);
+    return;
+  }
+  let asked = false;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;            // if "Later": installed when the app is next closed
+  autoUpdater.on('error', () => {});                   // offline, or no release yet: try again later
+  autoUpdater.on('update-downloaded', async info => {
+    if (asked) return;
+    asked = true;
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'info', buttons: ['Restart now', 'Later'], defaultId: 0, cancelId: 1, title: TITLE,
+      message: `Version ${info.version} of the app is ready.`,
+      detail: 'Restart to use it now, or it will be installed the next time you close the app. Your city is kept on the server.' });
+    if (response === 0) setImmediate(() => autoUpdater.quitAndInstall());
+  });
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  check();
+  setInterval(check, UPDATE_EVERY);
+}
+
 app.whenReady().then(() => {
   // The game asks for nothing (camera, location, notifications...), so nothing is granted.
   session.fromPartition('persist:game').setPermissionRequestHandler((wc, permission, callback) => callback(false));
   createWindow();
+  watchForUpdates();
 });
 app.on('window-all-closed', () => app.quit());

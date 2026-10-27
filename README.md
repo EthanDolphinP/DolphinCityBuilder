@@ -69,14 +69,27 @@ That makes, in `desktop-app/dist/`:
 
 | File | What it is |
 |---|---|
-| `Dolphin City Builder Setup 1.1.0.exe` | An installer, with Start menu shortcut and uninstaller. |
-| `DolphinCityBuilder-1.1.0-portable.exe` | The same app as one file that runs without installing. |
+| `DolphinCityBuilder-Setup-1.2.0.exe` | An installer, with Start menu shortcut and uninstaller. It updates itself. |
+| `DolphinCityBuilder-Setup-1.2.0.exe.blockmap`, `latest.yml` | What the installed app reads to update itself (see below). |
+| `DolphinCityBuilder-1.2.0-portable.exe` | The same app as one file that runs without installing. It can't update itself; it says when a new one is out. |
 | `win-unpacked/` | The app as a plain folder. This is what Steam would want uploaded. |
 
 They are about 105 MB each, mostly Chromium, so they are not kept in git
 (GitHub refuses files over 100 MB). Share them by attaching them to a GitHub
 release instead. If `npm run start` says Electron is missing, run
 `node node_modules/electron/install.js` once.
+
+**Updating the app.** The installed app checks GitHub when it starts and every 6 hours. When there is a
+newer version it downloads it quietly, then offers to restart into it (or installs it the next time the app
+is closed). To publish one:
+
+1. Raise `version` in `desktop-app/package.json` (1.2.0 to 1.2.1, say), then `npm run dist`.
+2. On GitHub, open **Releases**, and either make a new release or edit the one marked **Latest**. Upload
+   `latest.yml`, `DolphinCityBuilder-Setup-<version>.exe`, its `.blockmap`, and the portable `.exe`
+   (take the old versions' files off an edited release). The release must be the one marked Latest.
+
+Every app checks `releases/latest/download/latest.yml`, so whichever release is marked Latest is the one
+they update to. The game itself never needs this: it updates on the server.
 
 `npm run dist:linux` makes a Linux AppImage and folder; it is best run on a
 Linux computer. The game's address is at the top of `desktop-app/main.js`, and
