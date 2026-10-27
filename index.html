@@ -806,6 +806,96 @@
   @media (prefers-reduced-motion: reduce) {
     #map.ms *, #map.ms .tile { animation-duration: 0s !important; animation-iteration-count: 1 !important; }
   }
+
+  /* ===================== Phone layout (html.mobile) =====================
+     A tab bar along the bottom, a slim header that scrolls away, the resources in one row that swipes sideways,
+     a map that zooms and pans, and the selected tile's details in a sheet over the bottom of the screen. */
+  :root { --mobnav-h: 58px; }
+  #mobNav, #mobMore { display: none; }
+  /* map size buttons, on a computer too: a bigger map scrolls inside its own window */
+  #mobZoom { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
+  #mobZoom button { padding: 3px 10px; }
+  #mobZoom button.on { border-color: var(--accent); color: var(--accent); }
+  html:not(.mobile) #mapPanel > .scroll { overflow: auto; max-height: calc(100vh - var(--topbar-h, 60px) - 40px); border-radius: 8px; }
+  html.mobile body { padding-bottom: calc(var(--mobnav-h) + env(safe-area-inset-bottom, 0px)); }
+  html.mobile main { padding: 6px 8px calc(var(--mobnav-h) + 16px); }
+  /* the header: one line for the name, one for the status, and it scrolls away with the page */
+  html.mobile #topbar { position: static; padding: 6px 10px; gap: 0; }
+  html.mobile #topbar #titleBlock { width: 100%; }
+  html.mobile #topbar h1 { font-size: 16px; }
+  html.mobile #status { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  html.mobile #tabMenu, html.mobile #topbar .tabs, html.mobile #topbar.menuOpen .tabs { display: none; }
+  /* the tab bar */
+  html.mobile #mobNav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    height: calc(var(--mobnav-h) + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--panel, #161a1d); border-top: 1px solid var(--line); box-shadow: 0 -4px 18px #0006; }
+  html.mobile #mobNav button { position: relative; min-height: 0; height: var(--mobnav-h); padding: 6px 2px 4px; margin: 0; border: 0; border-radius: 0;
+    background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font-size: 11px; line-height: 1.1; color: var(--dim); }
+  html.mobile #mobNav button .ui-icon { width: 22px; height: 22px; }
+  html.mobile #mobNav button .mobGlyph { font-size: 17px; line-height: 1; }
+  html.mobile #mobNav button.on { color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+  html.mobile #mobNav .mobDot { position: absolute; top: 7px; right: calc(50% - 17px); width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 0 2px var(--panel, #161a1d); }
+  html.mobile #mobNav .mobDot.bad { background: var(--bad); }
+  /* "More": the other tabs, in a sheet above the bar */
+  html.mobile #mobMore:not([hidden]) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; position: fixed; left: 0; right: 0;
+    bottom: calc(var(--mobnav-h) + env(safe-area-inset-bottom, 0px)); z-index: 19; padding: 12px; background: var(--panel, #161a1d);
+    border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px #0008; }
+  html.mobile #mobMore button { min-height: 52px; font-size: 14px; white-space: normal; line-height: 1.2; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px; }
+  html.mobile #mobMore button.on { border-color: var(--accent); color: var(--accent); }
+  html.mobile #mobMore .ui-icon { width: 20px; height: 20px; }
+  /* resources: one row that swipes sideways, and the people figures a second (on the City tab) */
+  html.mobile #resourcePanel { padding: 6px; margin-top: 4px; }
+  html.mobile #resourcePanel .resource-head, html.mobile #resourceToggle { display: none !important; }
+  html.mobile #resources, html.mobile #resourcePanel #people { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; scroll-snap-type: x proximity;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  html.mobile #resources::-webkit-scrollbar, html.mobile #resourcePanel #people::-webkit-scrollbar { display: none; }
+  html.mobile #resourcePanel #people { margin-top: 6px; }
+  html.mobile body:not([data-shown="city"]) #resourcePanel #people { display: none !important; }
+  html.mobile #resources .stat, html.mobile #resourcePanel #people .stat { flex: 0 0 auto; min-width: 104px; max-width: 170px; scroll-snap-align: start;
+    padding: 5px 8px !important; display: block !important; }
+  html.mobile #resourcePanel .resource-panel:not(.expanded) .resource-extra, html.mobile #resourcePanel .resource-extra { display: block !important; }
+  html.mobile #resources .stat .v { font-size: 15px !important; }
+  html.mobile #resources .stat .r, html.mobile #resourcePanel #people .stat .r { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html.mobile #resources .stat .k .ui-icon { width: 15px !important; height: 15px !important; }
+  /* the map: zoom buttons, and a window onto it that pans with a finger */
+  html.mobile #mobZoom { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }
+  html.mobile #mobZoom button { min-height: 36px; padding: 4px 12px; }
+  html.mobile #mobZoom button.on { border-color: var(--accent); color: var(--accent); }
+  html.mobile #mapPanel > .scroll { overflow: auto; max-height: 64dvh; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    border-radius: 8px; touch-action: pan-x pan-y; }
+  html.mobile #mapPanel > h2, html.mobile #mapKey { display: none; }
+  html.mobile #weatherBar .weather-forecast { display: none; }
+  html.mobile #weatherBar .weather-section { margin: 0 0 4px !important; padding: 0 !important; border: 0 !important; }
+  html.mobile #weatherBar .weather-heading { font-size: 13px; margin: 0 0 3px; }
+  html.mobile #weatherBar .weather-row { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; gap: 4px; margin: 0; }
+  html.mobile #weatherBar .weather-row::-webkit-scrollbar { display: none; }
+  html.mobile #weatherBar .weather-effect { flex: none; padding: 2px 7px; font-size: 13px; }
+  html.mobile #mapStyles, html.mobile #areas .bar { margin: 0 0 6px !important; gap: 6px; }
+  html.mobile #mapStyles button, html.mobile #areas button, html.mobile #areas select, html.mobile #mobZoom button { min-height: 34px; padding: 3px 11px; font-size: 14px; }
+  html.mobile #mapPanel .ms-atlas .atlas { margin: 0; }
+  /* the selected tile: a sheet over the bottom of the screen, above the tab bar, in both looks */
+  html.mobile .inspector { display: none; }
+  html.mobile .inspector.selected { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; z-index: 18;
+    bottom: calc(var(--mobnav-h) + env(safe-area-inset-bottom, 0px)); max-height: 52dvh; margin: 0; padding: 0 12px 12px;
+    border-radius: 18px 18px 0 0; box-shadow: 0 -10px 32px #0009; border-bottom: 0; }
+  html.mobile .inspector.selected.tall { max-height: calc(100dvh - var(--mobnav-h) - 24px); }
+  html.mobile .inspector.selected > .head { display: flex !important; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 2;
+    background: inherit; padding: 14px 0 8px; margin: 0; }
+  html.mobile .inspector.selected > .head::before { content: ""; position: absolute; top: 5px; left: 50%; width: 40px; height: 4px; margin-left: -20px;
+    border-radius: 2px; background: var(--line); }
+  html.mobile .inspector.selected #tile { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+  html.mobile #toMap { display: none !important; }
+  html.mobile #inspectorClose { display: block !important; margin-left: auto; }
+  html.mobile #mobSheetSize { display: block; }
+  #mobSheetSize { display: none; }
+  html.mobile #tutorCoach { bottom: calc(var(--mobnav-h) + 8px + env(safe-area-inset-bottom, 0px)); }
+  html.mobile body.sheetOpen #tutorCoach { bottom: auto; top: 8px; }
+  /* wide things scroll inside their own box instead of the page */
+  html.mobile .scroll { max-width: 100%; overflow-x: auto; }
+  html.mobile .panel h2 { font-size: 15px; }
 </style>
 </head>
 <body>
@@ -835,6 +925,8 @@
     <button data-tab="settings">Settings</button>
   </nav>
 </header>
+<nav id="mobNav" aria-label="Tabs"></nav>
+<div id="mobMore" hidden></div>
 <main>
   <div id="login" class="panel" hidden>
     <h1>Text City Builder</h1>
@@ -869,6 +961,7 @@
           <div id="mapStyles" class="bar" role="group" aria-label="Map view"></div>
           <div id="areas" style="margin:0 0 10px"></div>
           <div id="weatherBar" class="small"></div>
+          <div id="mobZoom" role="group" aria-label="Map size"></div>
           <div class="scroll"><div id="map"></div></div>
           <div id="mapKey" class="dim small" style="margin-top:8px"></div>
           <div id="tameHere" class="bar"></div>
@@ -890,7 +983,7 @@
           </div>
         </div>
         <div class="panel inspector" id="inspector">
-          <div class="head"><h2 id="tileTitle" hidden>Tile</h2><button id="toMap" title="Back up to the map">Back to the map</button><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
+          <div class="head"><h2 id="tileTitle" hidden>Tile</h2><button id="toMap" title="Back up to the map">Back to the map</button><button id="mobSheetSize" type="button" aria-label="Make the details taller">Taller</button><button id="inspectorClose" aria-label="Close tile details">Close</button></div>
           <div id="tile" class="dim">
             <div id="tileInfo"></div>
             <div id="buildTools" hidden>
@@ -1521,8 +1614,16 @@ function applyLayout() {
   document.documentElement.classList.toggle('mobile', isMobile);
 }
 // Make the map's tiles as big as the setting asks, but never wider than the room there is.
+// The map can be bigger than its window, and pans: a tile size from the zoom buttons, or "fit" to see it all.
+// A phone and a computer each keep their own choice (a phone starts zoomed in, a computer fitted).
+const MOB_ZOOMS = [['fit', 'Fit'], [30, 'S'], [40, 'M'], [54, 'L']];
+const DESK_ZOOMS = [['fit', 'Fit'], [56, 'Large'], [72, 'Larger'], [92, 'Largest']];
+const zoomKey = () => isMobile ? 'mobZoom' : 'deskZoom';
+const zoomLevels = () => isMobile ? MOB_ZOOMS : DESK_ZOOMS;
+const mobZoom = () => zoomLevels().some(([k]) => k === settings[zoomKey()]) ? settings[zoomKey()] : isMobile ? 40 : 'fit';
 function fitMap() {
   if (!view) return;
+  if (mobZoom() !== 'fit') { $('map').style.setProperty('--tw', mobZoom() + 'px'); return; }
   const map = $('map'), box = map.parentElement, pad = getComputedStyle(box), size = view.state.areas[view.area].size;
   if (!box.clientWidth) return;            // the City tab is not showing
   const room = box.clientWidth - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight);     // the space inside the panel's padding
@@ -1584,7 +1685,8 @@ const mapBar = c => c.timer ? `<i data-bar="${c.x},${c.y}" aria-hidden="true"></
 const mapName = c => c.b ? `<span class="tile-name" aria-hidden="true">${esc(c.b.name)}</span>` : '';
 const mapAdds = c => c.adds.length ? `<u aria-hidden="true">${'+'.repeat(c.adds.length)}</u>` : '';
 function drawMapStyle(style, area, marked, findNote) {
-  const map = $('map'), cells = mapCells(area, marked, findNote), n = area.size, room = mapRoom(), roomH = mapRoomH();
+  const z = mobZoom(), map = $('map'), cells = mapCells(area, marked, findNote), n = area.size;
+  const room = z === 'fit' ? mapRoom() : n * z + 16, roomH = z === 'fit' ? mapRoomH() : n * z + 16;
   setHTML(map, drawAtlas(cells, n, room, roomH));
 }
 const MAP_KEYS = {
@@ -1611,7 +1713,7 @@ function contourPath(get, n, level, ts, ox, oy) {
   return d;
 }
 function drawAtlas(cells, n, room, roomH) {
-  const m = 8, top = 8, ts = Math.max(14, Math.min(64, Math.floor((room - 2 * m) / n), Math.floor((roomH - top - m) / n)));
+  const m = 8, top = 8, ts = Math.max(14, Math.min(mobZoom() === 'fit' ? 64 : 96, Math.floor((room - 2 * m) / n), Math.floor((roomH - top - m) / n)));
   const S = n * ts, W = S + 2 * m, Ht = S + top + m;
   const ink = '#4a3418', red = '#a3271b', f = v => v.toFixed(1);
   const cl = v => Math.min(n - 1, Math.max(0, v));
@@ -1869,7 +1971,7 @@ const finInput = new Map();   // amounts being typed into a finished order: "id:
 // in game.py, in the same order; the city's place in it is kept in its save, so it follows the player everywhere.
 const TUTOR_TILES = '#map .tile, #areas button, #areas select, #areas input';
 const TUTOR_BUILD = TUTOR_TILES + ', #buildList [data-build], #buildSearch, #buildCats [data-build-cat], #buildRecent [data-build], #toMap';
-const tabStep = (id, name) => ({ id, tab: name, goto: true, allow: `[data-tab=${name}], #tabMenu`, glow: `[data-tab=${name}]`, done: () => tab === name });
+const tabStep = (id, name) => ({ id, tab: name, goto: true, allow: `[data-tab=${name}], #tabMenu, #mobMoreBtn`, glow: `[data-tab=${name}]`, done: () => tab === name });
 const TUTOR = [
   { id: 'welcome', tab: 'city', read: true, title: 'Welcome to Dolphin City Builder!',
     text: 'This short tutorial walks you through every part of the game by having you try each one. While it runs, only what you need for each step can be pressed: it glows, and everything else is greyed out.' },
@@ -2873,6 +2975,8 @@ function render() {
   document.title = (waitingCount ? `(${waitingCount}) ` : '') + (visiting ? `${state.name} (visiting)` : state.name) + ' - Dolphin City Builder';
   fitTopbar();
   renderTabMenu();
+  renderMobNav();
+  document.body.classList.toggle('sheetOpen', isMobile && !!sel && tab === 'city');
   renderEffects();
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'cauldron', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
   if (tab === 'cauldron') renderCauldron();
@@ -2928,6 +3032,11 @@ function render() {
       const on = k === style || (style === 'classic' && k === settings.visuals);
       return `<button class="chip ${on ? 'on' : ''}" data-map-style="${k}" aria-pressed="${on}" title="${esc(about)}">${label}</button>`;
     }).join(''));
+  const pan = $('map').parentElement, panX = pan.scrollLeft, panY = pan.scrollTop;
+  requestAnimationFrame(() => { if (pan.scrollLeft !== panX || pan.scrollTop !== panY) { pan.scrollLeft = panX; pan.scrollTop = panY; } });
+  setHTML($('mobZoom'), `<span class="dim small">Map size</span>` + zoomLevels().map(([k, label]) =>
+    `<button data-mob-zoom="${k}" class="${mobZoom() === k ? 'on' : ''}" aria-pressed="${mobZoom() === k}">${label}</button>`).join('') +
+    `<span class="dim small">${mobZoom() === 'fit' ? 'whole area' : isMobile ? 'drag to move' : 'drag or scroll to move'}</span>`);
   $('map').className = style === 'classic' ? '' : 'ms ms-' + style;
   $('map').style.gridTemplateColumns = style === 'classic' ? `repeat(${area.size}, auto)` : '';
   fitMap();
@@ -5972,6 +6081,99 @@ $('restart').onclick = () => {
   if (confirm('Wipe this city and start over on a new map? Its market offers are removed too.')) { sel = null; areaIdx = 0; act('restart'); }
 };
 
+
+// ---- the phone layout's own parts (see the CSS "Phone layout") ----
+const MOB_MAIN = [['city', 'City', 'house'], ['people', 'People', 'people'], ['research', 'Research', 'knowledge'],
+                  ['explore', 'Explore', 'pin'], ['ideology', 'Ideology', 'shaman']];
+let mobMoreOpen = false;
+function renderMobNav() {
+  if (!isMobile) return;
+  const orig = id => document.querySelector(`#tabNav [data-tab="${id}"]`);
+  const waiting = b => b && b.querySelector('.good, .hi, .bad, .nav-badge');
+  const dot = b => waiting(b) ? `<span class="mobDot${b.querySelector('.bad') ? ' bad' : ''}"></span>` : '';
+  const pic = (kind, fallback) => gfx() ? icon(kind) : `<span class="mobGlyph">${fallback}</span>`;
+  const mainIds = MOB_MAIN.map(([id]) => id);
+  const others = [...document.querySelectorAll('#tabNav [data-tab]')].filter(b => !mainIds.includes(b.dataset.tab));
+  const moreOn = others.some(b => b.dataset.tab === tab);
+  setHTML($('mobNav'), MOB_MAIN.map(([id, label, kind]) =>
+      `<button type="button" data-tab="${id}" data-mob-tab="${id}" class="${tab === id ? 'on' : ''}">${pic(kind, label[0])}${label}${dot(orig(id))}</button>`).join('') +
+    `<button type="button" id="mobMoreBtn" class="${moreOn || mobMoreOpen ? 'on' : ''}" aria-expanded="${mobMoreOpen}">` +
+      `${pic('materials', '...')}${moreOn ? esc(orig(tab).textContent.replace(/\(.*\)/, '').trim()) : 'More'}${others.some(waiting) ? '<span class="mobDot"></span>' : ''}</button>`);
+  $('mobMore').hidden = !mobMoreOpen;
+  if (mobMoreOpen) setHTML($('mobMore'), others.map(b =>
+    `<button type="button" data-tab="${b.dataset.tab}" data-mob-tab="${b.dataset.tab}" class="${tab === b.dataset.tab ? 'on' : ''}">${b.innerHTML}</button>`).join(''));
+}
+function mobGo(id) {
+  mobMoreOpen = false;
+  const b = document.querySelector(`#tabNav [data-tab="${id}"]`);
+  if (b) b.click();
+  renderMobNav();
+  window.scrollTo(0, 0);
+}
+$('mobNav').addEventListener('click', e => {
+  const b = e.target.closest('[data-mob-tab]');
+  if (b) { mobGo(b.dataset.mobTab); return; }
+  if (e.target.closest('#mobMoreBtn')) { mobMoreOpen = !mobMoreOpen; renderMobNav(); }
+});
+$('mobMore').addEventListener('click', e => { const b = e.target.closest('[data-mob-tab]'); if (b) mobGo(b.dataset.mobTab); });
+document.addEventListener('click', e => {      // a tap anywhere else closes "More"
+  if (mobMoreOpen && e.target.isConnected && !e.target.closest('#mobMore, #mobNav')) { mobMoreOpen = false; renderMobNav(); }
+});
+$('mobZoom').addEventListener('click', e => {
+  const b = e.target.closest('[data-mob-zoom]');
+  if (!b) return;
+  const k = b.dataset.mobZoom === 'fit' ? 'fit' : Number(b.dataset.mobZoom);
+  const pan = $('map').parentElement, cx = (pan.scrollLeft + pan.clientWidth / 2) / (pan.scrollWidth || 1),
+        cy = (pan.scrollTop + pan.clientHeight / 2) / (pan.scrollHeight || 1);
+  settings[zoomKey()] = k; saveSettings(); render();
+  requestAnimationFrame(() => {        // the same spot stays in the middle
+    pan.scrollLeft = cx * pan.scrollWidth - pan.clientWidth / 2;
+    pan.scrollTop = cy * pan.scrollHeight - pan.clientHeight / 2;
+  });
+});
+// With a mouse, a zoomed map is dragged around too (a finger does it by itself); a drag is not a click on a tile.
+{
+  const pan = $('map').parentElement;
+  let drag = null;
+  pan.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || mobZoom() === 'fit') return;
+    drag = { x: e.clientX, y: e.clientY, left: pan.scrollLeft, top: pan.scrollTop, moved: false };
+  });
+  addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+    drag.moved = true;
+    pan.style.cursor = 'grabbing';
+    pan.scrollLeft = drag.left - dx;
+    pan.scrollTop = drag.top - dy;
+  });
+  addEventListener('pointerup', () => {
+    if (drag && drag.moved) addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); }, { capture: true, once: true });
+    drag = null;
+    pan.style.cursor = '';
+  });
+}
+$('mobSheetSize').onclick = () => {
+  const tall = $('inspector').classList.toggle('tall');
+  $('mobSheetSize').textContent = tall ? 'Shorter' : 'Taller';
+};
+// After a tap on the map: the page scrolls so the map is at the top, and the map pans so the tile is in the part
+// of it the sheet leaves uncovered.
+function showTileAboveSheet() {
+  requestAnimationFrame(() => {
+    const pan = $('map').parentElement, tile = sel && $('map').querySelector(`.tile[data-x="${sel.x}"][data-y="${sel.y}"]`);
+    if (!tile) return;
+    const sheet = $('inspector').getBoundingClientRect().top || innerHeight * 0.48;
+    const t = tile.getBoundingClientRect(), p = pan.getBoundingClientRect();
+    // inside the map's window: the tile a little below its top edge, and in the middle across
+    pan.scrollTop += t.top - p.top - Math.min(80, Math.max(0, (sheet - p.top) / 3));
+    pan.scrollLeft += t.left - p.left - (pan.clientWidth - t.width) / 2;
+    // then the page: the tile above the sheet
+    const t2 = tile.getBoundingClientRect(), room = Math.max(120, sheet - 20);
+    if (t2.bottom > room || t2.top < 0) window.scrollBy(0, t2.top - Math.max(10, room / 2 - t2.height));
+  });
+}
 // The phone's menu button: says which tab is open, and has a dot when another tab has something waiting.
 function renderTabMenu() {
   const open = document.querySelector(`.tabs [data-tab="${tab}"]`);
@@ -6071,8 +6273,7 @@ $('map').onclick = e => {
   if (!b) return;
   sel = { x: +b.dataset.x, y: +b.dataset.y };
   render();
-  // On a phone the tile's details are far below the map: go to them (the visual style shows them as a sheet instead).
-  if (isMobile && !gfx()) $('inspector').scrollIntoView({ block: 'start' });
+  if (isMobile) showTileAboveSheet();      // on a phone the details open in a sheet: keep the tile in sight above it
 };
 $('mapStyles').onclick = e => {
   const b = e.target.closest('[data-map-style]');
