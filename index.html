@@ -2840,10 +2840,21 @@ function plain(cost) {
 // ---------------------------------------------------------------- render --
 
 function powerCoverage(power) {
-  const percent = power.demand > 0 ? power.supply / power.demand * 100 : null;
+  // with batteries the city runs at most at 110% (the rest is stored), and at 101% while they cover a shortfall
+  const bat = power.battery, real = power.demand > 0 ? power.supply / power.demand * 100 : null;
+  const percent = real === null || !bat ? real : real < 100 && bat.charge > 0 ? bat.floor * 100 : Math.min(real, bat.top * 100);
   const level = percent === null ? 'good' : percent < 100 ? 'low' : percent < 110 ? 'close' : percent < 125 ? 'good' : 'surplus';
   const label = percent === null ? 'No demand' : `${Math.floor(percent)}%`;
-  return `<span class="power-${level}" title="${num(power.supply)} power supplied / ${num(power.demand)} consumed">${label}</span>`;
+  return `<span class="power-${level}" title="${num(power.supply)} power supplied / ${num(power.demand)} consumed` +
+    (bat ? ` (batteries: ${Math.floor(real || 0)}% before storing or drawing)` : '') + `">${label}</span>`;
+}
+// The batteries in a few words: how full, and charging or giving power right now.
+function batteryLine(bat) {
+  if (!bat) return '';
+  const pct = bat.capacity ? Math.round(bat.charge / bat.capacity * 100) : 0;
+  return `<span class="${bat.flow < 0 ? 'bad' : bat.flow > 0 ? 'good' : 'dim'}" title="${num(bat.charge)} of ${num(bat.capacity)} power-hours stored">` +
+    `Battery ${pct}%` + (bat.flow > 0 ? ` +${num(Math.round(bat.flow))}/h` : bat.flow < 0 ? ` ${num(Math.round(bat.flow))}/h` +
+      ` (${duration(bat.charge / -bat.flow * 3600)} left)` : pct >= 100 ? ' full' : '') + `</span>`;
 }
 // The map stays put while the tile panel beside it changes. The map is pinned (sticky) inside the row it shares with
 // the tile panel, so when that panel got much shorter (a long build list becoming a building's details) the row
@@ -2916,7 +2927,7 @@ function render() {
   });
   const trainedNow = status.trained || 0, pop = state.population + trainedNow, working = state.population - status.idle;
   const unfilled = Math.max(0, status.jobs - working);
-  const short = status.power.supply < status.power.demand;
+  const short = status.power.supply < status.power.demand && !(status.power.battery && status.power.battery.charge > 0);
   const free = status.housing - state.population, growthAll = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
   const trShare = trainingShare(), growth = growthAll * (1 - trShare);     // newcomers sent to training don't join
   setHTML($('people'),
@@ -2928,7 +2939,7 @@ function render() {
     stat('Workers', `${working} / ${num(status.jobs)} jobs`,
       unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${num(status.idle)} idle` : 'all filled') +
     (status.power.supply || status.power.demand || status.unpaused_power?.demand || status.unpaused_power?.supply ? stat('Power', powerCoverage(status.power),
-      (short ? '<span class="bad">not enough</span>' : '') +
+      (short ? '<span class="bad">not enough</span>' : '') + batteryLine(status.power.battery) +
       (status.unpaused_power && (status.unpaused_power.supply !== status.power.supply || status.unpaused_power.demand !== status.power.demand)
         ? `<span class="potential-rate" title="Power coverage at full housing with all buildings enabled">Max pop: ${powerCoverage(status.unpaused_power)}</span>` : '')) : '') +
     stat('Next meal', `<span data-timer="meal"></span>`,

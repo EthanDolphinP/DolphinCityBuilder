@@ -349,6 +349,7 @@ CATEGORIES = {
     "knowledge": "Knowledge",
     "power": "Power",
     "support": "Support",
+    "utility": "Utility",
     "wonder": "Wonders",
 }
 
@@ -1679,6 +1680,23 @@ BUILDINGS = {
         "terrain": ["plains", "desert", "hill", "forest"], "cost": {"stone": 200000, "tools": 100000, "electronics": 40000, "gold": 300000, "knowledge": 200000},
         "wonder": {"speed": {"all": 0.05}, "yield": {"all": 0.05}},
         "desc": "A city that works as one: all buildings 5% faster and all buildings make 5% more. A wonder: each one after the first gives a little less than the one before.",
+    },
+    # ---- utility: batteries (see battery_step) ----
+    "battery_bank": {
+        "name": "Battery Bank", "glyph": "\u03df", "tech": 4, "category": "utility", "research": "smart_grid",
+        "terrain": ["plains", "desert", "steppe", "scrubland", "tundra", "hill", "foothills"],
+        "cost": {"stone": 1500, "tools": 600, "gold": 1200},
+        "battery_capacity": 1500, "battery_kept": 750,
+        "desc": "Racks of heavy cells. Power past 110% of what the city needs is stored here, half of it kept (50% efficient), "
+                "and given back whenever the city falls short. Holds 1,500 power-hours.",
+    },
+    "grid_battery": {
+        "name": "Grid Battery", "glyph": "\u03de", "tech": 5, "category": "utility", "research": "smart_grid",
+        "terrain": ["plains", "desert", "steppe", "scrubland", "tundra", "hill", "foothills", "salt_flat"],
+        "cost": {"stone": 3000, "tools": 1500, "electronics": 800, "gold": 4000},
+        "battery_capacity": 5000, "battery_kept": 3750,
+        "desc": "A field of modern cells under one control system. Power past 110% of what the city needs is stored here, "
+                "three quarters of it kept (75% efficient), and given back whenever the city falls short. Holds 5,000 power-hours.",
     },
     # ---- rare tiles: buildings found nowhere else, at every stage of the game ----
     # Each is a little better than the best ordinary building of its tech level, as the reward for finding the tile.
@@ -4956,6 +4974,68 @@ def power_status(state, jobs, env=None):
     return supply, demand, (min(1.0, supply / demand) if demand else 1.0)
 
 
+# ---- batteries ----
+# With batteries the city's power is held at BATTERY_TOP of its need: what is generated past that is stored, as much
+# as the batteries keep of it (battery_kept / battery_capacity: 50% for a Battery Bank, 75% for a Grid Battery),
+# until they are full. When the city has less than it needs, the batteries give power back, enough for
+# BATTERY_FLOOR of the need (a little over, so it does not flicker at the edge), while they have it.
+# Charge is in power-hours: 100 power for an hour is 100.
+BATTERY_TOP = 1.10
+BATTERY_FLOOR = 1.01
+
+
+def battery_info(state):
+    """(capacity in power-hours, share of stored power kept) of all the city's batteries."""
+    cap = building_stat(state, "battery_capacity")
+    return cap, (building_stat(state, "battery_kept") / cap if cap else 0.0)
+
+
+def battery_charge(state):
+    cap = battery_info(state)[0]
+    return min(cap, state.get("battery", {}).get("charge", 0.0)) if cap else 0.0
+
+
+def battery_step(state, supply, demand, dt):
+    """Charge or draw the batteries for `dt` seconds; returns the share of the city's power need that is met."""
+    share = min(1.0, supply / demand) if demand else 1.0
+    cap, kept = battery_info(state)
+    if not cap:
+        return share
+    bat = state.setdefault("battery", {"charge": 0.0})
+    charge = min(cap, bat.get("charge", 0.0))
+    if supply > demand * BATTERY_TOP:
+        charge = min(cap, charge + (supply - demand * BATTERY_TOP) * kept * dt / 3600)
+    elif supply < demand:
+        want = (demand * BATTERY_FLOOR - supply) * dt / 3600
+        if charge >= want:
+            charge -= want
+            share = 1.0
+        else:
+            share = min(1.0, (supply + charge * 3600 / dt) / demand) if dt else share
+            charge = 0.0
+    bat["charge"] = charge
+    return share
+
+
+def battery_share(state, supply, demand, share):
+    """The share of the need that is met right now, counting what the batteries can give (for what is shown)."""
+    return 1.0 if supply < demand and battery_charge(state) > 0 else share
+
+
+def battery_view(state, supply, demand):
+    cap, kept = battery_info(state)
+    if not cap:
+        return None
+    charge = battery_charge(state)
+    flow = (supply - demand * BATTERY_TOP) * kept if supply > demand * BATTERY_TOP else \
+           -(demand * BATTERY_FLOOR - supply) if supply < demand else 0.0
+    if (flow > 0 and charge >= cap) or (flow < 0 and charge <= 0):
+        flow = 0.0
+    return {"capacity": round(cap), "charge": round(charge, 1), "kept": round(kept, 3), "flow": round(flow, 1),
+            "top": BATTERY_TOP, "floor": BATTERY_FLOOR}
+
+
+
 def _flow(state, job, power=1.0, env=1.0):
     """(speed, output multiple) right now: _speed, held so a cycle never takes less than MIN_CYCLE (a building
     whose cycle is shorter than that to start with is held at full speed), with what is past it given as more
@@ -5311,7 +5391,8 @@ def _advance(state, now, remaining, coarse=False):
         dt = min(LONG_STEP if coarse or remaining > LONG_CATCH_UP else SIM_STEP, remaining)
         env = weather.job_factors(state, jobs, now - remaining)    # day or night and the weather as this step starts
         remaining -= dt
-        power = power_status(state, jobs, env)[2]
+        supply, demand, _ = power_status(state, jobs, env)
+        power = battery_step(state, supply, demand, dt)
         for i, job in enumerate(jobs):
             speed, more = _flow(state, job, power, env[i][0])
             if not speed or job["cycle"] is None:
@@ -6143,6 +6224,7 @@ def unpaused_projection(state, plan=None, env=None):
         if env is None:
             env = weather.job_factors(state, jobs, state["updated"])
         supply, demand, power = power_status(state, jobs, env)
+        power = battery_share(state, supply, demand, power)
         rates = {k: 0.0 for k in RESOURCES}
         rates["food"] = -housing * 3600 / MEAL_TIME
         for i, job in enumerate(jobs):
@@ -6173,6 +6255,7 @@ def _view(state, ai, detail):
     here = {}
     env = weather.job_factors(state, jobs, state["updated"])
     supply, demand, power = power_status(state, jobs, env)
+    power = battery_share(state, supply, demand, power)
     projected = unpaused_projection(state, (jobs, housing, totals), env)
     # The Cauldron's ingredients, taken every hour while it brews (its effect is in the buildings' speed already).
     for k, v in cauldron.hourly(state).items():
@@ -6280,7 +6363,7 @@ def _view(state, ai, detail):
             "jobs": totals["jobs"],
             "idle": totals["idle"],
             "herd_room": totals["herd_room"],
-            "power": {"supply": round(supply, 1), "demand": demand},
+            "power": {"supply": round(supply, 1), "demand": demand, "battery": battery_view(state, supply, demand)},
             "rates": {k: round(v, 1) for k, v in rates.items()},
             "unpaused_rates": projected["rates"],
             "unpaused_power": projected["power"],
@@ -6379,7 +6462,8 @@ def find(state, kind, what, here=None):
     found = []   # (sort key, result)
     jobs, _, _ = work_plan(state)
     env = weather.job_factors(state, jobs, state["updated"])
-    power = power_status(state, jobs, env)[2]
+    supply, demand, power = power_status(state, jobs, env)
+    power = battery_share(state, supply, demand, power)
     for i, job in enumerate(jobs):
         job["env"], job["power_env"], job["env_notes"] = env[i][0], env[i][1], env[i][2]
     by_tile = {(j["area"], j["x"], j["y"]): j for j in jobs}
@@ -6483,6 +6567,7 @@ def _city_stats(state, now, rates):
     jobs, housing, totals = work_plan(state)
     env = weather.job_factors(state, jobs, state["updated"])
     supply, demand, power = power_status(state, jobs, env)
+    power = battery_share(state, supply, demand, power)
     tiles = [(ai, t) for ai, area in enumerate(state["areas"]) for row in area["tiles"] for t in row]
     built = [t for _, t in tiles if t["building"]]
     pct = lambda x: {"pct": x}
