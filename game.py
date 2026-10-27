@@ -4989,7 +4989,7 @@ def _speed(state, job, power=1.0, env=1.0):
 # A city can send a share of each meal's newcomers (TRAINING_SHARES) to training. They don't join the city (so they
 # don't eat or need a home): each one adds to the city's trained count, and every building with workers is faster by
 # TRAINING_STEP for each doubling of it (in TRAINING_UNIT steps): 30 trained +4%, 90 +8%, 210 +12%, 450 +16%...
-# Trained people live in the city: they count in its population, eat and need a home, but never take a job. Only
+# Trained people count in the city's population and eat, but need no home and never take a job. Only
 # people who would really have come are trained, so a city whose homes are all full trains nobody. At most 90%
 # can be sent.
 TRAINING_SHARES = (0, 0.25, 0.5, 0.75, 0.9)
@@ -5040,8 +5040,8 @@ def trained_people(state):
 
 
 def people(state):
-    """Everyone who lives in the city: its workers (state["population"]) and the people sent to training, who eat
-    and need a home like anyone else but never take a job."""
+    """The city's whole population: its workers (state["population"], who need homes) and the people sent to
+    training, who eat like anyone else but need no home and never take a job."""
     return state["population"] + trained_people(state)
 
 
@@ -5062,7 +5062,7 @@ def _meal(state, housing, when):
     if state["hungry"]:
         state["hungry"] = False
         log(state, when, "Everyone is fed again.")
-    arrivals = _arrivals(pop, res["food"], housing, 1 + city_attracts(state, when))
+    arrivals = _arrivals(state["population"], res["food"], housing, 1 + city_attracts(state, when), trained_people(state))
     trained = _train(state, arrivals)          # some go to training instead of joining the city
     arrivals -= trained
     state["population"] += arrivals
@@ -5215,15 +5215,16 @@ def city_attracts(state, when=None):
             + weather.night_attracts(state, state["updated"] if when is None else when))
 
 
-def _arrivals(pop, food_left, housing, tries):
+def _arrivals(pop, food_left, housing, tries, trained=0):
     """How many people join after a meal that left `food_left` in store.
 
     Up to `tries` may come. Each needs a free place to live and a meal already
     in store for everyone including the newcomers before them, so every extra
-    arrival takes one more meal's worth of spare food than the last.
+    arrival takes one more meal's worth of spare food than the last. `pop` is
+    the city's workers (who need homes); `trained` people eat but need none.
     """
     n = 0
-    while n < tries and pop + n < housing and food_left >= pop + n:
+    while n < tries and pop + n < housing and food_left >= pop + trained + n:
         n += 1
     return n
 
@@ -5233,7 +5234,8 @@ def next_arrivals(state, housing):
     pop, food = people(state), state["resources"]["food"]
     if food < pop:
         return 0
-    return _arrivals(pop, food - pop, housing, 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]))
+    return _arrivals(state["population"], food - pop, housing, 1 + city_attracts(state, state["updated"] + MEAL_TIME - state["meal"]),
+                     trained_people(state))
 
 
 def advance_time(state, now, coarse=False):
@@ -6412,13 +6414,13 @@ def housing_sources(state):
 
 def growth_checks(state, housing):
     """What _meal needs before it adds a person, and whether each is met right now."""
-    pop, food = people(state), int(state["resources"]["food"])
+    pop, food, homed = people(state), int(state["resources"]["food"]), state["population"]
     return [
         {"ok": food >= 2 * pop,
          "text": f"Food for the next meal with another meal to spare: {2 * pop} needed, {food} in store",
          "fix": "Make more food (farms, fishing docks, hunting lodges, pastures) or buy some on the market."},
-        {"ok": pop < housing,
-         "text": f"A free place to live: {pop} people, housing for {housing}",
+        {"ok": homed < housing,
+         "text": f"A free place to live: {homed} people in homes, housing for {housing}",
          "fix": "Build more housing (huts, then houses and apartments) or add rooms to the homes you have."},
     ]
 
@@ -6486,7 +6488,7 @@ def _city_stats(state, now, rates):
     workers = state["population"] - totals["idle"]
     section("people", "People", {"rows": [
         ["Population", people(state), f"{trained_people(state):,} of them trained (they don't work)" if trained_people(state) else ""],
-        ["Housing", housing, f"{max(0, housing - people(state))} beds free"],
+        ["Housing", housing, f"{max(0, housing - state['population'])} beds free"],
         ["Jobs", totals["jobs"], f"{max(0, totals['jobs'] - workers)} unfilled"],
         ["Working", workers, pct(workers / state["population"]) if state["population"] else ""],
         ["Idle", totals["idle"], ""],

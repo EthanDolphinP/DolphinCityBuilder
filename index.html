@@ -2815,10 +2815,10 @@ function render() {
   const trainedNow = status.trained || 0, pop = state.population + trainedNow, working = state.population - status.idle;
   const unfilled = Math.max(0, status.jobs - working);
   const short = status.power.supply < status.power.demand;
-  const free = status.housing - pop, growthAll = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
+  const free = status.housing - state.population, growthAll = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
   const trShare = trainingShare(), growth = growthAll * (1 - trShare);     // newcomers sent to training don't join
   setHTML($('people'),
-    stat('Population', `${pop} / ${num(status.housing)}` + (trainedNow ? ` <span class="dim small" title="Trained people live here and eat, but don't work">(${num(trainedNow)} trained)</span>` : ''),
+    stat('Population', `${state.population} / ${num(status.housing)}` + (trainedNow ? ` <span class="dim small" title="${num(pop)} people in all: trained people eat, but need no home and don't work">+${num(trainedNow)} trained</span>` : ''),
       free <= 0 ? '<span class="bad">housing full</span>' : `${free} ${free === 1 ? 'place' : 'places'} free` +
         ` &middot; <span class="good" title="With enough food for ${num(status.arrivals_max)} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal` +
         (trShare ? `; ${rateText(growthAll)} before ${Math.round(trShare * 100)}% go to training (People tab)` : '') + `">${rateText(growth)}</span>` +
@@ -5168,7 +5168,7 @@ function renderPeople() {
   // ---- the buttons along the top, each saying in a word or two how that part is doing ----
   {
     const growing = status.growth.every(g => g.ok) && !state.hungry, net = status.rates.food;
-    const free = status.housing - pop, gap = Math.max(0, status.jobs - (workers - status.idle));
+    const free = status.housing - workers, gap = Math.max(0, status.jobs - (workers - status.idle));
     const parts = {
       all: ['Overview', ''],
       growth: ['Growth', growing ? `<span class="good">+${num(trainingSplit(status.arrivals_next).join)} next meal</span>` : '<span class="bad">not growing</span>'],
@@ -5206,7 +5206,7 @@ function renderPeople() {
   const tr = view.training, pct = x => `${Math.round(x * 1000) / 10}%`;
   setHTML($('pplTraining'), !tr ? '' :
     `<p class="dim small" style="margin-top:0">Send some of each meal's newcomers to training instead of letting them join the city. ` +
-    `Trained people live in the city (they count in its population, eat and need a home) but never take a job: each one makes every building with workers a little faster, for good ` +
+    `Trained people count in your population and eat like anyone else, but need no home and never take a job: each one makes every building with workers a little faster, for good ` +
     `(${tr.unit} trained: +${pct(tr.step)}, ${tr.unit * 3}: +${pct(tr.step * 2)}, ${tr.unit * 7}: +${pct(tr.step * 3)}, then +${pct(tr.step)} more each time the number doubles). ` +
     `Only people who would really have arrived are trained, so a city whose homes are full trains nobody, and at most ` +
     `${pct(tr.shares[tr.shares.length - 1])} can be sent: the rest join and fill your homes, so build more to keep training.</p>` +
@@ -5241,11 +5241,11 @@ function renderPeople() {
 
   // Housing
   setHTML($('pplHousing'),
-    `<span class="hi">${pop}</span> people in housing for <span class="hi">${num(status.housing)}</span>` +
-    (status.trained ? ` <span class="dim">(${num(workers)} workers and ${num(status.trained)} trained)</span>` : '') +
-    meter([[Math.min(pop, status.housing), pop >= status.housing ? 'warn' : '']], Math.max(status.housing, pop)) +
-    `<p class="${pop >= status.housing ? 'bad' : 'dim'}">` + (pop >= status.housing ? 'Full. Nobody new can move in until you build more.'
-      : `${status.housing - pop} free ${status.housing - pop === 1 ? 'place' : 'places'}.`) + `</p>` +
+    `<span class="hi">${workers}</span> people in housing for <span class="hi">${num(status.housing)}</span>` +
+    (status.trained ? ` <span class="dim">(and ${num(status.trained)} trained, who need no home)</span>` : '') +
+    meter([[Math.min(workers, status.housing), workers >= status.housing ? 'warn' : '']], Math.max(status.housing, workers)) +
+    `<p class="${workers >= status.housing ? 'bad' : 'dim'}">` + (workers >= status.housing ? 'Full. Nobody new can move in until you build more.'
+      : `${status.housing - workers} free ${status.housing - workers === 1 ? 'place' : 'places'}.`) + `</p>` +
     status.housing_from.slice().sort((a, b) => b[1] - a[1]).map(([name, n]) => `<div class="opt">${esc(name)} <span style="float:right">${n}</span></div>`).join(''));
 
   // Work
