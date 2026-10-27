@@ -4363,11 +4363,80 @@ def _playable(tiles):
 
 # ---- the tutorial: every city is taken through the game one step at a time (see TUTOR in index.html, whose
 # steps these are, in the same order). New cities must finish it; cities from before it can skip it. ----
-TUTORIAL_STEPS = ("welcome", "stores", "select", "food", "house", "knowledge", "priority", "addition",
-                  "people", "people_read", "research_open", "research", "explore", "explore_read", "beast", "beast_read",
-                  "market", "market_read", "cauldron", "cauldron_read", "ideology", "ideology_read",
+TUTORIAL_STEPS = ("welcome", "stores", "select", "food", "house", "knowledge", "research_open", "research",
                   "back_to_city", "advance_read", "finish")
+# The longer tutorial before October 2026 (it toured every tab); a city part way through it carries on from the
+# first of today's steps at or after where it was.
+OLD_TUTORIAL_STEPS = ("welcome", "stores", "select", "food", "house", "knowledge", "priority", "addition",
+                      "people", "people_read", "research_open", "research", "explore", "explore_read", "beast", "beast_read",
+                      "market", "market_read", "cauldron", "cauldron_read", "ideology", "ideology_read",
+                      "back_to_city", "advance_read", "finish")
 TUTORIAL_GIFTS = {"research": {"knowledge": 30}}     # handed over when the tutorial reaches that step, once
+
+
+# ---- what opens when: each system of the game opens with a tech level or a research, and its tab (or part of a
+# tab) is locked until then. The first time a city has one open, the page shows a short introduction to it
+# (state["intros"]: the ones it has seen). ----
+def _tech_at_least(level):
+    return lambda s: s["tech"] >= level
+
+
+def _explores(s):
+    return any(RESEARCH[r].get("explore_range") for r in s["research"] if r in RESEARCH)
+
+
+FEATURES = {     # id: (name, the tab it is on, open?, what opens it)
+    "explore": ("Exploring", "explore", _explores, "Research Pathfinding"),
+    "beast": ("Beasts", "beast", _tech_at_least(1), "Become a Village"),
+    "market": ("The Market", "market", _tech_at_least(1), "Become a Village"),
+    "ideology": ("Ideology", "ideology", _tech_at_least(1), "Become a Village"),
+    "cauldron": ("The Cauldron", "cauldron", _tech_at_least(2), "Become a Town"),
+    "training": ("Training", "people", _tech_at_least(2), "Become a Town"),
+    "bills": ("Bills and debts", "market", _tech_at_least(2), "Become a Town"),
+    "duels": ("Beast duels", "beast", _tech_at_least(2), "Become a Town"),
+    "hexes": ("Hexes and sabotage", "ideology", _tech_at_least(2), "Become a Town"),
+    "artifacts": ("Artifacts", "ideology", _tech_at_least(3), "Become a City"),
+}
+FEATURE_ACTIONS = {      # actions that need a system open
+    "explore": "explore",
+    "beast_active": "beast", "breed_set": "beast", "breed_queue": "beast", "breed_unqueue": "beast", "breed_stop": "beast",
+    "breed_collect": "beast", "egg_deliver": "beast", "mission_deliver": "beast",
+    "beast_offer_post": "beast", "beast_offer_accept": "beast",
+    "offer_post": "market", "offer_accept": "market", "offer_edit": "market", "offer_reactivate": "market",
+    "bill_propose": "bills", "bill_accept": "bills",
+    "duel_post": "duels", "duel_accept": "duels",
+    "ideology_choose": "ideology", "perk_take": "ideology", "ritual_start": "ideology", "quest_give": "ideology", "tree_take": "ideology",
+    "curse_cast": "hexes",
+    "cauldron_set": "cauldron",
+    "training_set": "training", "train_idle": "training",
+    "artifact_craft": "artifacts", "artifact_enshrine": "artifacts", "artifact_offer_post": "artifacts", "artifact_offer_accept": "artifacts",
+}
+
+
+def feature_open(state, fid):
+    return FEATURES[fid][2](state)
+
+
+def locked_action(state, action):
+    """Why this action can't be taken yet (its system is not open), or None."""
+    fid = FEATURE_ACTIONS.get(action)
+    if not fid or feature_open(state, fid):
+        return None
+    name, _, _, need = FEATURES[fid]
+    return f"Locked until you {need[0].lower() + need[1:]}: {name}."
+
+
+def features_view(state):
+    return {fid: {"name": name, "tab": tab, "open": test(state), "need": need} for fid, (name, tab, test, need) in FEATURES.items()}
+
+
+def intro_seen(state, fid):
+    if fid not in FEATURES:
+        return "Unknown part of the game."
+    seen = state.setdefault("intros", [])
+    if fid not in seen:
+        seen.append(fid)
+    return None
 
 
 def tutorial_reach(state, now, step):
@@ -4419,6 +4488,7 @@ def new_game(name, now, seed=None):
     state["banned"] = []     # cities that may not view this one or propose bills to it
     state["priorities"] = PRIORITY_VERSION
     state["tutorial"] = {"at": TUTORIAL_STEPS[0], "done": False, "skippable": False, "gifts": []}   # a new city takes it all
+    state["intros"] = []     # each system's introduction is shown when it opens
     beasts.setup(state, now, rng)
     ideology.setup(state)
     _remember_seen(state, now)
@@ -4472,6 +4542,14 @@ def migrate(state, now):
     ideology.setup(state)
     # a city from before the tutorial goes through it too, but may skip it
     state.setdefault("tutorial", {"at": TUTORIAL_STEPS[0], "done": False, "skippable": True, "gifts": []})
+    tut = state["tutorial"]
+    if not tut.get("done") and tut.get("at") not in TUTORIAL_STEPS:      # part way through the old, longer one
+        old = OLD_TUTORIAL_STEPS.index(tut["at"]) if tut.get("at") in OLD_TUTORIAL_STEPS else 0
+        tut["at"] = next((s for s in TUTORIAL_STEPS if OLD_TUTORIAL_STEPS.index(s) >= old), None)
+        if tut["at"] is None:
+            tut["at"], tut["done"] = TUTORIAL_STEPS[-1], True
+    if "intros" not in state:       # a city from before the introductions: what it already has needs none
+        state["intros"] = [fid for fid in FEATURES if feature_open(state, fid)]
     return state
 
 
@@ -6081,6 +6159,8 @@ def apply_action(state, now, action, data):
         return ideology.quest_give(state, now, data.get("res") or None, data.get("amount"))
     if action == "tutorial":
         return tutorial_reach(state, now, data.get("reach"))
+    if action == "intro_seen":
+        return intro_seen(state, data.get("feature"))
     if action == "tutorial_skip":
         tut = state.get("tutorial") or {}
         if not tut.get("skippable"):
@@ -6398,6 +6478,7 @@ def _view(state, ai, detail):
         "wonders": wonder_view(state),
         "training": training_view(state),
         "tags": tags.view(state),
+        "features": features_view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,

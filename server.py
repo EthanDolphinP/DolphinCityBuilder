@@ -747,7 +747,10 @@ def handle_post(path, data, token, now):
     _seen(name, now, False)
     weather.set_timezone(state, data.get("tz"))
 
-    if action == "restart":
+    locked = game.locked_action(state, action) if isinstance(action, str) else None    # a system not open yet
+    if locked:
+        error = locked
+    elif action == "restart":
         market.drop_city(MARKET, name)
         fresh = game.new_game(name, now)
         fresh.update({k: state[k] for k in PRIVATE if k in state})   # same owner

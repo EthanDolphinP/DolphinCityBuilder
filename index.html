@@ -33,8 +33,16 @@
   .tut-glow { outline: 2px solid var(--accent) !important; outline-offset: 2px; animation: tutGlow 1.1s ease-in-out infinite alternate; }
   @keyframes tutGlow { from { box-shadow: 0 0 0 0 transparent; } to { box-shadow: 0 0 12px 3px color-mix(in srgb, var(--accent) 55%, transparent); } }
   @media (prefers-reduced-motion: reduce) { .tut-glow { animation: none; } }
-  #tutorCoach { position: fixed; left: 16px; bottom: 16px; z-index: 900; width: min(360px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto;
+  #tutorCoach, #introCoach { position: fixed; left: 16px; bottom: 16px; z-index: 900; width: min(360px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto;
     background: var(--panel); border: 2px solid var(--accent); border-radius: 8px; padding: 12px 14px; box-shadow: 0 8px 30px #000a; }
+  #introCoach h3 { margin: 2px 0 6px; color: var(--accent); font-size: 15px; }
+  #introCoach p { margin: 0 0 8px; }
+  #introCoach .tut-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  html.mobile #introCoach { left: 8px; right: 8px; width: auto; max-height: 45vh; bottom: calc(var(--mobnav-h) + 8px + env(safe-area-inset-bottom, 0px)); }
+  .tabs button.locked, #mobNav button.locked, #mobMore button.locked { opacity: .38; }
+  .tabs button.locked::after { content: " (locked)"; font-size: 11px; }
+  html.gfx .tabs button.locked::after, html.mobile .tabs button.locked::after { content: none; }
+  .locknote { border: 1px dashed var(--line); border-radius: 6px; padding: 10px 12px; }
   #tutorCoach h3 { margin: 2px 0 6px; color: var(--accent); font-size: 15px; }
   #tutorCoach p { margin: 0 0 8px; }
   #tutorCoach .tut-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
@@ -1974,9 +1982,9 @@ const TUTOR_BUILD = TUTOR_TILES + ', #buildList [data-build], #buildSearch, #bui
 const tabStep = (id, name) => ({ id, tab: name, goto: true, allow: `[data-tab=${name}], #tabMenu, #mobMoreBtn`, glow: `[data-tab=${name}]`, done: () => tab === name });
 const TUTOR = [
   { id: 'welcome', tab: 'city', read: true, title: 'Welcome to Dolphin City Builder!',
-    text: 'This short tutorial walks you through every part of the game by having you try each one. While it runs, only what you need for each step can be pressed: it glows, and everything else is greyed out.' },
+    text: 'This short tutorial covers the basics: feeding your people, housing them, and learning new things. The rest of the game (beasts, the market, ideologies and more) opens as your city grows, and each part introduces itself when it does.' },
   { id: 'stores', tab: 'city', read: true, glow: '#resourcePanel', title: 'Your stores',
-    text: 'On the left are your materials. The number under each is how much you gain or lose per hour. Your buildings make materials, your people eat food at every meal, and new buildings, research and more cost materials.' },
+    text: 'These are your materials. The number under each is how much you gain or lose per hour. Your buildings make materials, your people eat food at every meal, and new buildings and research cost materials.' },
   { id: 'select', tab: 'city', allow: TUTOR_TILES, title: 'Pick a place to build',
     text: 'This is the map of your land. Click any empty tile (one with no building on it).', done: c => c.selEmpty },
   { id: 'food', tab: 'city', allow: TUTOR_BUILD, glow: '#buildList [data-build]', title: 'Feed your people',
@@ -1984,40 +1992,35 @@ const TUTOR = [
   { id: 'house', tab: 'city', allow: TUTOR_BUILD, glow: '#buildList [data-build]', title: 'Give them homes',
     text: 'New people only arrive if there is a free place to live. Pick another empty tile and build a Hut (or any housing).', done: c => c.gained('housing') },
   { id: 'knowledge', tab: 'city', allow: TUTOR_BUILD, glow: '#buildList [data-build]', title: 'Learn new things',
-    text: 'Knowledge pays for research, which unlocks new buildings and makes old ones better. Build a Shaman Hut on an empty tile.', done: c => c.gained('knowledge') },
-  { id: 'priority', tab: 'city', allow: TUTOR_TILES + ', [data-priority]', glow: '[data-priority]', title: 'Who works where',
-    text: 'Buildings need workers, and you only have so many people. Click one of your buildings, then change its priority: First and High get workers before Normal, and Off sends its workers elsewhere.', done: c => c.did('priority') },
-  { id: 'addition', tab: 'city', allow: TUTOR_TILES + ', [data-add]', glow: '[data-add]', title: 'Make a building better',
-    text: 'Most buildings can take up to two additions that make them faster, bigger or give them more. Click one of your buildings and add an addition to it, such as a Sleeping Loft on a Hut.',
-    done: c => c.additions > c.base.additions, fallback: c => !c.canAdd, fallbackText: 'You can\'t afford an addition right now. You can come back to them later.' },
-  { ...tabStep('people', 'people'), title: 'Your people', text: 'Open the People tab (at the top).' },
-  { id: 'people_read', tab: 'people', read: true, title: 'Growing your city',
-    text: 'Here you can see why your city is or isn\'t growing. At each meal one new person can arrive if there is a free home and enough food. Taverns let more arrive at once. Workers fill the jobs in your buildings; people with no job still eat. Later you can send newcomers to Training instead, to make every worker better.' },
+    text: 'Knowledge pays for research, which unlocks new buildings, new parts of the game and makes old buildings better. Build a Shaman Hut on an empty tile.', done: c => c.gained('knowledge') },
   { ...tabStep('research_open', 'research'), title: 'Research', text: 'Open the Research tab.' },
   { id: 'research', tab: 'research', allow: '[data-research]', glow: '[data-research]:not([disabled])', title: 'Research something',
-    text: 'Research costs knowledge, and the tutorial has given you some to try it. Press Research on anything you can afford.',
+    text: 'Research costs knowledge, and the tutorial has given you some to try it. Press Research on anything you can afford. (Pathfinding opens exploring new land.)',
     done: c => c.researched > c.base.researched, fallback: c => !document.querySelector('[data-research]:not([disabled])'), fallbackText: 'Nothing can be researched right now. Come back once you have more knowledge.' },
-  { ...tabStep('explore', 'explore'), title: 'Exploring', text: 'Open the Explore tab.' },
-  { id: 'explore_read', tab: 'explore', read: true, title: 'New land',
-    text: 'Once you research Pathfinding you can send expeditions to map new areas next to the ones you have. Each area brings new kinds of land, wildlife, rare tiles with buildings found nowhere else, and sometimes beast eggs. Expeditions cost supplies and take time, and when they come back they are summed up at the top of this tab.' },
-  { ...tabStep('beast', 'beast'), title: 'Your beast', text: 'Open the Beast tab.' },
-  { id: 'beast_read', tab: 'beast', read: true, title: 'Beasts',
-    text: 'You start with an egg. Each egg and beast has missions: do them and it hatches, grows and levels up. Your active beast boosts your whole city. Later you can breed beasts, trade them and battle other cities\' beasts in the arena.' },
-  { ...tabStep('market', 'market'), title: 'Trading', text: 'Open the Market tab.' },
-  { id: 'market_read', tab: 'market', read: true, title: 'The market',
-    text: 'Every trade is with another player\'s city. Post an offer of what you give for what you want, or buy someone else\'s. Bills are trades that repeat every few hours; miss a payment and you go into debt. Beasts and artifacts are traded here too.' },
-  { ...tabStep('cauldron', 'cauldron'), title: 'The Cauldron', text: 'Open the Cauldron tab.' },
-  { id: 'cauldron_read', tab: 'cauldron', read: true, title: 'Brews',
-    text: 'Pick a recipe and the Cauldron brews it every hour from your stores, giving your city a boost for that hour. Put in more than the recipe needs for a stronger brew.' },
-  { ...tabStep('ideology', 'ideology'), title: 'Ideology', text: 'Open the Ideology tab.' },
-  { id: 'ideology_read', tab: 'ideology', read: true, title: 'What your city believes',
-    text: 'Choose an ideology to get perks for your city, and later rituals that boost you, hexes that slow your rivals, and artifacts to craft and trade. Each ideology also has its own quests (Pilgrimages, Ventures, Odysseys...): hand in resources to finish one and win a bonus for good, and see how many you have done on the leaderboard.' },
   { ...tabStep('back_to_city', 'city'), title: 'Back home', text: 'Go back to the City tab.' },
   { id: 'advance_read', tab: 'city', read: true, glow: '#advancePanel', title: 'Growing up',
-    text: 'The panel showing the next tech level lists what your city needs to reach it: people, materials and research. Each level (Village, Town, City and on to Megacity) unlocks new buildings and research. The Guide tab explains everything in more detail whenever you need it.' },
+    text: 'The panel showing the next tech level lists what your city needs to reach it: people, materials and research. Each level opens new buildings, research and parts of the game: at Village the Market, beasts and ideologies, at Town the Cauldron, training and more.' },
   { id: 'finish', tab: 'city', read: true, last: true, title: 'You\'re ready!',
-    text: 'That\'s the whole game in a nutshell. Everything is unlocked now. Have fun building your city, and join the Discord (Settings tab) for news and help.' },
+    text: 'That\'s the basics. Greyed-out tabs show what opens them; each one introduces itself when it opens. The Guide tab explains everything, and the Discord (Settings tab) is there for news and help. Have fun!' },
 ];
+// What each system says about itself the first time it opens (see FEATURES in game.py).
+const INTROS = {
+  explore: ['Exploring', 'Send expeditions to map new areas next to the ones you have. Each area brings new kinds of land, wildlife, rare tiles with buildings found nowhere else, and sometimes beast eggs. Expeditions cost supplies and take time.'],
+  beast: ['Your beast', 'You have an egg. Each egg and beast has missions: do them and it hatches, grows and levels up. Your active beast boosts your whole city. Later you can breed beasts and trade them.'],
+  market: ['The market', 'Every trade is with another player\'s city. Post an offer of what you give for what you want, or buy someone else\'s. Beasts are traded here too.'],
+  ideology: ['Ideology', 'Choose what your city believes. Each ideology gives a bonus straight away and perks to choose as you grow, its own quests (hand in resources to win a bonus for good), and later rituals, wonders and a perk tree.'],
+  cauldron: ['The Cauldron', 'Pick a recipe and the Cauldron brews it every hour from your stores, giving your city a boost for that hour. Put in more for a stronger brew.'],
+  training: ['Training', 'On the People tab you can now send some newcomers, or idle workers, to training. Trained people eat but never work, and make every building with workers faster.'],
+  bills: ['Bills', 'On the Market tab you can now agree bills with other cities: trades that repeat every few hours. Miss a payment and you go into debt.'],
+  duels: ['Beast duels', 'Your beasts can now fight other cities\' beasts in the arena, on the Beast tab, for a prize both sides put up.'],
+  hexes: ['Hexes and sabotage', 'Your ideology can now be turned against rivals: slow down another city for a while, at a price. Others can do the same to you.'],
+  artifacts: ['Artifacts', 'Craft artifacts on the Ideology tab, enshrine up to three for lasting bonuses, and trade them on the market.'],
+};
+// The tabs a system needs open (the others are always there).
+const TAB_FEATURE = { explore: 'explore', beast: 'beast', market: 'market', ideology: 'ideology', cauldron: 'cauldron' };
+const featureOpen = id => !view || !view.features || !view.features[id] || view.features[id].open;
+const tabLocked = name => TAB_FEATURE[name] && !featureOpen(TAB_FEATURE[name]) ? view.features[TAB_FEATURE[name]] : null;
+const lockNote = id => { const f = view.features[id]; return `<p class="dim locknote">Locked: ${esc(f.name)} opens when you ${esc(f.need[0].toLowerCase() + f.need.slice(1))}.</p>`; };
 let tutorBase = { id: null }, tutorDid = new Set(), tutorSmall = false;
 const tutorStep = () => {
   const t = view && !visiting && view.state.tutorial;
@@ -2083,6 +2086,27 @@ function renderTutor() {
   for (const el of document.querySelectorAll('.tut-glow')) if (!(glow && el.matches(glow))) el.classList.remove('tut-glow');
   if (glow && !glow.includes('data-')) for (const el of document.querySelectorAll(glow)) el.classList.add('tut-glow');
 }
+// ---- introductions: the first time a system opens, a card says what it is (once; see FEATURES in game.py) ----
+function renderIntro() {
+  let card = $('introCoach');
+  const f = view && !visiting && !tutorStep() && view.features &&
+    Object.keys(INTROS).find(id => view.features[id] && view.features[id].open && !(view.state.intros || []).includes(id));
+  if (!f) { if (card) card.remove(); return; }
+  if (!card) { card = document.createElement('div'); card.id = 'introCoach'; document.body.appendChild(card); }
+  const [title, text] = INTROS[f], where = view.features[f].tab;
+  setHTML(card, `<div class="tut-bar" style="margin-top:0"><span class="dim small">New: just opened</span></div>` +
+    `<div class="tut-body"><h3>${esc(title)}</h3><p>${esc(text)}</p><div class="tut-bar">` +
+    (where !== tab ? `<button data-intro-go="${esc(f)}">Show me</button>` : '') + `<button data-intro-ok="${esc(f)}">Got it</button></div></div>`);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('#introCoach button');
+  if (!b) return;
+  const f = b.dataset.introGo || b.dataset.introOk;
+  (view.state.intros = view.state.intros || []).push(f);
+  act('intro_seen', { feature: f });
+  if (b.dataset.introGo) { const t = document.querySelector(`#tabNav [data-tab="${view.features[f].tab}"]`); if (t) t.click(); }
+  renderIntro();
+});
 // a press on anything greyed out does nothing (a keyboard shortcut clicks the button too, so it is stopped here as well)
 addEventListener('click', e => {
   if (!document.body.classList.contains('tutoring')) return;
@@ -2946,9 +2970,15 @@ function render() {
       (state.hungry ? '<span class="bad">HUNGRY: half speed</span>' : `eats ${pop} food`) +
       (status.housing !== pop ? `<span class="potential-rate" title="Food consumed each meal at full housing">Max pop: ${num(status.housing)} food</span>` : '')));
 
-  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  if (!visiting && tabLocked(tab)) tab = 'city';
+  document.querySelectorAll('[data-tab]').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === tab);
+    const lock = !visiting && tabLocked(b.dataset.tab);
+    b.classList.toggle('locked', !!lock);
+    if (lock) b.title = `Opens when you ${lock.need[0].toLowerCase() + lock.need.slice(1)}`; else b.removeAttribute('title');
+  });
   // a beast mission, or an egg's own mission, is waiting
-  const todo = !visiting && ((view.beast.mission && !view.beast.mission.complete) || view.beast.beasts.some(b => b.egg && b.task && !b.task.complete));
+  const todo = !visiting && featureOpen('beast') && ((view.beast.mission && !view.beast.mission.complete) || view.beast.beasts.some(b => b.egg && b.task && !b.task.complete));
   const challenged = !visiting && (view.market.duels || []).some(d => d.to === state.name);
   setHTML(document.querySelector('[data-tab=beast]'), gfx()
     ? icon('animal') + 'Beast' + (challenged ? ' <span class="nav-badge">Duel</span>' : todo ? ' <span class="nav-badge">Mission</span>' : '')
@@ -2987,6 +3017,7 @@ function render() {
   fitTopbar();
   renderTabMenu();
   renderMobNav();
+  renderIntro();
   document.body.classList.toggle('sheetOpen', isMobile && !!sel && tab === 'city');
   renderEffects();
   for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'cauldron', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
@@ -4617,8 +4648,9 @@ function renderIdeology() {
     ideologyCards(false) + `</div>`;
 
   setHTMLKeep(box, header + (show('mine') ? mine : '') + (show('rituals') ? ritualPanel(i, iv, own) : '') +
-    (show('curses') ? cursedPanel(iv) + cursePanel(i, iv, own) : (iv.curses.on_me.length && show('mine') ? cursedPanel(iv) : '')) +
-    (show('perks') ? perkPanel : '') + (show('quests') ? questPanel(i, iv, own) : '') + (show('wonders') ? wonderPanel(i, iv, own) : '') + (show('artifacts') ? artifactPanel(i, iv, own) : '') +
+    (show('curses') ? cursedPanel(iv) + (featureOpen('hexes') ? cursePanel(i, iv, own) : `<div class="panel">${lockNote('hexes')}</div>`)
+      : (iv.curses.on_me.length && show('mine') ? cursedPanel(iv) : '')) +
+    (show('perks') ? perkPanel : '') + (show('quests') ? questPanel(i, iv, own) : '') + (show('wonders') ? wonderPanel(i, iv, own) : '') + (show('artifacts') ? (featureOpen('artifacts') ? artifactPanel(i, iv, own) : `<div class="panel">${lockNote('artifacts')}</div>`) : '') +
     (show('compare') ? compare : ''));
 }
 // ---- the quest tree, in the Perks part of the Ideology tab ----
@@ -5324,7 +5356,7 @@ function renderPeople() {
 
   // ---- training: newcomers sent to train instead of joining make every worker better ----
   const tr = view.training, pct = x => `${Math.round(x * 1000) / 10}%`;
-  setHTML($('pplTraining'), !tr ? '' :
+  setHTML($('pplTraining'), !tr ? '' : !featureOpen('training') ? lockNote('training') :
     `<p class="dim small" style="margin-top:0">Send some of each meal's newcomers to training instead of letting them join the city. ` +
     `Trained people count in your population and eat like anyone else, but need no home and never take a job: each one makes every building with workers a little faster, for good ` +
     `(${tr.unit} trained: +${pct(tr.step)}, ${tr.unit * 3}: +${pct(tr.step * 2)}, ${tr.unit * 7}: +${pct(tr.step * 3)}, then +${pct(tr.step)} more each time the number doubles). ` +
@@ -6118,12 +6150,12 @@ function renderMobNav() {
   const others = [...document.querySelectorAll('#tabNav [data-tab]')].filter(b => !mainIds.includes(b.dataset.tab));
   const moreOn = others.some(b => b.dataset.tab === tab);
   setHTML($('mobNav'), MOB_MAIN.map(([id, label, kind]) =>
-      `<button type="button" data-tab="${id}" data-mob-tab="${id}" class="${tab === id ? 'on' : ''}">${pic(kind, label[0])}${label}${dot(orig(id))}</button>`).join('') +
+      `<button type="button" data-tab="${id}" data-mob-tab="${id}" class="${tab === id ? 'on' : ''}${!visiting && tabLocked(id) ? ' locked' : ''}">${pic(kind, label[0])}${label}${dot(orig(id))}</button>`).join('') +
     `<button type="button" id="mobMoreBtn" class="${moreOn || mobMoreOpen ? 'on' : ''}" aria-expanded="${mobMoreOpen}">` +
       `${pic('materials', '...')}${moreOn ? esc(orig(tab).textContent.replace(/\(.*\)/, '').trim()) : 'More'}${others.some(waiting) ? '<span class="mobDot"></span>' : ''}</button>`);
   $('mobMore').hidden = !mobMoreOpen;
   if (mobMoreOpen) setHTML($('mobMore'), others.map(b =>
-    `<button type="button" data-tab="${b.dataset.tab}" data-mob-tab="${b.dataset.tab}" class="${tab === b.dataset.tab ? 'on' : ''}">${b.innerHTML}</button>`).join(''));
+    `<button type="button" data-tab="${b.dataset.tab}" data-mob-tab="${b.dataset.tab}" class="${tab === b.dataset.tab ? 'on' : ''}${!visiting && tabLocked(b.dataset.tab) ? ' locked' : ''}">${b.innerHTML}</button>`).join(''));
 }
 function mobGo(id) {
   mobMoreOpen = false;
@@ -6210,6 +6242,8 @@ $('tabMenu').onclick = () => {
 document.querySelector('.tabs').onclick = e => {
   const button = e.target.closest('[data-tab]');   // the click may land on a badge inside the button
   if (!button) return;
+  const locked = tabLocked(button.dataset.tab);
+  if (locked) { say(`${locked.name} is locked: it opens when you ${locked.need[0].toLowerCase() + locked.need.slice(1)}.`); return; }
   $('topbar').classList.remove('menuOpen');
   $('tabMenu').setAttribute('aria-expanded', 'false');
   tab = button.dataset.tab;
