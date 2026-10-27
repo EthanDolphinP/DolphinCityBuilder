@@ -3050,12 +3050,12 @@ function render() {
   // whenever something built here was still waiting for workers or power)
   const withProblems = view.areas.map((a, i) => i).filter(i => i !== view.area && view.areas[i].problems);
   setHTML($('areas'), n < 2 ? '' :
-    `<div class="bar" style="margin:0"><button data-area="${(view.area + n - 1) % n}" title="Previous area">&lt;</button>` +
+    `<div class="bar" style="margin:0"><button data-area-step="-1" title="Previous area">&lt;</button>` +
     `<select id="areaPick" title="Choose an area to view">` + view.areas.map((a, i) =>
       `<option value="${i}" ${i === view.area ? 'selected' : ''}>${esc(a.name)}` +
       (hits ? (hits[i] ? ` - ${hits[i]} found` : '') : a.problems ? ` - ${a.problems} not working` : '') +
       (view.environment.areas[i] ? ` - ${esc(skyName(view.environment.areas[i].now))}` : '') + `</option>`).join('') + `</select>` +
-    `<button data-area="${(view.area + 1) % n}" title="Next area">&gt;</button>` +
+    `<button data-area-step="1" title="Next area">&gt;</button>` +
     `<span class="dim small">${view.area + 1} of ${n}</span></div>` +
     (hits ? `<div class="bar areaChips"><span class="dim small">${withHits.length ? 'Found in' : 'Not found in any area'}</span>` +
         withHits.map(i => chip(i, hits[i], 'good', `${hits[i]} found here`)).join('') + `</div>`
@@ -6318,7 +6318,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
   } else if (e.key === 'Escape' && sel) { sel = null; render(); }
   else if ((e.key === '[' || e.key === ']') && view.areas.length > 1) {
-    showArea((view.area + (e.key === ']' ? 1 : view.areas.length - 1)) % view.areas.length);
+    showArea((areaIdx + (e.key === ']' ? 1 : view.areas.length - 1)) % view.areas.length);
   }
 });
 $('buildSearch').oninput = () => { buildState.q = $('buildSearch').value; buildState.cat = 'all'; if (view) renderTile(); };
@@ -6403,7 +6403,19 @@ $('tile').onclick = e => {
     if (confirm(`Demolish ${building.name}? This removes the building. You get back half of what it cost.`)) act('demolish', { x: sel.x, y: sel.y });
   }
 };
-function showArea(i) { areaIdx = i; sel = null; refresh(); }
+// Another area: drawn at once from what the page already knows of it (its land, buildings, animals and additions),
+// then filled in (timers, how each building is doing, heights) when the server's answer comes.
+function showArea(i) {
+  areaIdx = i; sel = null;
+  const a = view && view.state.areas[i];
+  if (a && a.tiles && view.area !== i) {
+    a.tiles = a.tiles.map(row => row.map(t => ({ ...t, building: t.building || null, animal: t.animal || null, additions: t.additions || [] })));
+    view.area = i;
+    view.tiles = a.tiles.map(row => row.map(() => ({})));
+    try { render(); } catch (error) { console.warn('area preview', error); }
+  }
+  refresh();
+}
 $('findKind').onchange = () => { finder.kind = $('findKind').value; findChoices(); refresh(); };
 $('findWhat').onchange = () => { finder.what = $('findWhat').value; refresh(); };
 $('findClear').onclick = () => { finder = { kind: '', what: '' }; $('findKind').value = ''; $('findWhat').hidden = true; refresh(); };
@@ -6418,7 +6430,12 @@ $('findOut').onclick = e => {
   jump = { area, x, y };
   if (area === view.area) { sel = { x, y }; jump = null; render(); } else { areaIdx = area; sel = null; refresh(); }
 };
-$('areas').onclick = e => { const b = e.target.closest('[data-area]'); if (b) showArea(+b.dataset.area); };
+$('areas').onclick = e => {
+  const step = e.target.closest('[data-area-step]'), n = view.state.areas.length;
+  if (step) { showArea((areaIdx + n + +step.dataset.areaStep) % n); return; }
+  const b = e.target.closest('[data-area]');
+  if (b) showArea(+b.dataset.area);
+};
 $('areas').onchange = e => { if (e.target.id === 'areaPick') showArea(+e.target.value); };
 $('expReports').onclick = e => {
   const b = e.target.closest('[data-reports-clear], [data-view]');
