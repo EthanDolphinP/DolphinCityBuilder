@@ -7006,6 +7006,15 @@ def found_vassal(lord, vassal, now):
     log(lord, now, f"Paid {fmt_goods(VASSAL_COST)} and founded the vassal city {vassal['name']}. "
                    f"{lord['name']} is locked forever; {vassal['name']} gets {round(VASSAL_SHARE * 100)}% of what it made each hour.")
     vassal["tutorial"] = {"at": TUTORIAL_STEPS[-1], "done": True, "skippable": True, "gifts": []}   # its player knows the game
+    # The lord's active beast goes with the player, in place of the common egg a new city starts with.
+    beast = beasts.active(lord)
+    if beast:
+        lord["beasts"].remove(beast)
+        lord.pop("beast_active", None)
+        beast.pop("duel", None)
+        vassal.update(beasts=[], beast_count=0, mission=None, mission_at=now)
+        vassal["beast_active"] = beasts.give(vassal, now, beast)["id"]
+        log(vassal, now, f"{beasts.title(beast)} came along from {lord['name']}, and is the city's active beast.")
     lines = ", ".join(vassal["vassal"]["line"])
     log(vassal, now, f"{vassal['name']} is founded as a vassal of {lord['name']} (generation {vassal['vassal']['generation']}). "
                      f"Every hour it gets {round(VASSAL_SHARE * 100)}% of what {lines} made.")

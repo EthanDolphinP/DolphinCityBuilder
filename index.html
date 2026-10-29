@@ -3282,7 +3282,7 @@ function renderVassal(adv) {
     const before = (vs.line || []);
     setHTML($('vassalWhat'), `Founding a vassal city <span class="bad">locks ${esc(state.name)} forever</span>: nobody can play it again, ` +
       `and it stays on the leaderboard as it is now. The new city starts from the beginning, as generation ${vs.generation + 1}, ` +
-      `with the same password and Discord account, and every hour gets <span class="hi">${Math.round(vs.share * 100)}%</span> of what ` +
+      `with the same password and Discord account, and takes your active beast along (in place of a starting egg). Every hour it gets <span class="hi">${Math.round(vs.share * 100)}%</span> of what ` +
       `${esc(state.name)}'s buildings make when it is locked` + (before.length ? `, and ${Math.round(vs.share * 100)}% of what ${esc(before.join(', '))} made` : '') + `.`);
     $('vassalGo').disabled = !ready;
     $('vassalGo').title = ready ? '' : 'Not enough resources yet';
