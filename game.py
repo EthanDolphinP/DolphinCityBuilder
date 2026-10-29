@@ -4616,6 +4616,11 @@ def all_tiles(state):
 
 
 def has_building(state, bid):
+    if _STAT_CACHE is not None:      # within one reply: every building the city has, found in one pass
+        have = _STAT_CACHE.get((id(state), "#have"))
+        if have is None:
+            have = _STAT_CACHE[(id(state), "#have")] = {t["building"] for t in all_tiles(state) if t["building"]}
+        return bid in have
     return any(t["building"] == bid for t in all_tiles(state))
 
 
@@ -5335,14 +5340,26 @@ WONDER_DECAY = 0.85
 _WONDER_MEMO = {}
 
 
+_WONDERS_OF = {}       # ideology -> its wonders' ids (the building list never changes while the game runs)
+
+
 def wonder_counts(state):
-    """{wonder id: how many the city has}, for the wonders of the city's own ideology (others do nothing)."""
+    """{wonder id: how many the city has}, for the wonders of the city's own ideology (others do nothing).
+    Asked for once for every building in a reply, so kept for the length of one (see _stats_cached)."""
+    if _STAT_CACHE is not None:
+        found = _STAT_CACHE.get((id(state), "#wonders"))
+        if found is not None:
+            return found
     ideo = state.get("ideology")
+    if ideo not in _WONDERS_OF:
+        _WONDERS_OF[ideo] = [bid for bid, b in BUILDINGS.items() if b.get("category") == "wonder" and b.get("ideology") == ideo]
     totals = _STAT_CACHE.get((id(state), None)) if _STAT_CACHE is not None else None
     if totals is None:
         totals = _tile_totals(state) if _STAT_CACHE is None else _STAT_CACHE.setdefault((id(state), None), _tile_totals(state))
-    return {bid: int(totals.get("#" + bid, 0)) for bid, b in BUILDINGS.items()
-            if b.get("category") == "wonder" and b.get("ideology") == ideo and totals.get("#" + bid)}
+    found = {bid: int(totals["#" + bid]) for bid in _WONDERS_OF[ideo] if totals.get("#" + bid)}
+    if _STAT_CACHE is not None:
+        _STAT_CACHE[(id(state), "#wonders")] = found
+    return found
 
 
 def wonder_share(n):

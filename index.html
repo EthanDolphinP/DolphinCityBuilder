@@ -2795,32 +2795,43 @@ function keepAnchor(anchor) {
     const el = [...document.querySelectorAll(sel)].find(e => e.offsetParent !== null);
     if (!el) continue;
     const moved = el.getBoundingClientRect().top - top;
-    if (Math.abs(moved) > 1) window.scrollBy(0, moved);
+    if (Math.abs(moved) > 1 && !(actAnchor === anchor && movedOnAt > actStarted + 50)) window.scrollBy(0, moved);
     return;
   }
 }
 let actAnchor = null;      // the anchor of the action on its way (kept in place after each redraw it causes)
+// The last time the player clicked, tapped, scrolled or pressed a key. Once they have, an answer still on its way
+// must not scroll the page to keep its button in place: they have moved on (to another tile, say), and the page
+// moving under the mouse made the next click land on the wrong tile.
+let movedOnAt = 0, actStarted = 0;
+for (const kind of ['pointerdown', 'wheel', 'keydown', 'touchstart'])
+  addEventListener(kind, () => { movedOnAt = performance.now(); }, { passive: true, capture: true });
 async function act(action, extra) {
   if (visiting) return;
   const pressed = lastPress && performance.now() - lastPress.t < 400 ? lastPress.b : null;
   lastPress = null;
   if (pressed) pressed.classList.add('working');
-  const anchor = anchorOf(pressed);
+  const anchor = anchorOf(pressed), started = actStarted = performance.now();
   actAnchor = anchor;
   holdCityHeight();         // before the click's own redraw can shrink the page under the map
   try { return await doAct(action, extra); }
-  finally { if (pressed) pressed.classList.remove('working'); keepAnchor(anchor); if (actAnchor === anchor) actAnchor = null; }
+  finally {
+    if (pressed) pressed.classList.remove('working');
+    if (movedOnAt <= started + 50) keepAnchor(anchor);      // (the press that started it counts as not moving on)
+    if (actAnchor === anchor) actAnchor = null;
+  }
 }
 async function doAct(action, extra) {
   actionRevision++;
   pendingActions++;
   const log = view ? view.state.log : [], last = log.length ? log[log.length - 1] : null;
   const id = ++guessId;
+  const tileKey = view && extra && 'x' in extra ? `${view.area}:${extra.x},${extra.y}` : null;
   if (predict(action, extra)) { guesses.push({ id, action, extra }); render(); keepAnchor(actAnchor); }
   const settle = () => {       // this action is answered: forget its guess, keep the others'
     const i = guesses.findIndex(g => g.id === id);
     if (i >= 0) guesses.splice(i, 1);
-    pendingTiles.clear();
+    if (tileKey) pendingTiles.delete(tileKey);
   };
   let data;
   try { data = await api(action, extra); }
@@ -2834,7 +2845,11 @@ async function doAct(action, extra) {
     say(`${data.switch.city} is founded. Its password is the one you used for your old city.`, true);
     return;
   }
-  if (data.state) {
+  if (data.state && view && data.area !== areaIdx && view.area === areaIdx && !data.visiting) {
+    // the player has gone to another area since: it is done, and the page catches up there (not pulled back here)
+    if (!data.error) tutorDid.add(action);
+    refresh();
+  } else if (data.state) {
     if (!data.error) tutorDid.add(action);     // for a tutorial step that asks for it (before the redraw checks)
     accept(data);
     statsAsk = true;      // the Stats tab is out of date now: worked out again when it is next shown
@@ -6409,13 +6424,31 @@ document.addEventListener('keydown', e => {
 $('buildSearch').oninput = () => { buildState.q = $('buildSearch').value; buildState.cat = 'all'; if (view) renderTile(); };
 $('buildSort').onchange = () => { settings.buildSort = $('buildSort').value; saveSettings(); if (view) renderTile(); };
 $('buildSort').value = settings.buildSort || 'newest';
+function selectTile(x, y) {
+  sel = { x, y };
+  render();
+  if (isMobile) showTileAboveSheet();      // on a phone the details open in a sheet: keep the tile in sight above it
+}
 $('map').onclick = e => {
   const b = e.target.closest('.tile');
   if (!b) return;
-  sel = { x: +b.dataset.x, y: +b.dataset.y };
-  render();
-  if (isMobile) showTileAboveSheet();      // on a phone the details open in a sheet: keep the tile in sight above it
+  mapPress = null;
+  selectTile(+b.dataset.x, +b.dataset.y);
 };
+// If the map is drawn again between pressing a tile and letting go (an answer from the server came in), the browser
+// drops the click, as the tile pressed is gone. The tile is then selected when the button is let go.
+let mapPress = null;
+$('map').addEventListener('pointerdown', e => {
+  const b = e.target.closest('.tile');
+  mapPress = b && view ? { el: b, x: +b.dataset.x, y: +b.dataset.y, area: view.area, cx: e.clientX, cy: e.clientY } : null;
+});
+addEventListener('pointerup', e => {
+  const p = mapPress;
+  if (!p || p.el.isConnected) return;     // still there: the click comes as usual
+  mapPress = null;
+  if (!view || view.area !== p.area || Math.hypot(e.clientX - p.cx, e.clientY - p.cy) >= 6) return;
+  selectTile(p.x, p.y);
+});
 $('mapStyles').onclick = e => {
   const b = e.target.closest('[data-map-style]');
   if (!b) return;

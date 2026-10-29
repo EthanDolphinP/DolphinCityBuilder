@@ -403,14 +403,32 @@ def flagged_names(now):
     return out
 
 
+# When the game runs as its own program (python server.py), a helper thread does the upkeep in the background:
+# bills, catching idle cities up, and writing saves. A player's request then does only that player's work. (Run
+# under WSGI, on a host without threads, the requests do it all themselves, as before.)
+BACKGROUND = {"on": False}
+SAVE_SOON = 1.0          # with the helper: what an action changed is written to disk within this many seconds
+SOON = set()             # ...those cities (the others that were only brought up to date wait for the autosave)
+
+
 def flush(names=None):
     """Write changed cities and the market to disk. With `names`, just those cities (the ones an action
-    touched): every other city waits for the next autosave, so a click doesn't rewrite every save."""
+    touched): every other city waits for the next autosave, so a click doesn't rewrite every save.
+    With the helper thread running, those are written by it a moment later instead (see background_save)."""
     global LAST_SAVE
-    SAVES.mkdir(exist_ok=True)
+    if names is not None and BACKGROUND["on"]:
+        SOON.update(n for n in names if n in CITIES)
+        BACKGROUND["market"] = True
+        return
     if names is None:
         LAST_SAVE = time.time()
-        names = set(DIRTY)
+        names = set(DIRTY) | SOON
+        SOON.clear()
+    _save(names)
+
+
+def _save(names):
+    SAVES.mkdir(exist_ok=True)
     for name in set(names):
         if name in CITIES:
             news = CITIES[name].pop("tags_news", None)      # tags just earned: the rare ones are posted on Discord
@@ -469,6 +487,45 @@ def keep_up(now):
             DIRTY.add(name)         # far ahead of its save: the next autosave keeps it
         if time.perf_counter() - start >= WARM_BUDGET:
             return
+
+
+def background_save(everything=False):
+    """The helper's saving: the cities actions changed (or, `everything`, every city with something not yet saved).
+    Done holding LOCK, like every other save, so it never crosses a rename or the last save when the game stops."""
+    global LAST_SAVE
+    with LOCK:
+        names = (set(DIRTY) | SOON) if everything else set(SOON)
+        SOON.clear()
+        if not names and not BACKGROUND.get("market"):
+            return
+        BACKGROUND["market"] = False
+        if everything:
+            LAST_SAVE = time.time()
+        _save(names)
+
+
+def helper():
+    """The background upkeep thread (see BACKGROUND): a few times a second, bills and the like, and a little
+    catching up of idle cities; every SAVE_SOON seconds, what has changed is written (and everything at least
+    every AUTOSAVE_SECONDS, as before)."""
+    saved = time.time()
+    while BACKGROUND["on"]:
+        time.sleep(0.2)
+        try:
+            with LOCK:
+                now = time.time()
+                run_bills(now)
+                warm_up(now)
+            if time.time() - saved >= SAVE_SOON:
+                saved = time.time()
+                background_save(everything=saved - LAST_SAVE >= AUTOSAVE_SECONDS)
+        except Exception:
+            traceback.print_exc()
+
+
+def start_helper():
+    BACKGROUND["on"] = True
+    threading.Thread(target=helper, daemon=True, name="upkeep").start()
 
 
 def startup():
@@ -974,7 +1031,8 @@ def respond(method, path, query="", token=None, body=b"", headers=None):
         TOUCHED.clear()
         if method in ("GET", "POST"):
             try:
-                run_bills(now)
+                if not BACKGROUND["on"]:
+                    run_bills(now)
                 if method == "GET":
                     status, reply = handle_get(path, parse_qs(query), token, now)
                 else:
@@ -983,9 +1041,10 @@ def respond(method, path, query="", token=None, body=b"", headers=None):
                 # A bug: say so to the player instead of dropping the connection, and keep the details for the admin.
                 traceback.print_exc()
                 status, reply = 500, {"error": "Something went wrong on the server. Try again; if it keeps happening, tell the admin."}
-            if DIRTY and now - LAST_SAVE >= AUTOSAVE_SECONDS:
-                flush()
-            warm_up(now)
+            if not BACKGROUND["on"]:
+                if DIRTY and now - LAST_SAVE >= AUTOSAVE_SECONDS:
+                    flush()
+                warm_up(now)
         else:
             status, reply = 400, {"error": "Bad request."}
         return status, json.dumps(reply, separators=(",", ":")).encode("utf-8"), "application/json"
@@ -1063,6 +1122,7 @@ if __name__ == "__main__":
     # A service manager stops the game with SIGTERM: treat it like Ctrl+C, so everything is saved first.
     signal.signal(signal.SIGTERM, _stop)
     startup()
+    start_helper()
     server = ThreadingHTTPServer((host, port), Handler)
     print("Text City Builder is running.")
     print(f"  On this computer:      http://localhost:{port}")
@@ -1073,6 +1133,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
+        BACKGROUND["on"] = False
         with LOCK:
-            flush()
+            flush()             # everything changed, whatever the helper had or hadn't written yet
         print("\nSaved and stopped.")
