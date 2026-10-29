@@ -261,6 +261,7 @@
   html:not(.mobile) #resourcePanel .stat .r { font-size: 11px; line-height: 1.25; }
   html:not(.mobile) #resourcePanel .stat .v { grid-column: 2; grid-row: 1; text-align: right; font-size: 15px; }
   html:not(.mobile) #resourcePanel .stat .r { grid-column: 1 / -1; }
+  html:not(.mobile) #resourcePanel .stat .k { overflow-wrap: normal; white-space: nowrap; }   /* a label never breaks mid-word */
   #topbar.stacked #titleBlock { flex-direction: column; align-items: flex-start; }
   #topbar.stacked #titleBlock > * { max-width: 100%; }
   #topbar .tabs { flex: 0 1 auto; min-width: 0; margin: 0; gap: 2px 0; flex-wrap: wrap; }   /* too many to fit: a second row */
@@ -2968,11 +2969,12 @@ function render() {
   const free = status.housing - state.population, growthAll = Math.min(free, status.arrivals_max * 3600 / status.meal_time);
   const trShare = trainingShare(), growth = growthAll * (1 - trShare);     // newcomers sent to training don't join
   setHTML($('people'),
-    stat('Population', `${state.population} / ${num(status.housing)}` + (trainedNow ? ` <span class="dim small" title="${num(pop)} people in all: trained people eat, but need no home and don't work">+${num(trainedNow)} trained</span>` : ''),
-      free <= 0 ? '<span class="bad">housing full</span>' : `${free} ${free === 1 ? 'place' : 'places'} free` +
+    stat('Population', `${num(state.population)} / ${num(status.housing)}`,
+      (trainedNow ? `<span title="${num(pop)} people in all: trained people eat, but need no home and don't work">+${num(trainedNow)} trained</span> &middot; ` : '') +
+      (free <= 0 ? '<span class="bad">housing full</span>' : `${free} ${free === 1 ? 'place' : 'places'} free` +
         ` &middot; <span class="good" title="With enough food for ${num(status.arrivals_max)} ${status.arrivals_max === 1 ? 'arrival' : 'arrivals'} every meal` +
         (trShare ? `; ${rateText(growthAll)} before ${Math.round(trShare * 100)}% go to training (People tab)` : '') + `">${rateText(growth)}</span>` +
-        (trShare ? ` <span class="dim small">(-${Math.round(trShare * 100)}%, training)</span>` : '')) +
+        (trShare ? ` <span class="dim small">(-${Math.round(trShare * 100)}%, training)</span>` : ''))) +
     stat('Workers', `${working} / ${num(status.jobs)} jobs`,
       unfilled ? `<span class="bad">${unfilled} unfilled</span>` : status.idle ? `${num(status.idle)} idle` : 'all filled') +
     (status.power.supply || status.power.demand || status.unpaused_power?.demand || status.unpaused_power?.supply ? stat('Power', powerCoverage(status.power),
