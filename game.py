@@ -5424,8 +5424,9 @@ def advance_time(state, now, coarse=False):
     """Simulate everything that happened between the last update and `now`. `coarse`: in LONG_STEP steps all the
     way (the server catching up a city nobody is playing, a slice at a time), not SIM_STEP for the last hours."""
     remaining = now - state["updated"]
-    if remaining <= 0:
+    if remaining <= 0 or state.get("locked"):      # a locked city stays as it was, for good
         return
+    _pay_tribute(state, remaining)
     start = now - remaining
     state["wphase"] = weather.phase(state)     # before the clock moves on: the weather changes at meals
     state["updated"] = now
@@ -6341,6 +6342,9 @@ def _view(state, ai, detail):
     for k, v in cauldron.hourly(state).items():
         rates[k] -= v
         projected["rates"][k] = round(projected["rates"][k] - v, 1)
+    for k, v in tribute_rates(state).items():      # from the locked cities this one is a vassal of
+        rates[k] += v
+        projected["rates"][k] = round(projected["rates"][k] + v, 1)
     for i, job in enumerate(jobs):
         job["env"], job["power_env"] = env[i][0], env[i][1]
         job["notes"] = job["notes"] + env[i][2]
@@ -6479,6 +6483,7 @@ def _view(state, ai, detail):
         "training": training_view(state),
         "tags": tags.view(state),
         "features": features_view(state),
+        "vassal": vassal_view(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -6913,6 +6918,111 @@ def _group(items, value, key=lambda t: t["building"]):
     return out
 
 
+# ---- vassal cities ----
+# A Megacity may found a vassal city, for VASSAL_COST. The Megacity is then locked forever: nobody can play it
+# again, its clock stops, and it stays on the leaderboard as it was. What its buildings were making each hour when
+# it was locked is written down, and the new city gets VASSAL_SHARE of that every hour from then on. A vassal that
+# becomes a Megacity may found one of its own: the next city gets the share of every locked city before it too.
+# Generation 1 is a city that was founded the usual way; each vassal is one more than its lord.
+# Only found_vassal() (the "vassal_found" action, on the server) ever writes "vassal" or "locked".
+VASSAL_COST = {"food": 100_000_000, "wood": 100_000_000, "stone": 100_000_000, "ore": 100_000_000,
+               "gold": 100_000_000, "livestock": 1_000_000, "tools": 10_000_000, "electronics": 1_000_000}
+VASSAL_SHARE = 0.10
+VASSAL_SAMPLES = 24          # the hourly output written down is the average over a day (night, day and weather)
+
+
+def generation(state):
+    return state.get("vassal", {}).get("generation", 1)
+
+
+def production_per_hour(state):
+    """What the city's buildings make in an hour, averaged over a day from now (the tribute of the cities it
+    is a vassal of is not counted). Never edits the city."""
+    made = {k: 0.0 for k in RESOURCES}
+    with _stats_cached():
+        jobs = work_plan(state)[0]
+        for h in range(VASSAL_SAMPLES):
+            env = weather.job_factors(state, jobs, state["updated"] + h * 3600 * 24 / VASSAL_SAMPLES)
+            supply, demand, power = power_status(state, jobs, env)
+            power = battery_share(state, supply, demand, power)
+            for i, job in enumerate(jobs):
+                speed, more = _flow(state, job, power, env[i][0])
+                if not speed or not job["cycle"] or _missing(state, job["consumes"]):
+                    continue
+                for k, v in job_output(state, job).items():
+                    made[k] += v * 3600 / job["cycle"] * speed * more / VASSAL_SAMPLES
+    return {k: round(v, 2) for k, v in made.items() if v > 0}
+
+
+def tribute_rates(state):
+    """What the city gets each hour from the locked cities it is a vassal of."""
+    out = {}
+    for made in state.get("vassal", {}).get("tribute", {}).values():
+        for k, v in made.items():
+            if k in RESOURCES:
+                out[k] = out.get(k, 0.0) + v * VASSAL_SHARE
+    return out
+
+
+def _pay_tribute(state, seconds):
+    rates = tribute_rates(state)
+    if not rates or seconds <= 0:
+        return
+    totals = state.setdefault("totals", {})
+    for k, v in rates.items():
+        state["resources"][k] += v * seconds / 3600
+        totals["tribute:" + k] = totals.get("tribute:" + k, 0) + v * seconds / 3600
+
+
+def vassal_problem(state):
+    """Why this city can't found a vassal now, or None."""
+    if state.get("locked"):
+        return "This city is locked."
+    if state["tech"] < len(TECH_LEVELS) - 1:
+        return f"Only a {TECH_LEVELS[-1]['name']} can found a vassal city."
+    missing = _missing(state, VASSAL_COST)
+    if missing:
+        return f"Founding a vassal city needs {fmt_goods(missing)} more."
+    return None
+
+
+def found_vassal(lord, vassal, now):
+    """`lord` pays, is locked forever, and `vassal` (a new city) becomes its vassal. Returns an error or None."""
+    problem = vassal_problem(lord)
+    if problem:
+        return problem
+    made = production_per_hour(lord)          # before paying: buildings waiting for what was paid would count 0
+    _pay(lord, VASSAL_COST)
+    mine = lord.get("vassal", {})
+    vassal["vassal"] = {
+        "generation": generation(lord) + 1,
+        "lord": lord["name"],
+        "line": mine.get("line", []) + [lord["name"]],     # every locked city before it, the first one first
+        "tribute": {**mine.get("tribute", {}), lord["name"]: made},
+        "since": now,
+    }
+    lord["locked"] = {"at": now, "vassal": vassal["name"]}
+    tally(lord, "vassals")
+    log(lord, now, f"Paid {fmt_goods(VASSAL_COST)} and founded the vassal city {vassal['name']}. "
+                   f"{lord['name']} is locked forever; {vassal['name']} gets {round(VASSAL_SHARE * 100)}% of what it made each hour.")
+    vassal["tutorial"] = {"at": TUTORIAL_STEPS[-1], "done": True, "skippable": True, "gifts": []}   # its player knows the game
+    lines = ", ".join(vassal["vassal"]["line"])
+    log(vassal, now, f"{vassal['name']} is founded as a vassal of {lord['name']} (generation {vassal['vassal']['generation']}). "
+                     f"Every hour it gets {round(VASSAL_SHARE * 100)}% of what {lines} made.")
+    return None
+
+
+def vassal_view(state):
+    v = state.get("vassal")
+    out = {"generation": generation(state), "share": VASSAL_SHARE, "cost": VASSAL_COST,
+           "locked": state.get("locked"), "can": state["tech"] >= len(TECH_LEVELS) - 1 and not state.get("locked")}
+    if v:
+        out.update(lord=v["lord"], line=v["line"], since=v["since"],
+                   from_each={name: {k: round(x * VASSAL_SHARE, 1) for k, x in made.items()} for name, made in v["tribute"].items()},
+                   rates={k: round(x, 1) for k, x in tribute_rates(state).items()})
+    return out
+
+
 def summary(state):
     """One leaderboard row."""
     return {
@@ -6933,4 +7043,8 @@ def summary(state):
         "wonders": sum(1 for t in all_tiles(state) if t["building"] and BUILDINGS[t["building"]].get("category") == "wonder"),
         "resources": {k: int(state["resources"].get(k, 0)) for k in RESOURCES},
         "tags": tags.board(state),
+        "generation": generation(state),
+        "lord": state.get("vassal", {}).get("lord"),
+        "locked": bool(state.get("locked")),
+        "vassal": (state.get("locked") or {}).get("vassal"),
     }

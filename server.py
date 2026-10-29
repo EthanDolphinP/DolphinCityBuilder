@@ -208,6 +208,10 @@ def login(name, password, now):
 
     state = get_city(name, now)
     reply = {}
+    if state is not None and state.get("locked"):
+        head = head_of(name, now)
+        return 403, {"error": f"{name} is locked forever: it founded the vassal city {state['locked']['vassal']}. "
+                              f"Sign in to {head} instead (with the same password, unless it was changed)."}
     if state is None:
         problem = moderation.check_name(name) or (
             f"There is already a city called {match_city(name)}: sign in with its name written the same way."
@@ -236,10 +240,63 @@ def login(name, password, now):
 
 
 def find_city(name, now):
-    """A city named by a player or by saved market data; None if there is no such city."""
+    """A city named by a player or by saved market data; None if there is no such city, or it is locked (a
+    locked city takes no part in the game: no trades, bills, duels, hexes, messages or presents)."""
     if not isinstance(name, str) or not CITY_NAME.match(name):
         return None
-    return get_city(name, now)
+    state = get_city(name, now)
+    return None if state is None or state.get("locked") else state
+
+
+def head_of(name, now):
+    """The city a locked city's line goes on in now (its vassal's vassal, and so on)."""
+    seen = set()
+    state = _loaded(name, now)
+    while state and state.get("locked") and name not in seen:
+        seen.add(name)
+        name = state["locked"]["vassal"]
+        state = _loaded(name, now)
+    return name
+
+
+def found_vassal(state, now, new_name, token):
+    """The "vassal_found" action: `state` (a Megacity) pays, is locked forever, and the new city `new_name` is
+    founded as its vassal, with the same password and Discord account. Returns (error, the new city's sign-in token)."""
+    problem = game.vassal_problem(state)
+    if problem:
+        return problem, None
+    if not isinstance(new_name, str) or not CITY_NAME.match(new_name):
+        return BAD_NAME, None
+    if match_city(new_name):
+        return f"There is already a city called {match_city(new_name)}. Choose a new name.", None
+    problem = moderation.check_name(new_name)
+    if problem:
+        return problem, None
+    name = state["name"]
+    vassal = get_city(new_name, now, create=True)
+    error = game.found_vassal(state, vassal, now)
+    if error:                      # (vassal_problem said yes a moment ago, so this does not happen)
+        CITIES.pop(new_name, None)
+        return error, None
+    vassal["auth"] = dict(state["auth"])                     # the same password until it is changed
+    fresh = secrets.token_urlsafe(24)
+    vassal["sessions"] = [_token_hash(fresh)]
+    state["sessions"] = []                                   # nobody is signed in to a locked city
+    for book in (ONLINE, ACTIVE):
+        book.pop(name, None)
+    market.drop_locked(MARKET, name, lambda other: find_city(other, now))
+    if state.get("discord_user"):                            # the same Discord account
+        vassal["discord_user"] = state["discord_user"]
+        discord_bot.move_member(name, new_name, vassal)
+    DIRTY.update({name, new_name})
+    TOUCHED.update({name, new_name})
+    DISK_NAMES["at"] = -1e9
+    flush(TOUCHED)
+    BOARD["rows"].pop(name, None)            # both rows are worked out again at once
+    gen = vassal["vassal"]["generation"]
+    discord_bot.announce(f"\U0001F451 **{name}** has been locked forever, and founded the vassal city **{new_name}** "
+                         f"(generation {gen}), which gets 10% of what {', '.join(vassal['vassal']['line'])} made each hour.")
+    return None, fresh
 
 
 DISK_NAMES = {"at": -1e9, "names": set()}    # the saves folder's list of cities, looked at every NAMES_SECONDS
@@ -748,12 +805,18 @@ def handle_post(path, data, token, now):
     weather.set_timezone(state, data.get("tz"))
 
     locked = game.locked_action(state, action) if isinstance(action, str) else None    # a system not open yet
-    if locked:
+    if state.get("locked") and action != "sign_out":
+        error = "This city is locked forever."
+    elif locked:
         error = locked
+    elif action == "vassal_found":
+        error, fresh = found_vassal(state, now, data.get("name"), token)
+        if not error:
+            return 200, {"error": None, "switch": {"city": data["name"], "token": fresh}}
     elif action == "restart":
         market.drop_city(MARKET, name)
         fresh = game.new_game(name, now)
-        fresh.update({k: state[k] for k in PRIVATE if k in state})   # same owner
+        fresh.update({k: state[k] for k in PRIVATE + ("vassal", "discord_user") if k in state})   # same owner, same lords
         state = CITIES[name] = fresh
         error = None
     elif action == "set_password":
@@ -794,6 +857,8 @@ def handle_post(path, data, token, now):
     elif action == "beast_offer_accept":
         error = market.accept_beast(MARKET, state, now, data.get("offer"),
                                     lambda seller: find_city(seller, now), data.get("pay"))
+    elif action == "message_send" and isinstance(data.get("to"), str) and (_loaded(data["to"], now) or {}).get("locked"):
+        error = f"{data['to']} is locked forever and can't get messages. Its line goes on in {head_of(data['to'], now)}."
     elif action == "message_send":
         error = market.send_message(state, now, data.get("to"), data.get("text"),
                                     lambda other: find_city(other, now))

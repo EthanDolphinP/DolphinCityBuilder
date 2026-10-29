@@ -669,6 +669,17 @@ def _backfill(guild):
     _store(MEMBERS_FILE, known)
 
 
+def move_member(old, new, state):
+    """A city was locked and founded a vassal: the Discord member who claimed it now has the vassal."""
+    known = members()
+    users = [u for u, c in known["cities"].items() if c == old]
+    for user in users:
+        known["cities"][user] = new
+    if users:
+        _store(MEMBERS_FILE, known)
+        sync_roles([(u, city_roles(state)) for u in users])
+
+
 def member_city(user):
     return members()["cities"].get(str(user))
 
@@ -905,7 +916,9 @@ def _profile(server, now, name):
     wonders = ", ".join(f"{game.BUILDINGS[b]['name']}" + (f" x{n}" if n > 1 else "") for b, n in counts.items()) or "none yet"
     rare = sum(1 for t in shown if t[1] in ("epic", "legendary", "special"))
     return _embed(f"{c['name']}", f"A **{c['tech_name']}**" + (f" following **{c['ideology']}**" if c["ideology"] else "") +
-                  f". Rank #{rank} of {len(cities)}.",
+                  f". Rank #{rank} of {len(cities)}." +
+                  (f"\nGeneration {c['generation']}: a vassal of **{c['lord']}**." if c.get("lord") else "") +
+                  (f"\nLocked forever: it founded the vassal city **{c['vassal']}**." if c.get("locked") else ""),
                   [("Tags", f"{tag_text}\n-# {len(shown)} in all" + (f", {rare} of them epic, legendary or special" if rare else ""), False),
                    ("Wonders", wonders, False),
                    ("Ideology quests", short(c.get("quests", 0)), True), ("Population", short(c["population"]), True),

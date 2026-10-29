@@ -275,6 +275,15 @@ def drop_city(market, name):
     market["debts"] = [d for d in market.get("debts", []) if d["creditor"] != name]
 
 
+def drop_locked(market, name, get_city):
+    """A city is locked for good: everything it had on the market goes, and so do its debts either way. Duels
+    others sent it are called off and their bets given back."""
+    for duel in [d for d in market.get("duels", []) if d.get("to") == name]:
+        _end_duel(market, duel, get_city(duel["city"]), refund=True)
+    drop_city(market, name)
+    market["debts"] = [d for d in market.get("debts", []) if d["debtor"] != name]
+
+
 def drop_proposals(market, sender, receiver):
     """Remove bills `sender` has proposed to `receiver` that are still unanswered."""
     market["bills"] = [b for b in market["bills"]

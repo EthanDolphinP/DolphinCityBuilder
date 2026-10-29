@@ -1513,7 +1513,13 @@
         <button id="advance"></button>
       </div>
       <details id="advanceMore"><summary id="advanceSummary" class="small"></summary>
-        <div id="advanceInfo" class="checks"></div></details>
+        <div id="advanceInfo" class="checks"></div>
+        <div id="vassalForm" hidden>
+          <p id="vassalWhat" class="small"></p>
+          <input id="vassalName" maxlength="24" placeholder="the new city's name" autocomplete="off" style="width:100%">
+          <button id="vassalGo" style="width:100%;margin-top:6px">Found the vassal city</button>
+        </div></details>
+      <div id="vassalLine" class="small"></div>
     </aside>
   </div>
   <div id="ideologyPick" hidden>
@@ -2815,6 +2821,12 @@ async function doAct(action, extra) {
   pendingActions--;
   settle();
   if (data.auth) return signOut(data.error);
+  if (data.switch) {         // a vassal city was founded: carry on in it
+    token = data.switch.token;
+    await enter(data.switch.city);
+    say(`${data.switch.city} is founded. Its password is the one you used for your old city.`, true);
+    return;
+  }
   if (data.state) {
     if (!data.error) tutorDid.add(action);     // for a tutorial step that asks for it (before the redraw checks)
     accept(data);
@@ -2926,7 +2938,8 @@ function render() {
     if (b.status === 'active') timers['bill' + b.id] = { cycle: b.every, progress: b.every - (b.next - view.now), speed: 1, waiting: [] };
   }
 
-  $('title').textContent = `${state.name} - ${tech.name}`;
+  const gen = view.vassal ? view.vassal.generation : 1;
+  $('title').textContent = `${state.name} - ${tech.name}` + (gen > 1 ? ` (generation ${gen})` : '') + (state.locked ? ' (locked)' : '');
   document.body.classList.toggle('visiting', !!visiting);
   document.body.dataset.shown = tab;      // lets the phone layout show some parts only on some tabs (not "data-tab": the tab buttons use that)
   $('visitBar').hidden = !visiting;
@@ -3039,6 +3052,7 @@ function render() {
   }
   setHTML($('advanceInfo'), !adv ? '' : gfx() ? `<div class="requirement-grid">${adv.checks.map(requirementCard).join('')}</div>`
     : adv.checks.map(c => `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join(''));
+  renderVassal(adv);
 
   // One menu of every area with arrows either side, then a short row of only the areas worth a look:
   // the ones holding what the Find box is looking for, or (with no search) the ones with a problem.
@@ -3240,6 +3254,52 @@ let collectionFilter = 'all';
 function buildingCount(id) {
  return view.state.areas.reduce((n,a) => n + a.tiles.flat().filter(t => t.building === id).length, 0);
 }
+// Vassal cities: a Megacity can pay a fortune to be locked forever and found a new city, which gets a share of
+// what it (and every locked city before it in the line) made each hour.
+function renderVassal(adv) {
+  const { state, defs } = view, vs = view.vassal || {}, R = defs.resources;
+  const now = !adv && !visiting && vs.can;
+  $('vassalForm').hidden = !now;
+  if (now) {
+    const checks = Object.entries(vs.cost).map(([k, n]) => ({ ok: state.resources[k] >= n,
+      text: `${Math.floor(Math.min(state.resources[k], n)).toLocaleString('en-US')} of ${n.toLocaleString('en-US')} ${R[k]}` }));
+    const met = checks.filter(c => c.ok).length, ready = met === checks.length;
+    $('advanceTitle').textContent = 'Found a vassal city';
+    $('advanceMore').hidden = false;
+    if ($('advanceMore')._set === undefined) { $('advanceMore').open = settings.advanceOpen !== false; $('advanceMore')._set = true; }
+    setHTML($('advanceSummary'), ready ? '<span class="good">Everything it needs is ready</span>'
+      : `<span class="dim">What it costs:</span> ${met} of ${checks.length} ready`);
+    setHTML($('advanceInfo'), gfx() ? `<div class="requirement-grid">${checks.map(requirementCard).join('')}</div>`
+      : checks.map(c => `<span class="${c.ok ? 'good' : 'bad'}">[${c.ok ? 'x' : ' '}] ${esc(c.text)}</span>`).join(''));
+    const before = (vs.line || []);
+    setHTML($('vassalWhat'), `Founding a vassal city <span class="bad">locks ${esc(state.name)} forever</span>: nobody can play it again, ` +
+      `and it stays on the leaderboard as it is now. The new city starts from the beginning, as generation ${vs.generation + 1}, ` +
+      `with the same password and Discord account, and every hour gets <span class="hi">${Math.round(vs.share * 100)}%</span> of what ` +
+      `${esc(state.name)}'s buildings make when it is locked` + (before.length ? `, and ${Math.round(vs.share * 100)}% of what ${esc(before.join(', '))} made` : '') + `.`);
+    $('vassalGo').disabled = !ready;
+    $('vassalGo').title = ready ? '' : 'Not enough resources yet';
+  }
+  // where this city's line comes from, and what it gets from it
+  const per = vs.rates ? Object.entries(vs.rates).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]) : [];
+  setHTML($('vassalLine'), state.locked
+    ? `<p class="dim">Locked forever on ${esc(new Date(state.locked.at * 1000).toLocaleDateString())}: it founded the vassal city ` +
+      `<span class="hi">${esc(state.locked.vassal)}</span>.</p>`
+    : !vs.lord ? ''
+    : `<p><span class="hi">Generation ${vs.generation}</span>, a vassal of ${esc(vs.lord)}` +
+      (vs.line.length > 1 ? ` <span class="dim">(line: ${esc(vs.line.join(', '))})</span>` : '') + `.</p>` +
+      (per.length ? `<p class="dim">From them each hour: ${per.map(([k, v]) => `<span class="good">+${num(v)}</span> ${esc(R[k])}`).join(', ')}</p>` : ''));
+  $('advancePanel').hidden = !adv && !now && !vs.lord && !state.locked;
+}
+$('vassalGo').onclick = () => {
+  const name = $('vassalName').value.trim();
+  if (!name) { say('Type a name for the new city.'); return; }
+  const typed = prompt(`This locks ${city} forever: nobody will ever be able to play it again, and it can't be undone.\n\n` +
+                       `Type ${city} to found the vassal city ${name}.`);
+  if (typed === null) return;
+  if (typed.trim() !== city) { say(`Not founded: what you typed was not ${city}.`); return; }
+  act('vassal_found', { name });
+};
+
 function requirementCard(c) {
  const match = c.text.match(/([\d,.]+) of ([\d,.]+) (.+)/);
  if (!match) return `<div class="requirement ${c.ok ? 'complete' : ''}">${icon(c.ok ? 'check' : 'minus')}<div class="small">${esc(c.text)}</div></div>`;
@@ -5766,11 +5826,14 @@ function renderBoard() {
     (withIdeology ? `<th>Ideology</th>` : '') + `<th></th></tr>` +
     rows.map(c => `<tr class="${c.name === city ? 'me' : ''}"><td class="n">${rank.get(c.name)}</td>` +
       `<td>${esc(c.name)}${c.name === city ? ' <span class="dim">(you)</span>' : ''}${c.name === city ? '' : online.has(c.name) ? ' <span class="good small">online</span>' : idle.has(c.name) ? ' <span class="dim small">idle</span>' : ''}` +
-      `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}${tagChips(c.tags)}</td>` +
+      `${tag(c)}${banned(c) ? ' <span class="bad">banned</span>' : ''}` +
+      (c.generation > 1 ? ` <span class="dim small" title="Generation ${c.generation}: a vassal of ${esc(c.lord || '')}">gen ${c.generation}</span>` : '') +
+      (c.locked ? ` <span class="dim small" title="Locked forever: it founded ${esc(c.vassal || '')}">locked</span>` : '') +
+      `${tagChips(c.tags)}</td>` +
       cols.map(([k]) => `<td class="n${k === boardSort ? ' hi' : ''}">${show(c, k)}</td>`).join('') +
       (withIdeology ? `<td class="dim">${c.ideology ? esc(c.ideology) : '-'}</td>` : '') +
       `<td class="${c.name === city ? 'mine' : 'acts'}">` + (c.name === city ? '' : `<button data-visit="${esc(c.name)}">View</button> ` +
-        (visiting ? '' : `<button data-board-msg="${esc(c.name)}">Message</button> <button data-propose-bill="${esc(c.name)}" title="Propose a repeating trade with ${esc(c.name)}">Bill</button> ` + (banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
+        (visiting || c.locked ? '' : `<button data-board-msg="${esc(c.name)}">Message</button> <button data-propose-bill="${esc(c.name)}" title="Propose a repeating trade with ${esc(c.name)}">Bill</button> ` + (banned(c) ? `<button data-unban="${esc(c.name)}">Unban</button>`
                                    : `<button data-ban="${esc(c.name)}">Ban</button>`))) +
       `</td></tr>`).join('') + `</table>` +
       (cut ? `<div class="bar"><span class="dim small">Showing the top ${TOP} of ${matching.length}${rank.get(city) > TOP ? ', and your city' : ''}.</span>` +
