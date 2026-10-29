@@ -287,7 +287,11 @@
   /* The leaderboard: a wide table in a box of its own height, so its scroll bars are always close by. The headings stay
      at the top, and the city's name and its buttons (visit, message, ban) stay at the edges while the figures scroll. */
   /* only sideways: the mouse wheel over the board scrolls the page (the buttons column stays on the right) */
-  #board { overflow-x: auto; overflow-y: hidden; }
+  #board { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }    /* its scroll bar is the one above it: #boardBar */
+  #board::-webkit-scrollbar { display: none; }
+  #boardBar { overflow-x: auto; overflow-y: hidden; margin-top: 10px; }
+  #boardBar > div { height: 1px; }
+  #boardBar:not([hidden]) + #board { margin-top: 2px !important; }
   #board table { border-collapse: separate; border-spacing: 0; }
   #board th { position: sticky; top: 0; z-index: 2; background: var(--panel); }
   #board td:nth-child(2), #board th:nth-child(2) { position: sticky; left: 0; z-index: 1; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
@@ -1502,6 +1506,7 @@
         </div>
         <div id="boardViews" class="bar"></div>
         <div id="boardWho" class="bar"></div>
+        <div id="boardBar" hidden><div></div></div>
         <div id="board" class="scroll" data-keep-table style="margin-top:10px"><span class="dim">Loading...</span></div>
         <p class="dim small">Click a column heading, or use the menu, to rank by it. View opens another city
           read-only, and Message writes to it. Ban stops a city from viewing yours, writing to you and proposing
@@ -5773,6 +5778,18 @@ async function loadBoard() {
   if (tab === 'ideology' && view) renderIdeology();
 }
 
+// The leaderboard's scroll bar sits above it (#boardBar), kept in step with the table both ways.
+function fitBoardBar() {
+  const board = $('board'), bar = $('boardBar');
+  const wide = board.scrollWidth > board.clientWidth + 1;
+  bar.hidden = !wide;
+  if (wide) { bar.firstElementChild.style.width = board.scrollWidth + 'px'; bar.scrollLeft = board.scrollLeft; }
+}
+$('boardBar').addEventListener('scroll', () => { if ($('board').scrollLeft !== $('boardBar').scrollLeft) $('board').scrollLeft = $('boardBar').scrollLeft; });
+$('board').addEventListener('scroll', () => { if ($('boardBar').scrollLeft !== $('board').scrollLeft) $('boardBar').scrollLeft = $('board').scrollLeft; });
+if (window.ResizeObserver) new ResizeObserver(fitBoardBar).observe($('board'));
+window.addEventListener('resize', fitBoardBar);
+
 function renderBoard() {
   if (!board || !view) return;
   const R = view.defs.resources;
@@ -5843,6 +5860,7 @@ function renderBoard() {
       (cut ? `<div class="bar"><span class="dim small">Showing the top ${TOP} of ${matching.length}${rank.get(city) > TOP ? ', and your city' : ''}.</span>` +
         `<button data-board-all>Show all ${matching.length}</button></div>` : '')
     : `<span class="dim">No city matches.</span>`);
+  fitBoardBar();
 }
 
 // ------------------------------------------------------------------ time --
