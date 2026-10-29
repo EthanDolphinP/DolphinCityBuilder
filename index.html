@@ -3290,7 +3290,8 @@ function renderVassal(adv) {
     : `<p><span class="hi">Generation ${vs.generation}</span>, a vassal of ${esc(vs.lord)}` +
       (vs.line.length > 1 ? ` <span class="dim">(line: ${esc(vs.line.join(', '))})</span>` : '') + `.</p>` +
       (per.length ? `<p class="dim">From them each hour: ${per.map(([k, v]) => `<span class="good">+${num(v)}</span> ${esc(R[k])}`).join(', ')}</p>` : ''));
-  $('advancePanel').hidden = !adv && !now && !vs.lord && !state.locked;
+  // founding a vassal, or where a line comes from, is shown on the City tab only (the other tabs keep their width)
+  $('advancePanel').hidden = !adv && (tab !== 'city' || (!now && !vs.lord && !state.locked));
 }
 $('vassalGo').onclick = () => {
   const name = $('vassalName').value.trim();
