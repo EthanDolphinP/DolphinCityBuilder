@@ -291,6 +291,7 @@
   #board table { border-collapse: separate; border-spacing: 0; }
   #board th { position: sticky; top: 0; z-index: 2; background: var(--panel); }
   #board td:nth-child(2), #board th:nth-child(2) { position: sticky; left: 0; z-index: 1; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
+  #board td:nth-child(n+3), #board th:nth-child(n+3) { padding-left: 14px; }   /* clear of the City column's line */
   #board td.acts, #board th:last-child { position: sticky; right: 0; z-index: 1; background: var(--panel); box-shadow: -1px 0 0 var(--line); }
   #board td.acts { white-space: nowrap; padding: 2px 4px; }
   #board td.acts button { min-height: 0; padding: 2px 7px; font-size: 12px; margin: 0 1px; }
