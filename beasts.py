@@ -105,6 +105,7 @@ RARITIES = {
 #   housing         people housed, per level
 #   attracts        extra arrivals per meal, per level (rounded down in total)
 #   night_shelter / weather_shelter   share of night's (or the weather's) slowdowns the city is spared, per level
+#   adv_power, adv_beast, adv_speed, adv_loot, adv_heal, adv_xp, adv_cost   adventure bonuses (see adventure.py)
 # home: kinds of land (game.ENVIRONMENTS) where its eggs are likelier to be found.
 SPECIES = {
     "mossback":    {"name": "Mossback Tortoise", "rarity": "common", "nature": "Patient grower",
@@ -229,6 +230,57 @@ SPECIES = {
     "aurora_whale": {"name": "Aurora Whale", "rarity": "legendary", "nature": "Sky-swimmer", "home": ["icefields", "reef", "sea_cliffs"],
                      "bonus": {"night_shelter": 0.05, "weather_shelter": 0.05, "speed": {"all": 0.02}},
                      "desc": "It swims through the night sky trailing green light. Under it, night is never quite dark and storms never quite break."},
+    "mud_buffalo": {"name": "Mud Buffalo", "rarity": "uncommon", "nature": "Wallower", "home": ["savanna", "floodplains"],
+        "bonus": {"speed": {"food": 0.02}, "wildlife_speed": 0.05},
+        "desc": "It wallows in the river all day, and the fields and the wild things downstream both do better for it."},
+    "quill_hog": {"name": "Quill Hog", "rarity": "uncommon", "nature": "Prickly healer", "home": ["woodland", "jungle"],
+        "bonus": {"adv_heal": 0.05, "speed": {"materials": 0.015}},
+        "desc": "Its shed quills make good splints. A beaten party is back on its feet sooner with one about."},
+    "glass_lizard": {"name": "Glass Lizard", "rarity": "uncommon", "nature": "Sun-drinker", "home": ["desert", "volcanic"],
+        "bonus": {"speed": {"knowledge": 0.02}, "power": 0.015},
+        "desc": "You can see the sunlight move through it. Tinkerers keep one on the workbench."},
+    "salt_gull": {"name": "Salt Gull", "rarity": "uncommon", "nature": "Far-flier", "home": ["coast", "sea_cliffs"],
+        "bonus": {"explore_speed": 0.04, "speed": {"trade": 0.01}},
+        "desc": "It always knows the way back to port, and the way to wherever the fish are."},
+    "bramble_wolf": {"name": "Bramble Wolf", "rarity": "rare", "nature": "Pack-leader", "home": ["woodland", "taiga"],
+        "bonus": {"adv_power": 0.02, "explore_speed": 0.03},
+        "desc": "A wolf grown through with thorns. Heroes who run with it fight like a pack."},
+    "tide_seal": {"name": "Tide Seal", "rarity": "rare", "nature": "Harbour-keeper", "home": ["coast", "islands"],
+        "bonus": {"speed": {"food": 0.03, "trade": 0.02}},
+        "desc": "It basks on the quay all day and barks at every boat. The boats come in heavier for it."},
+    "copper_scarab": {"name": "Copper Scarab", "rarity": "rare", "nature": "Spark-maker", "home": ["desert", "outback", "badlands"],
+        "bonus": {"power": 0.04, "speed": {"knowledge": 0.02}},
+        "desc": "Its shell hums with a charge. Wires laid near it carry more."},
+    "mist_crane": {"name": "Mist Crane", "rarity": "rare", "nature": "Fog-dancer", "home": ["lakeland", "floodplains", "delta"],
+        "bonus": {"weather_shelter": 0.03, "night_shelter": 0.02, "speed": {"knowledge": 0.01}},
+        "desc": "It dances at dawn in the river mist, and the mist seems to keep the worst of the weather off."},
+    "storm_griffin": {"name": "Storm Griffin", "rarity": "epic", "nature": "Sky-scout", "home": ["highlands", "sea_cliffs", "steppe"],
+        "bonus": {"explore_speed": 0.06, "adv_speed": 0.04, "speed": {"trade": 0.02}},
+        "desc": "Half eagle, half lion, all impatience. Wherever the city sends people, it gets them there first."},
+    "jade_qilin": {"name": "Jade Qilin", "rarity": "epic", "nature": "Good-omen", "home": ["bamboo_valley", "jungle"],
+        "bonus": {"speed": {"knowledge": 0.03, "food": 0.03}, "weather_shelter": 0.03},
+        "desc": "Where it walks, the rice stands up straight and the scholars stop arguing."},
+    "obsidian_basilisk": {"name": "Obsidian Basilisk", "rarity": "epic", "nature": "Stone-gazer", "home": ["volcanic", "badlands"],
+        "bonus": {"speed": {"materials": 0.05}, "adv_beast": 0.04, "adv_power": 0.01},
+        "desc": "Rock cracks clean under its stare, which saves the quarries a great deal of work. Lair beasts dislike it too."},
+    "moon_unicorn": {"name": "Moon Unicorn", "rarity": "epic", "nature": "Night-light", "home": ["grassland", "moorland", "lakeland"],
+        "bonus": {"night_shelter": 0.04, "housing": 2, "attracts": 0.2},
+        "desc": "Its horn glows after dark. People move to the city just to see it go by."},
+    "mountain_titan": {"name": "Mountain Titan", "rarity": "legendary", "nature": "Living mountain", "home": ["volcanic", "highlands"],
+        "bonus": {"speed": {"materials": 0.08, "all": 0.02}, "power": 0.06},
+        "desc": "It was a hill until it got up. Quarries, mines and generators all run harder in its shadow."},
+    "star_kirin": {"name": "Star Kirin", "rarity": "legendary", "nature": "Sage of the sky", "home": ["bamboo_valley", "steppe", "grassland"],
+        "bonus": {"speed": {"knowledge": 0.08, "all": 0.02}, "explore_speed": 0.05},
+        "desc": "Its mane is full of stars that move. Scholars follow it, map-makers follow the scholars."},
+    "verdant_hydra": {"name": "Verdant Hydra", "rarity": "legendary", "nature": "Many-headed gardener", "home": ["jungle", "floodplains", "delta"],
+        "bonus": {"speed": {"food": 0.08, "all": 0.02}, "housing": 4, "attracts": 0.2},
+        "desc": "Cut a head off and two grow back, and so does everything else it touches. Nobody in its city goes hungry."},
+    "abyss_kraken": {"name": "Abyssal Kraken", "rarity": "legendary", "nature": "Deep raider", "home": ["islands", "coast", "reef"],
+        "bonus": {"speed": {"trade": 0.04, "all": 0.02}, "adv_power": 0.03, "adv_loot": 0.05, "adv_beast": 0.04},
+        "desc": "It drags whole lairs into the sea and brings back what was in them. Its heroes never come home empty-handed."},
+    "sun_roc": {"name": "Sun Roc", "rarity": "legendary", "nature": "Horizon-chaser", "home": ["desert", "outback", "savanna"],
+        "bonus": {"speed": {"all": 0.02}, "explore_speed": 0.1, "adv_speed": 0.05, "weather_shelter": 0.03},
+        "desc": "A bird so big its shadow is a cool afternoon. Expeditions ride on its back to the edge of the map."},
 }
 
 # Every beast has four stats of its own. They are for show and for trading:
@@ -269,6 +321,23 @@ BASE_STATS = {      # (health, attack, defense, speed)
     "snow_lion":    (100, 28, 18, 24),
     "crystal_drake": (120, 36, 36, 20),
     "aurora_whale": (190, 38, 34, 22),
+    "mud_buffalo": (95, 14, 18, 7),
+    "quill_hog": (62, 13, 22, 8),
+    "glass_lizard": (48, 16, 10, 20),
+    "salt_gull": (46, 13, 8, 24),
+    "bramble_wolf": (75, 26, 14, 24),
+    "tide_seal": (90, 18, 20, 18),
+    "copper_scarab": (66, 20, 28, 14),
+    "mist_crane": (64, 20, 12, 26),
+    "storm_griffin": (100, 36, 18, 34),
+    "jade_qilin": (115, 30, 28, 24),
+    "obsidian_basilisk": (125, 40, 34, 12),
+    "moon_unicorn": (105, 32, 22, 30),
+    "mountain_titan": (190, 36, 44, 8),
+    "star_kirin": (145, 42, 28, 42),
+    "verdant_hydra": (190, 40, 28, 14),
+    "abyss_kraken": (165, 50, 28, 22),
+    "sun_roc": (140, 46, 24, 44),
 }
 
 # A small picture of each species, drawn in text.
@@ -465,6 +534,108 @@ ART = {
         r"  (  o        >==",
         r"   ~~~~~~~~~~~ /",
     ],
+    "mud_buffalo": [
+        r"  (__)",
+        r"  (oo)______",
+        r"   \/      )\\~",
+        r"    ||--||  ~~",
+    ],
+    "quill_hog": [
+        r"   //////////",
+        r"  (o ////////)",
+        r" <__ ////////",
+        r"    U    U",
+    ],
+    "glass_lizard": [
+        r"    _____",
+        r" __/ o   \___",
+        r"<__  ___  ___>~~",
+        r"   /_/ \_\ ",
+    ],
+    "salt_gull": [
+        r"  ___     ___",
+        r"  \  \_o_/  /",
+        r"   \__(_>__/",
+        r"      ^^",
+    ],
+    "bramble_wolf": [
+        r"   /\___/\ ",
+        r"  ( o   o )~*~",
+        r"   \  w  /____",
+        r"   /|_|--|_|\ ",
+    ],
+    "tide_seal": [
+        r"     __",
+        r"   _(o \ ",
+        r"  (  __ \___",
+        r" ~~\_______/>",
+    ],
+    "copper_scarab": [
+        r"   \  ||  /",
+        r"   _(oo)_",
+        r"  /|(==)|\ ",
+        r"  / \__/ \ ",
+    ],
+    "mist_crane": [
+        r"   __",
+        r"  (o >--",
+        r"  _\ \ ~~~",
+        r"     ||  ~~",
+    ],
+    "storm_griffin": [
+        r"  __    _/|",
+        r" <(o >__/ /",
+        r"   \  ___/ \~",
+        r"   |_|  |_|",
+    ],
+    "jade_qilin": [
+        r"   ^  ^",
+        r"  (o.o)\~~~",
+        r"  /(  )~~~~\ ",
+        r"   |_|--|_|",
+    ],
+    "obsidian_basilisk": [
+        r"    _____",
+        r"  <(o   o)vvv",
+        r"   \_^^^_/  \ ",
+        r"  ~~~~\_____/",
+    ],
+    "moon_unicorn": [
+        r"     \ ",
+        r"   __(o>",
+        r"  /  ____)~",
+        r"  |_|  |_|",
+    ],
+    "mountain_titan": [
+        r"     /\/\ ",
+        r"  _[ o  o ]_",
+        r" |  [====]  |",
+        r"  \_/    \_/",
+    ],
+    "star_kirin": [
+        r"  * /\ /\  *",
+        r"   ( o o )~*~",
+        r" *  ) ** (~*~*",
+        r"   /_/ \_\  *",
+    ],
+    "verdant_hydra": [
+        r"  o> o> o>",
+        r"  |  |  |",
+        r"  \__|__/",
+        r"  (_____)~~",
+    ],
+    "abyss_kraken": [
+        r"    ______",
+        r"   ( o  o )",
+        r"   /||||||\ ",
+        r"  ~S S SS S~",
+    ],
+    "sun_roc": [
+        r"  \___  ___/",
+        r"   \__\(o>/",
+        r"      \__/~~",
+        r"      /  \ ",
+    ],
 }
 
 # ---- Duels ----
@@ -484,6 +655,7 @@ LIKES = {
     "coral_leviathan": "livestock", "ember_phoenix": "tools", "elder_dragon": "gold",
     "dusk_moth": "wood", "rain_frog": "food", "echo_bat": "ore", "snow_lion": "livestock",
     "crystal_drake": "electronics", "aurora_whale": "food",
+    "mud_buffalo": "livestock", "quill_hog": "wood", "glass_lizard": "tools", "salt_gull": "gold", "bramble_wolf": "livestock", "tide_seal": "food", "copper_scarab": "gold", "mist_crane": "wood", "storm_griffin": "livestock", "jade_qilin": "wood", "obsidian_basilisk": "ore", "moon_unicorn": "food", "mountain_titan": "stone", "star_kirin": "electronics", "verdant_hydra": "livestock", "abyss_kraken": "ore", "sun_roc": "tools",
 }
 DUEL = {
     "per": 50,       # every doubling past this much of the liked material...
@@ -1277,7 +1449,17 @@ def _describe(per, level, power):
         out.append(f"Night slows the city {pct(per['night_shelter'])} less")
     if "weather_shelter" in per:
         out.append(f"Bad weather slows the city {pct(per['weather_shelter'])} less")
+    for key, words in ADV_WORDS.items():
+        if key in per:
+            out.append(words.format(pct(per[key])))
     return out
+
+
+# Adventure bonuses (adventure.BONUSES) a beast can give while it is the active beast.
+ADV_WORDS = {"adv_power": "Heroes and beast fight {} harder on adventures",
+             "adv_beast": "The beast fights {} harder on adventures",
+             "adv_speed": "Adventures {} faster", "adv_loot": "Adventures bring back {} more",
+             "adv_heal": "A beaten party recovers {} faster", "adv_xp": "Heroes gain {} more experience"}
 
 
 def _breeding_view(state):

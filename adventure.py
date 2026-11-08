@@ -131,8 +131,9 @@ def _store(state):
 def bonus(state, key):
     """One of the city's adventure bonuses: buildings, ideology, brews and artifacts (game.city_stat), and for
     experience its trained people too."""
+    import beasts
     import game
-    x = game.city_stat(state, key)
+    x = game.city_stat(state, key) + beasts.bonus(state, key)
     if key == "adv_xp":
         x += game.training_bonus(state)
     return x
@@ -141,6 +142,7 @@ def bonus(state, key):
 def bonus_sources(state):
     """{bonus: [(where it comes from, amount)]}, for the page's breakdown."""
     import artifacts
+    import beasts
     import cauldron
     import game
     totals = game._tile_totals(state)
@@ -154,6 +156,8 @@ def bonus_sources(state):
     out = {}
     for key in BONUSES:
         rows = [(name, round(get(key), 3)) for name, get in parts if get(key)]
+        if beasts.bonus(state, key):
+            rows.append(("Active beast", round(beasts.bonus(state, key), 3)))
         if key == "adv_xp" and game.training_bonus(state):
             rows.append(("Trained people", round(game.training_bonus(state), 3)))
         out[key] = rows
