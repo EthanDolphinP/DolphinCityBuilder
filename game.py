@@ -7083,7 +7083,8 @@ def vassal_problem(state):
         return f"Only a {TECH_LEVELS[-1]['name']} can found a vassal city."
     missing = _missing(state, VASSAL_COST)
     if missing:
-        return f"Founding a vassal city needs {fmt_goods(missing)} more."
+        short = {k: math.ceil(v - state["resources"].get(k, 0)) for k, v in missing.items()}
+        return f"Founding a vassal city needs {fmt_goods(short)} more."
     return None
 
 

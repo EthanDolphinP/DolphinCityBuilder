@@ -1560,6 +1560,12 @@
           <p id="vassalWhat" class="small"></p>
           <input id="vassalName" maxlength="24" placeholder="the new city's name" autocomplete="off" style="width:100%">
           <button id="vassalGo" style="width:100%;margin-top:6px">Found the vassal city</button>
+          <div id="vassalSure" hidden style="margin-top:8px">
+            <p class="small bad" id="vassalSureText" style="margin:0 0 6px"></p>
+            <input id="vassalSureName" maxlength="24" autocomplete="off" style="width:100%">
+            <button id="vassalSureGo" style="width:100%;margin-top:6px">Lock this city and found the vassal</button>
+            <button id="vassalSureNo" style="width:100%;margin-top:6px">Cancel</button>
+          </div>
         </div></details>
       <div id="vassalLine" class="small"></div>
     </aside>
@@ -3357,15 +3363,26 @@ function renderVassal(adv) {
   // founding a vassal, or where a line comes from, is shown on the City tab only (the other tabs keep their width)
   $('advancePanel').hidden = !adv && (tab !== 'city' || (!now && !vs.lord && !state.locked));
 }
+// Asked on the page itself, not with prompt(): the desktop app has no prompt() box, so the button did nothing there.
 $('vassalGo').onclick = () => {
   const name = $('vassalName').value.trim();
   if (!name) { say('Type a name for the new city.'); return; }
-  const typed = prompt(`This locks ${city} forever: nobody will ever be able to play it again, and it can't be undone.\n\n` +
-                       `Type ${city} to found the vassal city ${name}.`);
-  if (typed === null) return;
-  if (typed.trim() !== city) { say(`Not founded: what you typed was not ${city}.`); return; }
+  $('vassalSureText').textContent = `This locks ${city} forever: nobody will ever be able to play it again, and it can't be undone. ` +
+                                    `Type ${city} below to found the vassal city ${name}.`;
+  $('vassalSureName').value = '';
+  $('vassalSureName').placeholder = `type ${city} to confirm`;
+  $('vassalSure').hidden = false;
+  $('vassalSureName').focus();
+};
+$('vassalSureNo').onclick = () => { $('vassalSure').hidden = true; };
+$('vassalSureGo').onclick = () => {
+  const name = $('vassalName').value.trim();
+  if (!name) { say('Type a name for the new city.'); return; }
+  if ($('vassalSureName').value.trim() !== city) { say(`Not founded: type ${city} exactly to confirm.`); return; }
+  $('vassalSure').hidden = true;
   act('vassal_found', { name });
 };
+$('vassalSureName').onkeydown = e => { if (e.key === 'Enter') $('vassalSureGo').click(); };
 
 function requirementCard(c) {
  const match = c.text.match(/([\d,.]+) of ([\d,.]+) (.+)/);
