@@ -5597,7 +5597,7 @@ def _advance(state, now, remaining, coarse=False):
                 _spawn_animal(area, rng, night)
 
 
-def build(state, now, area, x, y, bid):
+def build(state, now, area, x, y, bid, quiet=False):
     if bid not in BUILDINGS:
         return "Unknown building."
     tile = area["tiles"][y][x]
@@ -5615,8 +5615,9 @@ def build(state, now, area, x, y, bid):
     tile.update(building=bid, progress=0, additions=[], animal=None, priority=0)
     tally(state, "built")
     beasts.note(state, now, "build")
-    log(state, now, f"Built {b['name']} at ({x},{y}) in {area_name(area)}."
-        + (f" The {WILDLIFE[scared]['name'].lower()} fled." if scared else ""))
+    if not quiet:
+        log(state, now, f"Built {b['name']} at ({x},{y}) in {area_name(area)}."
+            + (f" The {WILDLIFE[scared]['name'].lower()} fled." if scared else ""))
     return None
 
 
@@ -5708,7 +5709,7 @@ def addition_problem(state, area, x, y, aid):
     return None
 
 
-def add_addition(state, now, area, x, y, aid):
+def add_addition(state, now, area, x, y, aid, quiet=False):
     if aid not in ADDITIONS:
         return "Unknown addition."
     a, tile = ADDITIONS[aid], area["tiles"][y][x]
@@ -5724,7 +5725,153 @@ def add_addition(state, now, area, x, y, aid):
     tile["additions"].append(aid)
     tally(state, "additions")
     beasts.note(state, now, "addition")
-    log(state, now, f"Added {a['name']} to the {BUILDINGS[tile['building']]['name']} at ({x},{y}).")
+    if not quiet:
+        log(state, now, f"Added {a['name']} to the {BUILDINGS[tile['building']]['name']} at ({x},{y}).")
+    return None
+
+
+# ---- the page's look, kept with the city ----
+# The page sends its look settings (theme, colours, font, icons or text, map style, number style...) whenever one
+# changes, and puts them back when the city is signed in to anywhere else. Only short words, numbers and yes/no.
+PREF_KEYS = {"visuals", "theme", "accent", "font", "tile", "width", "mapStyle", "mapKey", "rate", "clock",
+             "abbreviate", "separators"}
+
+
+def set_prefs(state, prefs):
+    if not isinstance(prefs, dict) or any(k not in PREF_KEYS for k in prefs):
+        return "Unknown settings."
+    for v in prefs.values():
+        if not (isinstance(v, (bool, int, float)) or (isinstance(v, str) and len(v) <= 24)):
+            return "Unknown settings."
+    state["prefs"] = dict(prefs)
+    return None
+
+
+# ---- blueprints ----
+# A building and the additions it should carry, in order, saved to the city. One press builds it on a tile with
+# all its additions; or brings every one of that building in an area (or the whole city) up to the blueprint;
+# or builds it, additions and all, on every free tile it can stand on (of one kind of land, if the player likes).
+# Each tile is paid for as it is done, so a big job stops where the materials run out.
+# state["blueprints"] = [{"id", "building", "additions": [addition ids, in order]}]
+MAX_BLUEPRINTS = 40
+BLUEPRINT_MOST = 5000       # tiles one press may change
+
+
+def _blueprint(state, bp_id):
+    return next((b for b in state.get("blueprints", []) if b["id"] == bp_id), None)
+
+
+def blueprint_save(state, now, bid, adds):
+    if bid not in BUILDINGS:
+        return "Pick a building."
+    if not isinstance(adds, list) or len(adds) > MAX_ADDITIONS or len(set(map(str, adds))) != len(adds) \
+            or any(not isinstance(a, str) or a not in ADDITIONS or bid not in ADDITIONS[a]["for"] for a in adds):
+        return f"A blueprint has up to {MAX_ADDITIONS} additions that fit its building."
+    book = state.setdefault("blueprints", [])
+    if any(b["building"] == bid and b["additions"] == adds for b in book):
+        return "You already have that blueprint."
+    if len(book) >= MAX_BLUEPRINTS:
+        return f"You can keep {MAX_BLUEPRINTS} blueprints. Delete one first."
+    state["blueprint_next"] = state.get("blueprint_next", 0) + 1
+    book.append({"id": state["blueprint_next"], "building": bid, "additions": list(adds)})
+    return None
+
+
+def blueprint_delete(state, now, bp_id):
+    bp = _blueprint(state, bp_id)
+    if not bp:
+        return "You have no such blueprint."
+    state["blueprints"].remove(bp)
+    return None
+
+
+def _blueprint_name(bp):
+    adds = [ADDITIONS[a]["name"] for a in bp["additions"]]
+    return BUILDINGS[bp["building"]]["name"] + (f" with {' and '.join(adds)}" if adds else "")
+
+
+def _apply_blueprint(state, now, area, x, y, bp):
+    """Build the blueprint's building here if the tile is free, then attach whatever of its additions are missing,
+    in order. Returns (built, additions attached, why it stopped or None)."""
+    tile = area["tiles"][y][x]
+    built = False
+    if not tile["building"]:
+        error = build(state, now, area, x, y, bp["building"], quiet=True)
+        if error:
+            return False, 0, error
+        built = True
+    elif tile["building"] != bp["building"]:
+        return False, 0, "That tile has another building."
+    added = 0
+    for aid in bp["additions"]:
+        if aid in tile["additions"]:
+            continue
+        error = add_addition(state, now, area, x, y, aid, quiet=True)
+        if error:
+            return built, added, error
+        added += 1
+    return built, added, None
+
+
+def blueprint_place(state, now, area, x, y, bp_id):
+    bp = _blueprint(state, bp_id)
+    if not bp:
+        return "You have no such blueprint."
+    built, added, error = _apply_blueprint(state, now, area, x, y, bp)
+    if not built and not added:
+        return error or "Nothing to do: this building already has everything the blueprint asks for."
+    b = BUILDINGS[bp["building"]]["name"]
+    log(state, now, (f"Built {_blueprint_name(bp)} at ({x},{y}) in {area_name(area)}." if built and not error else
+                     f"Built {b} at ({x},{y})" + (f" and attached {added} addition{'s' if added != 1 else ''}" if added else "") + "." if built else
+                     f"Attached {added} addition{'s' if added != 1 else ''} to the {b} at ({x},{y}).")
+        + (f" Stopped: {error}" if error else ""))
+    return None
+
+
+def blueprint_all(state, now, bp_id, mode, scope, ai, terrain=None, most=None):
+    """mode "upgrade": every one of the blueprint's building gets the additions it is missing.
+    mode "build": the building, with its additions, goes on every free tile it can stand on (without wild animals;
+    only land of kind `terrain`, if given). scope: "area" (area `ai`) or "all" areas. `most`: tiles to change at most."""
+    bp = _blueprint(state, bp_id)
+    if not bp:
+        return "You have no such blueprint."
+    if mode not in ("upgrade", "build") or scope not in ("area", "all"):
+        return "Pick what to do and where."
+    if scope == "area" and not (isinstance(ai, int) and not isinstance(ai, bool) and 0 <= ai < len(state["areas"])):
+        return "Unknown area."
+    if terrain is not None and (not isinstance(terrain, str) or terrain not in TERRAINS):
+        return "Unknown kind of land."
+    if not isinstance(most, int) or isinstance(most, bool) or not 1 <= most <= BLUEPRINT_MOST:
+        most = BLUEPRINT_MOST
+    areas = [state["areas"][ai]] if scope == "area" else state["areas"]
+    bid = bp["building"]
+    tiles = built = added = 0
+    stop = None
+    for area in areas:
+        for y, row in enumerate(area["tiles"]):
+            for x, tile in enumerate(row):
+                if tiles >= most or stop:
+                    break
+                if mode == "upgrade":
+                    if tile["building"] != bid or all(a in tile["additions"] for a in bp["additions"]):
+                        continue
+                elif tile["building"] or tile["animal"] or (terrain and tile["terrain"] != terrain) \
+                        or placement_problem(state, area, x, y, bid):
+                    continue
+                b, a, error = _apply_blueprint(state, now, area, x, y, bp)
+                built, added = built + b, added + a
+                if b or a:
+                    tiles += 1
+                if error and error.startswith("Not enough"):
+                    stop = error
+    if not tiles:
+        return stop or ("No building of that kind is missing any of the blueprint's additions." if mode == "upgrade"
+                        else "There is no free tile it can go on" + (" of that land" if terrain else "") + ".")
+    where_ = area_name(areas[0]) if scope == "area" else "every area"
+    log(state, now, (f"Blueprint {_blueprint_name(bp)} in {where_}: " +
+                     (f"built {built:,}" if built else "") + (" and " if built and added else "") +
+                     (f"attached {added:,} addition{'s' if added != 1 else ''}" if added else "") + ".")
+        + (f" Stopped: {stop}" if stop else "") + (f" Stopped at {most:,} tiles." if tiles >= most else ""))
     return None
 
 
@@ -6315,9 +6462,18 @@ def apply_action(state, now, action, data):
         if not (isinstance(target, int) and 0 <= target < len(state["areas"])):
             return "Unknown area."
         return tame_all(state, now, [state["areas"][target]])
+    if action == "blueprint_save":
+        return blueprint_save(state, now, data.get("building"), data.get("additions"))
+    if action == "blueprint_delete":
+        return blueprint_delete(state, now, data.get("blueprint"))
+    if action == "blueprint_all":
+        return blueprint_all(state, now, data.get("blueprint"), data.get("mode"), data.get("scope"), data.get("area", 0),
+                             data.get("terrain") or None, data.get("most"))
+    if action == "prefs_set":
+        return set_prefs(state, data.get("prefs"))
     if action == "clear_out":
         return clear_out(state, now, data.get("tech"), data.get("category", "all"))
-    if action in ("build", "demolish", "add", "tame", "priority"):
+    if action in ("build", "demolish", "add", "tame", "priority", "blueprint_place"):
         ai, x, y = data.get("area", 0), data.get("x"), data.get("y")
         if not (isinstance(ai, int) and 0 <= ai < len(state["areas"])):
             return "Unknown area."
@@ -6333,6 +6489,8 @@ def apply_action(state, now, action, data):
             return tame(state, now, area, x, y)
         if action == "priority":
             return set_priority(state, now, area, x, y, data.get("priority"))
+        if action == "blueprint_place":
+            return blueprint_place(state, now, area, x, y, data.get("blueprint"))
         return demolish(state, now, area, x, y)
     return "Unknown action."
 

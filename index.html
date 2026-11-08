@@ -1022,6 +1022,8 @@
               </div>
               <div id="buildCats" class="bar areaChips"></div>
               <div id="buildRecent" class="bar areaChips"></div>
+              <div id="blueprintBox"></div>
+              <div id="bpMostRow" class="bar" hidden><span class="dim small">Fill at most</span><input id="bpMost" type="text" inputmode="numeric" autocomplete="off" placeholder="every free tile" style="width:110px" title="How many tiles a fill builds on at most; empty: as many as fit"><span class="dim small">tiles</span></div>
             </div>
             <div id="buildList"></div>
           </div>
@@ -1638,7 +1640,30 @@ const DEFAULT_SETTINGS = { visuals: 'text', theme: 'forest', accent: '', font: '
                            poll: 5, startTab: 'city', tutorial: true, collection: false, away: true, reports: true, mapKey: true, mapStyle: 'classic' };
 let settings = { ...DEFAULT_SETTINGS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
-function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} }
+function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {} queuePrefs(); }
+// The look settings are also kept with the city (game.PREF_KEYS), so signing in anywhere else brings them along.
+const PREF_KEYS = ['visuals', 'theme', 'accent', 'font', 'tile', 'width', 'mapStyle', 'mapKey', 'rate', 'clock', 'abbreviate', 'separators'];
+const prefsNow = () => Object.fromEntries(PREF_KEYS.filter(k => k in settings).map(k => [k, settings[k]]));
+let prefsFor = null, prefsSent = null, prefsTimer = null;     // the city whose saved look was put back; what was sent last
+function queuePrefs() {
+  try { if (!view || visiting || !city || prefsFor !== city) return; } catch { return; }     // (not while the page is still starting)
+  const p = JSON.stringify(prefsNow());
+  if (p === prefsSent) return;
+  clearTimeout(prefsTimer);
+  prefsTimer = setTimeout(() => { prefsSent = p; api('prefs_set', { prefs: JSON.parse(p) }).catch(() => { prefsSent = null; }); }, 1000);
+}
+// The first answer for a city signed in to: put its saved look back (or, if it has none yet, save this one).
+function takePrefs(st) {
+  if (prefsFor === city) return;
+  prefsFor = city;
+  const saved = st.prefs;
+  if (saved && typeof saved === 'object') {
+    prefsSent = JSON.stringify(Object.fromEntries(PREF_KEYS.filter(k => k in saved).map(k => [k, saved[k]])));
+    for (const k of PREF_KEYS) if (k in saved) settings[k] = saved[k];
+    try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {}
+    applySettings();
+  } else queuePrefs();
+}
 // The Visuals setting: 'text' is the original interface, 'icons' adds pictures, cards and a building
 // collection. Anything the visual interface has no picture for is drawn the text way.
 const gfx = () => settings.visuals === 'icons';
@@ -2433,6 +2458,7 @@ const HOWTO = [
   ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow further before they are fully grown (common at 10, legendary at 20); past that a beast still levels up, but each level takes 30% more experience than the last and adds less. Their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
+  ['Blueprints', 'For big cities. Select one of your buildings and press "Save this as a blueprint": it keeps the building and its additions, in the order they are attached. On an empty tile the blueprints that fit there are listed: one click builds the building with all its additions. A blueprint can also build itself on every free tile of the same land (in this area or in all of them), or on any free land it fits, up to as many tiles as you say; tiles with wild animals are left alone. On a building, a blueprint can bring every one of that building, in this area or in all of them, up to the blueprint, adding whatever additions each is missing while there is room. Everything is paid for tile by tile, so a big job simply stops where the materials run out. Blueprints are saved with your city.'],
   ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Up to 3 heroes go out at Town, 4 at City, 5 at Metropolis and 6 at Megacity, with your active beast fighting beside them if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. In Party battles your party fights another city\'s for a bet, as beasts do in duels.'],
   ['Cauldron', 'The Cauldron tab is open from the start. Set one recipe and how much of it goes in: every hour the cauldron takes those ingredients and brews for that hour, again and again, even while you are away, until you change or stop it. Only one brew works at a time, and each does two or three things: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster and cheaper expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. Putting in more makes the brew stronger, never longer, with no top: each extra handful adds a little less than the one before. If an hour\'s ingredients are not there, the cauldron goes cold for that hour and tries again the next. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
 
@@ -2653,6 +2679,7 @@ function accept(data) {
   if (jump && !data.state.areas[data.area]?.tiles[jump.y]?.[jump.x]) jump = null;
   if (jump && jump.area === data.area) { sel = { x: jump.x, y: jump.y }; jump = null; }
   fetchedAt = performance.now();
+  if (!visiting) takePrefs(data.state);
   render();
   if (tab === 'board' && !board) loadBoard();
   if (data.away) showAway(data.away);
@@ -3647,9 +3674,87 @@ function renderTile() {
     setHTML(box, html);
     if (waiting) { setHTML($('buildList'), `<p class="dim">Loading what can be built here...</p>`); return; }
     renderBuildList(info);
+    setHTML($('blueprintBox'), blueprintsFree(info, t));
+    $('bpMostRow').hidden = !$('blueprintBox').querySelector('[data-bp-all]');
     return;
   }
+  if (t.building && !visiting && !waiting) html += blueprintsBuilt(t);
   setHTML(box, html);
+}
+
+// ---- blueprints (see game.py): a building and its additions, built or brought up to date in one press ----
+const bpName = bp => view.defs.buildings[bp.building].name + (bp.additions.length ? ' + ' + bp.additions.map(a => view.defs.additions[a].name).join(' + ') : '');
+const bpCost = bp => { const out = {};
+  for (const part of [view.defs.buildings[bp.building], ...bp.additions.map(a => view.defs.additions[a])])
+    for (const [k, v] of Object.entries(part.cost)) out[k] = (out[k] || 0) + v;
+  return out; };
+// How many of this building, here or in every area, are missing some of the blueprint's additions.
+function bpBehind(bp, onlyHere) {
+  let n = 0;
+  view.state.areas.forEach((a, i) => { if (onlyHere && i !== view.area) return;
+    for (const row of a.tiles) for (const t of row) if (t.building === bp.building && bp.additions.some(x => !(t.additions || []).includes(x))) n++; });
+  return n;
+}
+function blueprintsBuilt(t) {
+  const bps = (view.state.blueprints || []), mine = bps.filter(b => b.building === t.building);
+  const same = mine.some(b => b.additions.join() === t.additions.join());
+  const B = view.defs.buildings[t.building];
+  let html = section('blueprints', `Blueprints <span class="dim small">${mine.length ? mine.length + ' for this building' : ''}</span>`, mine.length > 0) +
+    `<p class="dim small" style="margin:2px 0 6px">A blueprint is this building with its additions, in order. Use it to build the same thing on an empty tile in one click, ` +
+    `or to give every ${esc(B.name)} the same additions.</p>` +
+    `<div class="bar"><button data-bp-save ${same ? 'disabled title="You already have this blueprint"' : ''}>Save this as a blueprint</button>` +
+    `<span class="dim small">${esc(B.name)}${t.additions.length ? ' + ' + t.additions.map(a => esc(view.defs.additions[a].name)).join(' + ') : ' (no additions)'}</span></div>`;
+  for (const bp of mine) {
+    const missing = bp.additions.filter(a => !t.additions.includes(a)), here = bpBehind(bp, true), all = bpBehind(bp, false);
+    html += `<div class="card"><div class="head"><span class="hi">${esc(bpName(bp))}</span><button data-bp-del="${bp.id}">Delete</button></div>` +
+      `<div class="bar" style="margin-top:4px">` +
+      (missing.length ? `<button data-bp-place="${bp.id}">Add its additions here</button>` : '') +
+      `<button data-bp-all="${bp.id}:upgrade:area" ${here ? '' : 'disabled'}>Upgrade every one in this area (${num(here)})</button>` +
+      `<button data-bp-all="${bp.id}:upgrade:all" ${all ? '' : 'disabled'}>Upgrade every one in all areas (${num(all)})</button></div>` +
+      `<div class="dim small">Brings each ${esc(B.name)} up to the blueprint: adds the additions it is missing, as long as there is room and materials.</div></div>`;
+  }
+  return html + `</details>`;
+}
+function blueprintsFree(info, t) {
+  const bps = view.state.blueprints || [];
+  if (!bps.length) return `<div class="dim small" style="margin:6px 0">Blueprints: select one of your buildings and press "Save this as a blueprint" to build it again, additions and all, in one click.</div>`;
+  const fits = new Map((info.build || []).map(o => [o.id, o]));
+  const ok = bps.filter(bp => fits.has(bp.building) && !fits.get(bp.building).problem);
+  const terr = view.defs.terrains[t.terrain].name;
+  return `<div class="cat" style="margin-top:8px">Blueprints that fit here</div>` + (ok.length ? ok.map(bp => {
+    const cost = bpCost(bp), can = Object.entries(cost).every(([k, v]) => (view.state.resources[k] || 0) >= v);
+    return `<div class="card"><div class="head"><span class="hi">${esc(bpName(bp))}</span>` +
+      `<button data-bp-place="${bp.id}" ${can ? '' : 'disabled'}>Build here</button></div>` +
+      `<div class="small">${goods(cost)}</div><div class="bar" style="margin-top:4px"><span class="dim small">Build it on every free tile:</span>` +
+      `<button data-bp-all="${bp.id}:build:area:${esc(t.terrain)}">${esc(terr)} in this area</button>` +
+      `<button data-bp-all="${bp.id}:build:all:${esc(t.terrain)}">${esc(terr)} in all areas</button>` +
+      `<button data-bp-all="${bp.id}:build:all:">any land, all areas</button></div></div>`;
+  }).join('') : `<div class="dim small">None of your ${bps.length} blueprint${bps.length === 1 ? '' : 's'} can stand here.</div>`) +
+    `<details class="fold" data-fold="bpList"><summary class="small">All your blueprints (${bps.length})</summary>` +
+    bps.map(bp => `<div class="bar"><span class="small">${esc(bpName(bp))}</span><button data-bp-del="${bp.id}">Delete</button></div>`).join('') + `</details>`;
+}
+function blueprintClick(b) {
+  const d = b.dataset, t = view.state.areas[view.area].tiles[sel.y][sel.x];
+  if ('bpSave' in d) return act('blueprint_save', { building: t.building, additions: t.additions });
+  if (d.bpDel) {
+    const bp = (view.state.blueprints || []).find(x => x.id === +d.bpDel);
+    if (bp && confirm(`Delete the blueprint ${bpName(bp)}? Nothing already built changes.`)) act('blueprint_delete', { blueprint: bp.id });
+    return;
+  }
+  if (d.bpPlace) return act('blueprint_place', { blueprint: +d.bpPlace, x: sel.x, y: sel.y });
+  if (d.bpAll) {
+    const [id, mode, scope, terrain] = d.bpAll.split(':'), bp = (view.state.blueprints || []).find(x => x.id === +id);
+    if (!bp) return;
+    const where = scope === 'area' ? 'this area' : 'every area';
+    const land = terrain ? view.defs.terrains[terrain].name : 'any land';
+    const text = mode === 'upgrade'
+      ? `Give every ${view.defs.buildings[bp.building].name} in ${where} the additions it is missing from ${bpName(bp)}?\n\nEach is paid for as it is done; it stops if materials run out.`
+      : `Build ${bpName(bp)} on every free tile of ${land} in ${where} where it can stand (tiles with wild animals are left alone)?\n\n` +
+        `Each costs ${plain(bpCost(bp)).replace(/<[^>]+>/g, '')}. Each is paid for as it is done; it stops if materials run out.`;
+    if (!confirm(text)) return;
+    const most = mode === 'build' ? amount($('bpMost') ? $('bpMost').value : '') : NaN;
+    act('blueprint_all', { blueprint: bp.id, mode, scope, terrain: terrain || null, most: most >= 1 ? Math.floor(most) : null });
+  }
 }
 
 // Mastery: endless research for a Megacity. One card per resource: its level, what it gives, the next level's cost.
@@ -6756,6 +6861,8 @@ function findSiteFor(id) {
   refresh(); $('map').scrollIntoView({ block: 'center' });
 }
 $('tile').onclick = e => {
+  const bpb = e.target.closest('[data-bp-save], [data-bp-place], [data-bp-all], [data-bp-del]');
+  if (bpb) { if (!bpb.disabled && sel) blueprintClick(bpb); return; }
   const site = e.target.closest('[data-choose-site]');
   if (site) { findSiteFor(site.dataset.chooseSite); return; }
   const pick = e.target.closest('[data-build-cat]');
