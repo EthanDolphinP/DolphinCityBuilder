@@ -35,6 +35,7 @@ either side can't pay, nothing changes hands that time.
 import math
 import random
 
+import adventure
 import artifacts
 import beasts
 import game
@@ -271,6 +272,7 @@ def drop_city(market, name):
     market["beast_offers"] = [o for o in market.get("beast_offers", []) if o["city"] != name]
     market["artifact_offers"] = [o for o in market.get("artifact_offers", []) if o["city"] != name]
     market["duels"] = [d for d in market.get("duels", []) if d["city"] != name]
+    market["battles"] = [b for b in market.get("battles", []) if b["city"] != name]
     # a debt owed to a city that starts again is gone; one it owes is not (starting again doesn't clear a debt)
     market["debts"] = [d for d in market.get("debts", []) if d["creditor"] != name]
 
@@ -280,6 +282,8 @@ def drop_locked(market, name, get_city):
     others sent it are called off and their bets given back."""
     for duel in [d for d in market.get("duels", []) if d.get("to") == name]:
         _end_duel(market, duel, get_city(duel["city"]), refund=True)
+    for battle in [b for b in market.get("battles", []) if b["to"] == name]:
+        _end_battle(market, battle, get_city(battle["city"]), refund=True)
     drop_city(market, name)
     market["debts"] = [d for d in market.get("debts", []) if d["debtor"] != name]
 
@@ -730,6 +734,8 @@ def _fighter(market, state, beast_id):
     beast = beasts.get(state, beast_id)
     if not beast or beast["stage"] == "egg":
         return None, "Pick one of your hatched beasts to fight."
+    if beast.get("adventure"):
+        return None, "That beast is away on an adventure with your party."
     if beast.get("duel") and _duel(market, beast["duel"]):
         return None, "That beast is already waiting for a duel."
     return beast, None
@@ -862,6 +868,147 @@ def duels_view(market, name):
         if d["city"] == name:
             entry["bet"] = dict(d["bet"], text=_goods(d["bet"]))
             entry["boost"] = beasts.duel_boost(d["beast"]["species"], d["bet"]["res"], d["bet"]["qty"])
+        out.append(entry)
+    return out
+
+
+# ---- Party battles ----
+# Like a duel, but the two cities' adventuring parties fight (adventure.team_fight), each with its city's active
+# beast if it has hatched. One city challenges another by name with a bet; the other sees who is in the party but
+# not the bet, and declines or accepts with a bet of its own. The fight is fought at once with the parties as they
+# are then: a party away on an adventure can't fight, so a challenge whose party has gone off is called off. Each
+# side's bet raises all its fighters' stats (adventure.bet_boost); the winner takes both bets and its heroes gain
+# a little experience.
+
+def _battle(market, battle_id):
+    return next((b for b in market.get("battles", []) if b["id"] == battle_id), None)
+
+
+def _party_public(state):
+    units, _ = adventure.battle_team(state)
+    return [{"name": u["name"], "cls": u.get("cls"), "beast": bool(u.get("beast")), "level": u["level"]} for u in units or []]
+
+
+def post_battle(market, state, now, data, get_city):
+    to = data.get("to")
+    target = get_city(to) if to != state["name"] else None
+    if not target:
+        return "Pick another city that exists to challenge."
+    if state["name"] in target["banned"]:
+        return f"{to} is not accepting challenges from your city."
+    if not game.feature_open(target, "adventures"):
+        return f"{to} has no adventuring party yet (it opens at Town)."
+    bet = _valid_stake(data.get("bet"))
+    if not bet:
+        return "Say what you bet: a whole amount of 1 or more."
+    battles = market.setdefault("battles", [])
+    if sum(1 for b in battles if b["city"] == state["name"]) >= MAX_DUELS_PER_CITY:
+        return f"You can have at most {MAX_DUELS_PER_CITY} party challenges waiting for an answer."
+    units, error = adventure.battle_team(state)
+    if error:
+        return error
+    if state["resources"][bet["res"]] < bet["qty"]:
+        return f"You don't have {_goods(bet)} to bet."
+    state["resources"][bet["res"]] -= bet["qty"]      # held until the battle is fought, declined or withdrawn
+    battles.append({"id": market["next_id"], "city": state["name"], "to": to, "posted": now, "bet": bet,
+                    "party": _party_public(state), "power": adventure.power(units)})
+    market["next_id"] += 1
+    game.log(state, now, f"Challenged {to}'s adventurers to a party battle.")
+    game.log(target, now, f"{state['name']} has challenged your adventurers to a party battle. "
+                          f"Accept or decline it on the Adventure tab.")
+    social(state, now, to, "battle", "You challenged their party to a battle.")
+    social(target, now, state["name"], "battle", "They challenged your party to a battle.")
+    return None
+
+
+def _end_battle(market, battle, challenger, refund=False):
+    market["battles"].remove(battle)
+    if challenger and refund:
+        challenger["resources"][battle["bet"]["res"]] += battle["bet"]["qty"]
+
+
+def cancel_battle(market, state, now, battle_id, get_city):
+    battle = _battle(market, battle_id)
+    if not battle or state["name"] not in (battle["city"], battle["to"]):
+        return "That challenge is no longer waiting."
+    mine = battle["city"] == state["name"]
+    challenger = state if mine else get_city(battle["city"])
+    _end_battle(market, battle, challenger, refund=True)
+    if mine:
+        game.log(state, now, f"Withdrew a party challenge; {_goods(battle['bet'])} returned.")
+        social(state, now, battle["to"], "battle", "You withdrew your party challenge.")
+        social(get_city(battle["to"]), now, state["name"], "battle", "They withdrew their party challenge.")
+    else:
+        game.log(state, now, f"Declined a party battle with {battle['city']}.")
+        social(state, now, battle["city"], "battle", "You declined their party battle.")
+        social(challenger, now, state["name"], "battle", "They declined your party battle.")
+        if challenger:
+            game.log(challenger, now, f"{state['name']} declined your party battle; {_goods(battle['bet'])} returned.")
+    return None
+
+
+def accept_battle(market, state, now, battle_id, get_city, bet, rng=None):
+    """Accept a party challenge with a bet of this city's own. Returns (error, result line or None)."""
+    battle = _battle(market, battle_id)
+    if not battle or battle["to"] != state["name"]:
+        return "That challenge is no longer waiting.", None
+    challenger = get_city(battle["city"])
+    theirs, why = adventure.battle_team(challenger) if challenger else (None, "gone")
+    if not theirs:      # the challenger is gone, or its party went off: call it off
+        _end_battle(market, battle, challenger, refund=True)
+        if challenger:
+            game.log(challenger, now, f"Your party challenge to {state['name']} was called off ({why[0].lower() + why[1:]}); "
+                                      f"{_goods(battle['bet'])} returned.")
+        return "That challenge is no longer open: their party is not at home.", None
+    mine, error = adventure.battle_team(state)
+    if error:
+        return error, None
+    my_bet = _valid_stake(bet)
+    if not my_bet:
+        return "Say what you bet: a whole amount of 1 or more.", None
+    if state["resources"][my_bet["res"]] < my_bet["qty"]:
+        return f"You don't have {_goods(my_bet)} to bet.", None
+    state["resources"][my_bet["res"]] -= my_bet["qty"]
+
+    cities, bets = (challenger, state), (battle["bet"], my_bet)
+    boosts = [adventure.bet_boost(stake["qty"]) for stake in bets]
+    teams = [[dict(u, **{k: max(1, round(u[k] * boost)) for k in ("hp", "atk", "def", "spd")}) for u in side]
+             for side, boost in zip((theirs, mine), boosts)]
+    winner, rounds, story, left = adventure.team_fight(teams, rng or random.Random(), labels=(f"{battle['city']}'s party", f"{state['name']}'s party"))
+    _end_battle(market, battle, challenger)
+    for stake in bets:
+        cities[winner]["resources"][stake["res"]] += stake["qty"]
+    prize = " and ".join(_goods(stake) for stake in bets)
+    adventure.battle_won(cities[winner], now, [u["hero"] for u in teams[winner] if u.get("hero")])
+    sides = [{"city": c["name"], "bet": _goods(stake), "boost": boost, "power": adventure.power(t),
+              "party": [{"name": u["name"], "cls": u.get("cls"), "beast": bool(u.get("beast")), "level": u["level"],
+                         "hp": u["hp"], "atk": u["atk"], "def": u["def"], "spd": u["spd"]} for u in t], "left": l}
+             for c, stake, boost, t, l in zip(cities, bets, boosts, teams, left)]
+    for i, city in enumerate(cities):
+        city.setdefault("battles", []).append({
+            "id": battle["id"], "t": now, "won": winner == i, "prize": prize, "challenger": i == 0,
+            "sides": [sides[i], sides[1 - i]], "story": story})
+        del city["battles"][:-adventure.BATTLE_RESULTS_KEPT]
+        foe = sides[1 - i]
+        game.tally(city, "battles_won" if winner == i else "battles_lost")
+        game.log(city, now, f"Party battle: your adventurers (bet {sides[i]['bet']}) {'beat' if winner == i else 'lost to'} "
+                            f"{foe['city']}'s (bet {foe['bet']}). " + (f"You won {prize}." if winner == i else "You lost your bet."))
+        social(city, now, foe["city"], "battle",
+               f"Your party (bet {sides[i]['bet']}) {'beat' if winner == i else 'lost to'} theirs (bet {foe['bet']}). "
+               + (f"You won {prize}." if winner == i else "You lost your bet."))
+    return None, f"**{cities[winner]['name']}**'s adventurers beat **{cities[1 - winner]['name']}**'s in a party battle."
+
+
+def battles_view(market, name):
+    """The party challenges city `name` has sent or been sent. A bet is only shown to the city that made it."""
+    out = []
+    for b in market.get("battles", []):
+        if name not in (b["city"], b["to"]):
+            continue
+        entry = {"id": b["id"], "city": b["city"], "to": b["to"], "posted": b["posted"], "party": b["party"], "power": b["power"]}
+        if b["city"] == name:
+            entry["bet"] = dict(b["bet"], text=_goods(b["bet"]))
+            entry["boost"] = adventure.bet_boost(b["bet"]["qty"])
         out.append(entry)
     return out
 

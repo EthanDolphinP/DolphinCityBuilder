@@ -53,6 +53,12 @@ RECIPES = {
                                       "electronics": 2, "livestock": 1, "knowledge": 10},
                       "colour": "#e07bd8", "effects": {"speed": {"all": 0.06}, "attracts": 0.3, "beast_xp": 0.1},
                       "desc": "A little of everything the city has. Everything works a little better."},
+    "heros_draught": {"name": "Hero's Draught", "ingredients": {"food": 40, "livestock": 1, "gold": 20}, "colour": "#c0392b",
+                      "effects": {"adv_power": 0.1, "adv_heal": 0.25},
+                      "desc": "Thick, red and bitter. Heroes hit harder after a swig, and get up quicker after a beating."},
+    "seekers_brew": {"name": "Seeker's Brew", "ingredients": {"ore": 20, "knowledge": 20, "food": 20}, "colour": "#3a9d8f",
+                     "effects": {"adv_speed": 0.15, "adv_loot": 0.1},
+                     "desc": "Smells of old maps. The party finds the short way in, and the hidden room on the way out."},
 }
 
 

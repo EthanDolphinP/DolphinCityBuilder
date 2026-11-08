@@ -69,7 +69,7 @@ IDEOLOGIES = {
     "faith": {
         "name": "The Old Faith", "perk_word": "Blessing", "perk_plural": "Blessings of the gods",
         "desc": "The city keeps the old gods, and they keep the city. Their blessings reach every part of life.",
-        "effects": {"speed": {"food": 0.10, "knowledge": 0.10}},
+        "effects": {"speed": {"food": 0.10, "knowledge": 0.10}, "adv_heal": 0.3},
         "ritual_word": "Rite", "ritual_plural": "Rites of the temple",
         "rituals": {
             "first_fruits": {"name": "Feast of First Fruits", "effects": {"speed": {"food": 0.15}},
@@ -80,7 +80,7 @@ IDEOLOGIES = {
                                 "desc": "The priests carry the god's statue past every mine and quarry."},
             "storm_litany": {"name": "Litany Against the Storm", "effects": {"weather_shelter": 0.5, "speed": {"food": 0.1}},
                             "desc": "Chanted on the temple steps until the sky gives in."},
-            "holy_day": {"name": "High Holy Day", "effects": {"speed": {"all": 0.1}, "attracts": 1},
+            "holy_day": {"name": "High Holy Day", "effects": {"speed": {"all": 0.1}, "attracts": 1, "adv_heal": 0.3},
                         "desc": "The whole city stops to give thanks, then works twice as hard."},
         },
         "curse_word": "Hex", "curse_plural": "Hexes", "curse_a": "a Hex",
@@ -125,7 +125,7 @@ IDEOLOGIES = {
     "progress": {
         "name": "Progress", "perk_word": "Breakthrough", "perk_plural": "Great breakthroughs",
         "desc": "Measure, test, improve. The city puts its faith in invention, and every age brings a great leap forward.",
-        "effects": {"speed": {"materials": 0.15}},
+        "effects": {"speed": {"materials": 0.15}, "adv_cost": 0.15},
         "ritual_word": "Exhibition", "ritual_plural": "Exhibitions of progress",
         "rituals": {
             "science_fair": {"name": "Science Fair", "effects": {"speed": {"knowledge": 0.2}},
@@ -136,7 +136,7 @@ IDEOLOGIES = {
                            "desc": "Every generator pushed past its rating, for science."},
             "survey_grant": {"name": "Survey Grant", "effects": {"explore_speed": 0.5, "explore_cost": 0.3},
                             "desc": "Funding for every team that wants to map the unknown."},
-            "worlds_fair": {"name": "World's Fair", "effects": {"speed": {"all": 0.1}, "attracts": 1},
+            "worlds_fair": {"name": "World's Fair", "effects": {"speed": {"all": 0.1}, "attracts": 1, "adv_power": 0.1},
                            "desc": "The marvels of the age, all in one city."},
         },
         "curse_word": "Sabotage", "curse_plural": "Sabotage", "curse_a": "an act of Sabotage",
@@ -181,7 +181,7 @@ IDEOLOGIES = {
     "commerce": {
         "name": "Commerce", "perk_word": "Charter", "perk_plural": "Royal charters",
         "desc": "The city lives by trade. Its merchants buy charters that open new markets, routes and riches.",
-        "effects": {"speed": {"trade": 0.20}},
+        "effects": {"speed": {"trade": 0.20}, "adv_loot": 0.2},
         "ritual_word": "Fair", "ritual_plural": "Merchant fairs",
         "rituals": {
             "sale_day": {"name": "Great Sale Day", "effects": {"speed": {"trade": 0.25}},
@@ -192,7 +192,7 @@ IDEOLOGIES = {
                               "desc": "Merchants pay for the roads, and the scouts travel with them."},
             "guild_holiday": {"name": "Guild Holiday", "effects": {"speed": {"materials": 0.15}, "attracts": 1},
                              "desc": "The guilds show off their best work, and new apprentices arrive."},
-            "grand_exposition": {"name": "Grand Exposition", "effects": {"speed": {"all": 0.1, "trade": 0.15}},
+            "grand_exposition": {"name": "Grand Exposition", "effects": {"speed": {"all": 0.1, "trade": 0.15}, "adv_loot": 0.2},
                                 "desc": "Every merchant in the world wants a stall."},
         },
         "curse_word": "Embargo", "curse_plural": "Embargoes", "curse_a": "an Embargo",
@@ -237,7 +237,7 @@ IDEOLOGIES = {
     "wild": {
         "name": "Kinship with the Wild", "perk_word": "Pact", "perk_plural": "Pacts with the wild",
         "desc": "The city lives alongside the animals and the great beasts, and makes pacts with the wild places around it.",
-        "effects": {"beast_xp": 0.25, "wildlife_speed": 0.5},
+        "effects": {"beast_xp": 0.25, "wildlife_speed": 0.5, "adv_beast": 0.3},
         "ritual_word": "Call", "ritual_plural": "Calls of the wild",
         "rituals": {
             "herd_call": {"name": "Call of the Herd", "effects": {"wildlife_speed": 1.0, "speed": {"food": 0.1}},
@@ -248,7 +248,7 @@ IDEOLOGIES = {
                             "desc": "Sung softly over every egg in the city."},
             "storm_dance": {"name": "Storm Dance", "effects": {"weather_shelter": 0.6, "speed": {"materials": 0.1}},
                            "desc": "Danced in the rain until the rain grows bored."},
-            "great_hunt": {"name": "The Great Hunt", "effects": {"speed": {"all": 0.08}, "beast_xp": 0.5},
+            "great_hunt": {"name": "The Great Hunt", "effects": {"speed": {"all": 0.08}, "beast_xp": 0.5, "adv_beast": 0.3},
                           "desc": "The whole city follows the great beasts across the land."},
         },
         "curse_word": "Blight", "curse_plural": "Blights", "curse_a": "a Blight",
@@ -294,7 +294,7 @@ IDEOLOGIES = {
     "wayfarers": {
         "name": "The Wayfarers", "perk_word": "Discovery", "perk_plural": "Great discoveries",
         "desc": "Born explorers. The city looks over every horizon, and each age brings home something nobody has seen before.",
-        "effects": {"explore_speed": 0.25, "explore_cost": 0.15},
+        "effects": {"explore_speed": 0.25, "explore_cost": 0.15, "adv_speed": 0.2},
         "ritual_word": "Ceremony", "ritual_plural": "Ceremonies of the road",
         "rituals": {
             "lantern_sendoff": {"name": "Lantern Send-off", "effects": {"explore_speed": 0.5},
@@ -305,7 +305,7 @@ IDEOLOGIES = {
                            "desc": "Sails blessed, and the winds blow the right way."},
             "homecoming": {"name": "Homecoming Feast", "effects": {"attracts": 1, "speed": {"food": 0.15}},
                           "desc": "Every traveller who ever left comes back for one night, and some stay."},
-            "voyage_of_legends": {"name": "Voyage of Legends", "effects": {"speed": {"all": 0.1}, "egg_chance": 0.1},
+            "voyage_of_legends": {"name": "Voyage of Legends", "effects": {"speed": {"all": 0.1}, "egg_chance": 0.1, "adv_speed": 0.3},
                                  "desc": "The old stories retold, and the young set out to make new ones."},
         },
         "curse_word": "Misfortune", "curse_plural": "Misfortunes", "curse_a": "a Misfortune",
@@ -350,7 +350,7 @@ IDEOLOGIES = {
     "community": {
         "name": "Community", "perk_word": "Tradition", "perk_plural": "Traditions",
         "desc": "Everyone has a place, and everyone helps. The city grows its people and keeps its traditions.",
-        "effects": {"housing": 15, "attracts": 1},
+        "effects": {"housing": 15, "attracts": 1, "adv_xp": 0.2},
         "ritual_word": "Gathering", "ritual_plural": "Community gatherings",
         "rituals": {
             "barn_dance": {"name": "Barn Dance", "effects": {"speed": {"food": 0.15}, "housing": 10},
@@ -361,7 +361,7 @@ IDEOLOGIES = {
                              "desc": "Every window lit, and the market stays open late."},
             "town_meeting": {"name": "Town Meeting", "effects": {"speed": {"knowledge": 0.2}, "mission_speed": 0.5},
                             "desc": "Everyone has their say, and some of it is even useful."},
-            "midsummer": {"name": "Midsummer Festival", "effects": {"speed": {"all": 0.1}, "attracts": 2},
+            "midsummer": {"name": "Midsummer Festival", "effects": {"speed": {"all": 0.1}, "attracts": 2, "adv_xp": 0.3},
                          "desc": "The longest day, the biggest party, and the city's name on every tongue."},
         },
         "curse_word": "Feud", "curse_plural": "Feuds", "curse_a": "a Feud",
@@ -772,7 +772,7 @@ def curse_speed(state, category):
     return (f, "Hindered by rivals") if f < 1 else None
 
 
-PENALTY_WORDS = {"power": "Generators give {} less power", "explore": "Expeditions {} slower", "wildlife": "Wild animals appear {} less often",
+PENALTY_WORDS = {"power": "Generators give {} less power", "explore": "Expeditions and adventures {} slower", "wildlife": "Wild animals appear {} less often",
                  "hatch": "Eggs hatch {} slower", "missions": "Beast missions come {} less often"}
 
 
@@ -856,6 +856,14 @@ def describe(eff):
         "weather_shelter": lambda x: f"Bad weather slows the city {pct(x)} less",
         "cauldron_power": lambda x: f"Cauldron brews {pct(x)} stronger",
         "cauldron_cost": lambda x: f"Cauldron brews take {pct(x / (1 + x))} fewer ingredients",
+        "adv_power": lambda x: f"Adventuring party {pct(x)} stronger",
+        "adv_speed": lambda x: f"Adventures {pct(x)} quicker",
+        "adv_loot": lambda x: f"Adventures bring home {pct(x)} more loot",
+        "adv_xp": lambda x: f"Heroes gain {pct(x)} more experience",
+        "adv_heal": lambda x: f"A beaten party recovers {pct(x)} faster",
+        "adv_beast": lambda x: f"Your beast fights {pct(x)} harder on adventures",
+        "adv_cost": lambda x: f"Heroes and their gear cost {pct(x / (1 + x))} less",
+        "hero_slots": lambda x: f"Room for {x:g} more heroes",
     }
     for key, x in eff.items():
         if key in words and x:

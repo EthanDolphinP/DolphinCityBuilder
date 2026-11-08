@@ -40,9 +40,10 @@ GRADES = [(100, "S"), (90, "A"), (75, "B"), (50, "C"), (25, "D"), (10, "E"), (0,
 FULL = {"speed": 0.15, "speed_all": 0.06, "explore_speed": 0.25, "explore_cost": 0.15, "wildlife_speed": 0.4,
         "attracts": 1.0, "housing": 20, "power": 0.15, "beast_xp": 0.4, "beast_power": 0.25, "hatch_speed": 0.4,
         "egg_chance": 0.06, "mission_speed": 0.25, "night_shelter": 0.25, "weather_shelter": 0.25,
-        "cauldron_power": 0.3, "cauldron_cost": 0.3}
+        "cauldron_power": 0.3, "cauldron_cost": 0.3,
+        "adv_power": 0.2, "adv_speed": 0.3, "adv_loot": 0.3, "adv_xp": 0.4, "adv_heal": 0.5, "adv_beast": 0.4, "adv_cost": 0.25}
 
-# Five artifacts per ideology, and a sixth for the Cauldron. buffs: [first (Potency), second (Resonance)], each a buff key, or "speed:<category>".
+# Five artifacts per ideology, a sixth for the Cauldron and a seventh for adventures. buffs: [first (Potency), second (Resonance)], each a buff key, or "speed:<category>".
 ARTIFACTS = {
     # ---- The Old Faith ----
     "reliquary_of_dawn": {"name": "Reliquary of Dawn", "ideology": "faith", "buffs": ["speed:knowledge", "night_shelter"],
@@ -123,6 +124,19 @@ ARTIFACTS = {
                          "cost": {"gold": 60, "stone": 40, "food": 60}, "desc": "Every road's best recipe, carried home in one battered flask."},
     "hearth_cauldron": {"name": "Hearth Cauldron", "ideology": "community", "buffs": ["cauldron_power", "housing"],
                         "cost": {"stone": 100, "wood": 60, "food": 60}, "desc": "The pot the whole village cooks in: stronger brews, and room at the fire."},
+    # ---- one for adventures, per ideology ----
+    "martyrs_shroud": {"name": "Martyr's Shroud", "ideology": "faith", "buffs": ["adv_heal", "adv_power"],
+                       "cost": {"gold": 60, "food": 60, "livestock": 1}, "desc": "Wrapped round the wounded, it closes cuts and steadies hands."},
+    "clockwork_armour": {"name": "Clockwork Armour", "ideology": "progress", "buffs": ["adv_power", "adv_cost"],
+                         "cost": {"tools": 40, "ore": 60, "gold": 20}, "desc": "Self-tightening plate, and the plans to make more of it cheaply."},
+    "treasure_map": {"name": "Treasure Hunter's Map", "ideology": "commerce", "buffs": ["adv_loot", "adv_speed"],
+                     "cost": {"gold": 80, "knowledge": 20}, "desc": "Every X on it is real, and the short cuts too."},
+    "beastmasters_whistle": {"name": "Beastmaster's Whistle", "ideology": "wild", "buffs": ["adv_beast", "adv_xp"],
+                             "cost": {"wood": 60, "livestock": 2, "gold": 20}, "desc": "One note and the beast fights like three."},
+    "seven_league_boots": {"name": "Seven-League Boots", "ideology": "wayfarers", "buffs": ["adv_speed", "adv_loot"],
+                           "cost": {"gold": 50, "livestock": 1, "stone": 40}, "desc": "Seven leagues a stride, and room in the pack for more."},
+    "fellowship_banner": {"name": "Banner of the Fellowship", "ideology": "community", "buffs": ["adv_xp", "adv_power"],
+                          "cost": {"wood": 60, "food": 80, "gold": 30}, "desc": "Every name of every hero who ever marched under it."},
 }
 
 

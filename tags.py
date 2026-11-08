@@ -84,6 +84,14 @@ _RAW = [
     ("duels_100", "Champion", "epic", "Win 100 duels", _total("duels_won"), 100),
     ("missions_100", "Quartermaster", "rare", "Send beasts on 100 missions", _total("missions"), 100),
     ("tamed_100", "Beast Whisperer", "uncommon", "Tame 100 wild animals", _total("tamed"), 100),
+    # adventures
+    ("adventures_1", "Adventurer", "common", "Win an adventure", _total("adventures_won"), 1),
+    ("adventures_100", "Dungeon Crawler", "rare", "Win 100 adventures", _total("adventures_won"), 100),
+    ("adventures_1000", "Legend of the Deep", "legendary", "Win 1,000 adventures", _total("adventures_won"), 1000),
+    ("delve_25", "Deep Delver of Lairs", "epic", "Win the 25th delve of any lair", _total("deepest_delve"), 25),
+    ("hero_50", "Hero of the Age", "epic", "Raise a hero to level 50", _total("best_hero"), 50),
+    ("battles_10", "Warband", "uncommon", "Win 10 party battles", _total("battles_won"), 10),
+    ("battles_100", "Warlord", "epic", "Win 100 party battles", _total("battles_won"), 100),
     # the wider world
     ("expeditions_50", "Explorer", "uncommon", "Complete 50 expeditions", _total("expeditions"), 50),
     ("expeditions_500", "Wayfinder", "epic", "Complete 500 expeditions", _total("expeditions"), 500),

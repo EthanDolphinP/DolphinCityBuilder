@@ -549,6 +549,7 @@ MISSIONS = {
     "tame":      {"text": "Tame {n} wild animal{s} for it to meet", "event": "tame", "base": 1, "per_level": 0.4, "cap": 12, "scales": True, "min_level": 1},
     "research":  {"text": "Research {n} new thing{s} to show it", "event": "research", "base": 1, "per_level": 0.15, "cap": 6, "hard": True, "min_level": 2},
     "explore":   {"text": "Complete {n} expedition{s} and tell it what you saw", "event": "explore", "base": 1, "per_level": 0.1, "cap": 4, "hard": True, "min_level": 3},
+    "adventure": {"text": "Take it on {n} adventure{s} (won ones count)", "event": "adventure", "base": 1, "per_level": 0.1, "cap": 4, "hard": True, "min_level": 2, "min_tech": 2},
     "weather":   {"text": "Watch {n} spell{s} of rare weather with it (any area, at a meal)", "event": "weather", "base": 1, "per_level": 0.15, "cap": 5, "hard": True, "min_level": 4},
 }
 
@@ -568,6 +569,8 @@ def _possible(state, kind):
     if kind == "tame" and not game._researched(state, "taming"):
         return 0
     if kind == "explore" and not game._researched(state, "explore_range"):
+        return 0
+    if kind == "adventure" and not state.get("adventure", {}).get("heroes"):
         return 0
     return None
 
@@ -653,6 +656,8 @@ def take(state, beast_id):
         return None, "Your active beast can't be traded. Make another beast active first."
     if beast.get("duel"):
         return None, "That beast is waiting for a duel. Withdraw the duel first."
+    if beast.get("adventure"):
+        return None, "That beast is away on an adventure with your party."
     if beast["id"] in _pair(state):
         return None, "That beast is in your breeding pair. Stop breeding first."
     if beast["id"] in _in_line(state):

@@ -34,6 +34,7 @@ import random
 from contextlib import contextmanager
 import re
 
+import adventure
 import artifacts
 import beasts
 import cauldron
@@ -1536,6 +1537,43 @@ BUILDINGS = {
         "cauldron_power": 0.3,
         "desc": "Towers of glass coils that wring every last drop of power from a brew: Cauldron brews are much stronger. A city can have one.",
     },
+    # ---- for the city's adventurers (see adventure.py) ----
+    "adventurers_guild": {
+        "name": "Adventurers' Guild", "glyph": "\u0490", "tech": 2, "category": "support", "research": "heroic_tales", "unique": True,
+        "terrain": ["plains", "forest", "hill", "desert"], "cost": {"wood": 150, "stone": 100, "gold": 80},
+        "adv_xp": 0.15, "hero_slots": 4,
+        "desc": "A noisy hall of notice boards and tall tales: heroes gain more experience, and the city has room for 4 more. A city can have one.",
+    },
+    "sparring_ring": {
+        "name": "Sparring Ring", "glyph": "\u0166", "tech": 2, "category": "support", "research": "heroic_tales", "unique": True,
+        "terrain": ["plains", "desert", "hill"], "cost": {"wood": 100, "stone": 60, "tools": 20},
+        "adv_power": 0.05,
+        "desc": "Sand, wooden swords and bruises: the adventuring party is a little stronger. A city can have one.",
+    },
+    "healers_hall": {
+        "name": "Healers' Hall", "glyph": "\u2020", "tech": 3, "category": "support", "research": "field_medicine", "unique": True,
+        "terrain": ["plains", "forest", "hill"], "cost": {"stone": 200, "food": 200, "gold": 120},
+        "adv_heal": 0.5,
+        "desc": "Clean beds and steady hands: a beaten party is ready to set out again much sooner. A city can have one.",
+    },
+    "armoury": {
+        "name": "Armoury", "glyph": "\u0492", "tech": 3, "category": "support", "research": "field_medicine", "unique": True, "power": 1,
+        "terrain": ["plains", "hill", "desert"], "cost": {"stone": 200, "ore": 150, "tools": 60},
+        "adv_cost": 0.15, "adv_power": 0.05,
+        "desc": "Racks of blades and a forge that never cools: heroes and their gear cost less, and the party is a little stronger. A city can have one.",
+    },
+    "mercenary_camp": {
+        "name": "Mercenary Camp", "glyph": "\u01a4", "tech": 4, "category": "support", "research": "mercenary_contracts", "unique": True,
+        "terrain": ["plains", "forest", "hill", "desert"], "cost": {"wood": 300, "tools": 150, "gold": 400},
+        "adv_power": 0.1, "adv_speed": 0.15,
+        "desc": "Hard folk who know the roads, for hire: the party is stronger and adventures are quicker. A city can have one.",
+    },
+    "hall_of_heroes": {
+        "name": "Hall of Heroes", "glyph": "\u2021", "tech": 5, "category": "support", "research": "legends", "unique": True, "power": 5,
+        "terrain": ["plains", "hill", "desert"], "cost": {"stone": 800, "gold": 1000, "electronics": 60, "knowledge": 400},
+        "adv_power": 0.15, "adv_xp": 0.25, "hero_slots": 4,
+        "desc": "Statues of every hero the city ever had: the party is stronger, heroes learn faster, and there is room for 4 more. A city can have one.",
+    },
     # ---- wonders: one set for each ideology, opened at big milestones (see WONDER_* below) ----
     "shrine_of_plenty": {
         "name": "Shrine of Plenty", "glyph": "\u0411", "tech": 2, "category": "wonder", "ideology": "faith", "quests": 2,
@@ -2598,6 +2636,24 @@ RESEARCH.update({
     "arcology_design": {
         "name": "Arcology Design", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
         "desc": "A whole town under one roof, planned down to the last pipe.",
+    },
+})
+RESEARCH.update({     # for the city's adventurers (see adventure.py)
+    "heroic_tales": {
+        "name": "Heroic Tales", "tech": 2, "building": "university", "cost": {"knowledge": 70},
+        "desc": "Old stories of brave deeds, written down: the first guild of adventurers, and somewhere to train them.",
+    },
+    "field_medicine": {
+        "name": "Field Medicine", "tech": 3, "building": "university", "cost": {"knowledge": 150},
+        "desc": "Splints, stitches and what to do before the healer comes. Also: how to make better armour.",
+    },
+    "mercenary_contracts": {
+        "name": "Mercenary Contracts", "tech": 4, "building": "laboratory", "cost": {"knowledge": 330},
+        "desc": "Written terms for hired swords, so they stay hired.",
+    },
+    "legends": {
+        "name": "Legends", "tech": 5, "building": "research_institute", "cost": {"knowledge": 900},
+        "desc": "The city's heroes, remembered forever.",
     },
 })
 RESEARCH["urban_renewal"] = {
@@ -4006,6 +4062,16 @@ for _aid, _more in {
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
 
+# Additions for the adventurers' buildings.
+ADDITIONS.update({
+    "practice_dummies": {"name": "Practice Dummies", "for": ["adventurers_guild", "sparring_ring", "armoury"],
+                         "cost": {"wood": 80, "tools": 20}, "adv_power": 0.03, "desc": "Adventuring party 3% stronger."},
+    "relic_case": {"name": "Relic Case", "for": ["adventurers_guild", "hall_of_heroes", "mercenary_camp"],
+                   "cost": {"stone": 80, "gold": 100}, "adv_loot": 0.1, "desc": "Adventures bring home 10% more loot."},
+    "herb_store": {"name": "Herb Store", "research": "field_medicine", "for": ["healers_hall"],
+                   "cost": {"wood": 60, "food": 120}, "adv_heal": 0.2, "desc": "A beaten party recovers 20% faster."},
+})
+
 # Additions for the Cauldron buildings.
 ADDITIONS.update({
     "copper_stills": {"name": "Copper Stills", "for": [], "cost": {"ore": 60, "tools": 40, "gold": 60},
@@ -4396,6 +4462,7 @@ FEATURES = {     # id: (name, the tab it is on, open?, what opens it)
     "duels": ("Beast duels", "beast", _tech_at_least(2), "Become a Town"),
     "hexes": ("Hexes and sabotage", "ideology", _tech_at_least(2), "Become a Town"),
     "artifacts": ("Artifacts", "ideology", _tech_at_least(3), "Become a City"),
+    "adventures": ("Adventures", "adventure", _tech_at_least(2), "Become a Town"),
 }
 FEATURE_ACTIONS = {      # actions that need a system open
     "explore": "explore",
@@ -4410,6 +4477,8 @@ FEATURE_ACTIONS = {      # actions that need a system open
     "cauldron_set": "cauldron",
     "training_set": "training", "train_idle": "training",
     "artifact_craft": "artifacts", "artifact_enshrine": "artifacts", "artifact_offer_post": "artifacts", "artifact_offer_accept": "artifacts",
+    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures",
+    "adv_start": "adventures", "battle_post": "adventures", "battle_accept": "adventures",
 }
 
 
@@ -5472,6 +5541,7 @@ def advance_time(state, now, coarse=False):
             _depart(state, trip["arrive"], nxt["rx"], nxt["ry"])
             log(state, trip["arrive"], f"The next expedition set out {where(nxt['rx'], nxt['ry'])} of home.")
         trip = state["expedition"]
+    adventure.tick(state, now)
     beasts.tick(state, now)
     tags.check(state, now)
 
@@ -6149,6 +6219,16 @@ def apply_action(state, now, action, data):
         return artifacts.unenshrine(state, now, data.get("artifact"))
     if action == "artifact_break":
         return artifacts.break_up(state, now, data.get("artifact"))
+    if action == "adv_recruit":
+        return adventure.recruit(state, now, data.get("cls"))
+    if action == "adv_dismiss":
+        return adventure.dismiss(state, now, data.get("hero"))
+    if action == "adv_gear":
+        return adventure.upgrade(state, now, data.get("hero"), data.get("slot"), data.get("times", 1))
+    if action == "adv_party":
+        return adventure.set_party(state, now, data.get("hero"), bool(data.get("on")))
+    if action == "adv_start":
+        return adventure.start(state, now, data.get("target"))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":
@@ -6295,6 +6375,7 @@ def defs():
             "ideologies": ideology.defs(),
             "cauldron": cauldron.defs(),
             "artifacts": artifacts.defs(),
+            "adventure": adventure.defs(),
             "weather": weather.defs(),
         }
     return DEFS
@@ -6501,6 +6582,7 @@ def _view(state, ai, detail):
         "tags": tags.view(state),
         "features": features_view(state),
         "vassal": vassal_view(state),
+        "adventure": adventure.view(state, state["updated"]) if feature_open(state, "adventures") else None,
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -6651,6 +6733,8 @@ TALLIES = [
     ("bought", "Market purchases made"), ("sold", "Market sales to other cities"),
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
     ("rituals", "Rituals held"), ("brews", "Brews from the Cauldron"), ("artifacts_crafted", "Artifacts crafted"), ("artifact_trades", "Artifacts traded"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
+    ("heroes", "Heroes recruited"), ("hero_levels", "Hero levels gained"), ("gear_levels", "Gear levels made"),
+    ("adventures_won", "Adventures won"), ("adventures_lost", "Adventures lost"), ("battles_won", "Party battles won"), ("battles_lost", "Party battles lost"),
 ]
 
 
@@ -7029,9 +7113,16 @@ def found_vassal(lord, vassal, now):
         lord["beasts"].remove(beast)
         lord.pop("beast_active", None)
         beast.pop("duel", None)
+        beast.pop("adventure", None)
         vassal.update(beasts=[], beast_count=0, mission=None, mission_at=now)
         vassal["beast_active"] = beasts.give(vassal, now, beast)["id"]
         log(vassal, now, f"{beasts.title(beast)} came along from {lord['name']}, and is the city's active beast.")
+    # ...and so do the heroes (home from any adventure: the trip is called off)
+    party = lord.pop("adventure", None)
+    if party and party.get("heroes"):
+        party.update(trip=None, rest=0, depth={}, reports=[])
+        vassal["adventure"] = party
+        log(vassal, now, f"{len(party['heroes'])} heroes came along from {lord['name']}.")
     lines = ", ".join(vassal["vassal"]["line"])
     log(vassal, now, f"{vassal['name']} is founded as a vassal of {lord['name']} (generation {vassal['vassal']['generation']}). "
                      f"Every hour it gets {round(VASSAL_SHARE * 100)}% of what {lines} made.")
@@ -7073,4 +7164,5 @@ def summary(state):
         "lord": state.get("vassal", {}).get("lord"),
         "locked": bool(state.get("locked")),
         "vassal": (state.get("locked") or {}).get("vassal"),
+        "party": adventure.party_power(state),
     }

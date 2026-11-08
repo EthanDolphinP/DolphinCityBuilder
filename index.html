@@ -491,6 +491,17 @@
   .brewName { font-size: 17px; font-weight: bold; margin-bottom: 4px; }
   .recipeList { display: flex; flex-direction: column; }
   .recipeRow { border-top: 1px solid var(--line); padding: 8px 6px; cursor: pointer; }
+  .heroGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .heroCard { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .heroCard.inParty { border-color: var(--good); }
+  .heroCard .heroHead { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .heroCard .heroName { font-weight: bold; }
+  .heroCard .gearRow { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .heroCard .gearRow .gearName { min-width: 64px; }
+  .heroCard pre.heroArt { margin: 4px 0; line-height: 1.1; font-size: 12px; }
+  .advRating.Easy { color: var(--good); } .advRating.Fair { color: var(--hi); }
+  .advRating.Risky { color: #e0a040; } .advRating.Deadly { color: var(--bad); }
+  .advStory { margin: 4px 0 0 0; padding-left: 16px; }
   .recipeRow:hover { background: var(--inset); }
   .recipeRow.open { background: var(--inset); cursor: default; }
   .recipeRow.locked { cursor: default; opacity: .55; }
@@ -931,6 +942,7 @@
     <button data-tab="research">Research</button>
     <button data-tab="ideology">Ideology</button>
     <button data-tab="cauldron">Cauldron</button>
+    <button data-tab="adventure">Adventure</button>
     <button data-tab="market">Market</button>
     <button data-tab="social">Social</button>
     <button data-tab="board">Leaderboard</button>
@@ -1175,6 +1187,29 @@
     <!-- Ideology -->
     <div id="tab-ideology" hidden><div id="ideologyBody"></div></div>
     <div id="tab-cauldron" hidden><div id="cauldronBody"></div></div>
+    <div id="tab-adventure" hidden>
+      <div id="adventureBody"></div>
+      <div id="battlePanel" class="panel" hidden>
+        <h2>Party battles <span id="battleCount" class="count"></span></h2>
+        <details class="fold" data-fold="battle:how" style="margin-top:0"><summary>How party battles work</summary>
+          <p class="dim small" style="margin:4px 0">Challenge another city's adventurers. Your whole party fights theirs, each with its city's active beast if it has hatched.
+            They see who is in your party but not your bet; if they accept, they bet too, and the winner takes both bets. Every fighter on a side
+            is stronger the more its city bets (every doubling past 200 adds 10%), and the winning heroes gain a little experience. A party away on an adventure can't fight.</p>
+        </details>
+        <form id="battleForm" class="bar" style="margin-top:0">
+          <span class="pair">Challenge <input id="battleTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px"></span>
+          <span class="pair">and bet <input id="battleBetQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="500" style="width:100px"> <select id="battleBetRes"></select></span>
+          <button type="submit">Challenge</button>
+        </form>
+        <p id="battlePreview" class="small hi" style="margin:4px 0 10px"></p>
+        <div class="cat">Challenges for you</div>
+        <div id="battles" class="scroll"></div>
+        <div class="cat">Challenges you sent</div>
+        <div id="battlesSent" class="scroll"></div>
+        <div class="cat">Your recent party battles</div>
+        <div id="battleResults"></div>
+      </div>
+    </div>
 
     <!-- Market -->
     <div id="tab-market" hidden>
@@ -1601,8 +1636,8 @@ function saveSettings() { try { localStorage.setItem('settings', JSON.stringify(
 // The Visuals setting: 'text' is the original interface, 'icons' adds pictures, cards and a building
 // collection. Anything the visual interface has no picture for is drawn the text way.
 const gfx = () => settings.visuals === 'icons';
-const TAB_ICONS = { city: 'house', people: 'people', explore: 'pin', research: 'knowledge', cauldron: 'cauldron', board: 'trophy', stats: 'chart', guide: 'knowledge', settings: 'settings' };
-const TAB_NAMES = { city: 'City', people: 'People', explore: 'Explore', research: 'Research', cauldron: 'Cauldron', board: 'Leaderboard', stats: 'Stats', guide: 'Guide', settings: 'Settings' };
+const TAB_ICONS = { city: 'house', people: 'people', explore: 'pin', research: 'knowledge', cauldron: 'cauldron', adventure: 'sword', board: 'trophy', stats: 'chart', guide: 'knowledge', settings: 'settings' };
+const TAB_NAMES = { city: 'City', people: 'People', explore: 'Explore', research: 'Research', cauldron: 'Cauldron', adventure: 'Adventure', board: 'Leaderboard', stats: 'Stats', guide: 'Guide', settings: 'Settings' };
 let visualsWere = null;
 function applyVisuals() {
   const on = gfx();
@@ -1858,6 +1893,7 @@ const ICON_PATHS = {
   settings: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2ZM15 12a3 3 0 1 1-6 0a3 3 0 1 1 6 0Z',
  animal: 'M5 11 3 4l6 3h6l6-3-2 7v6l-7 5-7-5ZM8 13h1M15 13h1M10 17h4',
  cauldron: 'M2 9h20M4 9q0 10 8 10t8-10M7 18l-1.5 3M17 18l1.5 3M9 6q-1.5-1.5 0-3M14 6q-1.5-1.5 0-3',
+ sword: 'M14.5 3H21v6.5L10 20.5 3.5 14ZM6 12l6 6M3 21l3.5-3.5M17 5l2 2',
  desert: 'M2 19q6-10 12-3 4-5 8 3M18 3v4M16 5h4',
  plains: 'M3 19h18M6 19l-2-6M10 19l1-9M17 19l3-7',
 };
@@ -2028,9 +2064,10 @@ const INTROS = {
   duels: ['Beast duels', 'Your beasts can now fight other cities\' beasts in the arena, on the Beast tab, for a prize both sides put up.'],
   hexes: ['Hexes and sabotage', 'Your ideology can now be turned against rivals: slow down another city for a while, at a price. Others can do the same to you.'],
   artifacts: ['Artifacts', 'Craft artifacts on the Ideology tab, enshrine up to three for lasting bonuses, and trade them on the market.'],
+  adventures: ['Adventures', 'Recruit heroes on the Adventure tab and equip them with what your city makes. Your party, with your active beast beside it, goes into the lands you have explored for loot, experience, eggs and artifacts, and can fight other cities\' parties for a bet.'],
 };
 // The tabs a system needs open (the others are always there).
-const TAB_FEATURE = { explore: 'explore', beast: 'beast', market: 'market', ideology: 'ideology', cauldron: 'cauldron' };
+const TAB_FEATURE = { explore: 'explore', beast: 'beast', market: 'market', ideology: 'ideology', cauldron: 'cauldron', adventure: 'adventures' };
 const featureOpen = id => !view || !view.features || !view.features[id] || view.features[id].open;
 const tabLocked = name => TAB_FEATURE[name] && !featureOpen(TAB_FEATURE[name]) ? view.features[TAB_FEATURE[name]] : null;
 const lockNote = id => { const f = view.features[id]; return `<p class="dim locknote">Locked: ${esc(f.name)} opens when you ${esc(f.need[0].toLowerCase() + f.need.slice(1))}.</p>`; };
@@ -2390,6 +2427,7 @@ const HOWTO = [
   ['Beasts', 'Each egg has a mission of its own and hatches once that is done and it has been kept warm. Rarer eggs need longer in the warm and more missions (a legendary egg asks for three, one after another), and the missions ask for more. Rarer beasts grow further before they are fully grown (common at 10, legendary at 20); past that a beast still levels up, but each level takes 30% more experience than the last and adds less. Their missions are harder and give more experience. Missions grow with the beast\'s level and your tech level, and never ask for something your city cannot do: if one becomes impossible it is replaced at once. Every beast\'s health, attack, defense and speed are graded against the best and worst its species can have: F is the lowest, A near the top and S the best possible, and an overall grade averages the four. There is no limit on how many eggs a city can have. Every beast is male or female; pick a male and a female of the same kind under Breeding on the Beast tab and they lay an egg every 12 hours, each of its stats landing between its parents\' and moving up to 5% either way, so breeding your best beasts can work up to S grades. Your active beast sets one mission a day; completing it gives experience, and a higher level means a bigger bonus for the city. Beasts and eggs can be traded with other cities from the Beast tab. In the Arena there you can challenge another city to a duel: each side bets goods on a beast without seeing the other\'s bet, and the winner takes both; a beast fights harder the more is bet on it, especially in the material it likes.'],
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
+  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Up to 3 heroes go out at Town, 4 at City, 5 at Metropolis and 6 at Megacity, with your active beast fighting beside them if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. In Party battles your party fights another city\'s for a bet, as beasts do in duels.'],
   ['Cauldron', 'The Cauldron tab is open from the start. Set one recipe and how much of it goes in: every hour the cauldron takes those ingredients and brews for that hour, again and again, even while you are away, until you change or stop it. Only one brew works at a time, and each does two or three things: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster and cheaper expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. Putting in more makes the brew stronger, never longer, with no top: each extra handful adds a little less than the one before. If an hour\'s ingredients are not there, the cauldron goes cold for that hour and tries again the next. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
 
   ['Hexes, sabotage and rivals', 'Each ideology can also act against another city in its own way: The Old Faith lays Hexes, Progress commits Sabotage, Commerce sets Embargoes, Kinship with the Wild spreads Blights, The Wayfarers send Misfortunes and Community starts Feuds. Each has five, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can act against cities from one tech level below yours to two above, and each of yours can be on one city at a time; those from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Anything rivals have done to your city is shown on the Ideology tab and wears off by itself.'],
@@ -2943,6 +2981,10 @@ function render() {
     timers['ritual:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
   if (view.cauldron && view.cauldron.until > view.now)
     timers.cauldron = { cycle: view.cauldron.until - view.now, progress: 0, speed: 1, waiting: [] };
+  if (view.adventure && view.adventure.trip)
+    timers.adv = { cycle: Math.max(0, view.adventure.trip.back - view.now), progress: 0, speed: 1, waiting: [] };
+  if (view.adventure && view.adventure.rest > view.now)
+    timers.advRest = { cycle: view.adventure.rest - view.now, progress: 0, speed: 1, waiting: [] };
   ((view.ideology.curses || {}).on_me || []).forEach((x, n) => { timers['cursed:' + n] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] }; });
   for (const [id, x] of Object.entries((view.ideology.curses || {}).cursing || {}))
     timers['cursing:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
@@ -3056,8 +3098,9 @@ function render() {
   renderIntro();
   document.body.classList.toggle('sheetOpen', isMobile && !!sel && tab === 'city');
   renderEffects();
-  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'cauldron', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
+  for (const t of ['city', 'people', 'beast', 'explore', 'research', 'ideology', 'cauldron', 'adventure', 'market', 'social', 'board', 'stats', 'guide', 'settings']) $('tab-' + t).hidden = t !== tab;
   if (tab === 'cauldron') renderCauldron();
+  if (tab === 'adventure') renderAdventure();
 
   const adv = status.advance;
   $('advanceTitle').textContent = adv ? `Next tech level: ${adv.name}` : 'Highest tech level reached';
@@ -4967,7 +5010,11 @@ function effectWords(eff) {
     beast_xp: x => `Beast missions give ${ritualPct(x)} more experience`, beast_power: x => `Your beast's bonus is ${ritualPct(x)} stronger`,
     hatch_speed: x => `Eggs hatch ${ritualPct(x)} faster`, egg_chance: x => `Expeditions ${Math.round(x * 100)} points likelier to find an egg`,
     mission_speed: x => `Beast missions come ${ritualPct(x)} more often`, night_shelter: x => `Night slows the city ${ritualPct(Math.min(1, x))} less`,
-    weather_shelter: x => `Bad weather slows the city ${ritualPct(Math.min(1, x))} less` };
+    weather_shelter: x => `Bad weather slows the city ${ritualPct(Math.min(1, x))} less`,
+    adv_power: x => `Adventuring party ${ritualPct(x)} stronger`, adv_speed: x => `Adventures ${ritualPct(x)} quicker`,
+    adv_loot: x => `Adventures bring home ${ritualPct(x)} more loot`, adv_xp: x => `Heroes gain ${ritualPct(x)} more experience`,
+    adv_heal: x => `A beaten party recovers ${ritualPct(x)} faster`, adv_beast: x => `Your beast fights ${ritualPct(x)} harder on adventures`,
+    adv_cost: x => `Heroes and their gear cost ${ritualPct(x / (1 + x))} less` };
   for (const [k, x] of Object.entries(eff)) if (words[k] && x) out.push(words[k](x));
   return out;
 }
@@ -5211,6 +5258,196 @@ function renderCauldron() {
   setHTMLKeep($('cauldronBody'), html);
   drawPot();
 }
+// ---- Adventure tab ----
+// A little picture for each class, in text.
+const HERO_ART = { warrior: ' o \n[|]\n/ \\', ranger: ' o \n/|)\n/ \\', mage: ' ^ \n o*\n/|\\', cleric: ' o \n-|+\n/ \\', rogue: ' o \n/|~\n/ >', bard: ' o \n/|d\n/ \\' };
+const ADV_STAT = { hp: 'HP', atk: 'Atk', def: 'Def', spd: 'Spd' };
+const ADV_BONUS = { adv_power: 'Party strength', adv_speed: 'Adventure speed', adv_loot: 'Loot', adv_xp: 'Hero experience',
+                    adv_heal: 'Recovery', adv_beast: 'Beast on adventures', adv_cost: 'Cheaper heroes and gear' };
+let advAllPlaces = false;
+const battleQty = new Map(), battleRes = new Map();     // challenge id -> what the player typed to bet on it
+const advStats = st => Object.entries(ADV_STAT).map(([k, label]) => `${label} <span class="hi">${num(st[k])}</span>`).join(' &middot; ');
+const advBoost = qty => Math.round((1 + 0.1 * Math.log2(1 + qty / 200)) * 100) / 100;
+function renderAdventure() {
+  if (tab !== 'adventure' || !view) return;
+  if (!featureOpen('adventures') || !view.adventure) {
+    setHTMLKeep($('adventureBody'), `<div class="panel"><h2>Adventure</h2>${lockNote('adventures')}</div>`);
+    $('battlePanel').hidden = true;
+    return;
+  }
+  const a = view.adventure, D = view.defs.adventure, now = view.now;
+  const byId = new Map(a.heroes.map(h => [h.id, h]));
+  const party = a.party.map(i => byId.get(i)).filter(Boolean);
+  const place = a.trip && a.places[a.trip.area];
+  // ---- the party
+  let status;
+  if (a.trip)
+    status = `<div>Away at the <span class="hi">${esc(place ? place.lair : 'lair')}</span> in ${esc(place ? place.name : 'a far area')} ` +
+      `(delve ${a.trip.depth + 1}). ` + (a.trip.back > now ? `Back in <span class="hi" data-timer="adv"></span>.` : 'Coming home now.') + `</div>`;
+  else if (a.rest > now)
+    status = `<div class="bad">Resting after a beating. Ready to set out again in <span class="hi" data-timer="advRest"></span>.</div>`;
+  else
+    status = party.length ? `<div class="good">At home and ready. Pick somewhere to go below.</div>`
+      : `<div class="dim">Nobody is in the party yet. Recruit a hero below.</div>`;
+  let html = `<div class="panel"><h2>Your party</h2>${status}` +
+    kv([['Strength', `<span class="hi">${num(a.power)}</span> <span class="dim small">(a rough measure: compare it with the enemies' below)</span>`],
+        ['Heroes', party.length ? party.map(h => `${esc(h.name)} <span class="dim">the ${esc(D.classes[h.cls].name)}, level ${h.level}</span>`).join(', ') : '<span class="dim">none</span>'],
+        ['Party size', `${party.length} of ${a.party_size} <span class="dim small">(more at higher tech levels)</span>`],
+        ['Beast', a.beast ? `${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span> <span class="small">${advStats(a.beast)}</span>`
+                          : '<span class="dim">Your active beast goes along once it has hatched.</span>']]) + `</div>`;
+  // ---- the heroes
+  html += `<div class="panel"><h2>Heroes <span class="dim small">${a.heroes.length} of ${a.cap}</span></h2>` +
+    (a.heroes.length ? `<div class="heroGrid">` + a.heroes.map(h => {
+      const c = D.classes[h.cls], away = h.away;
+      const gear = Object.entries(D.gear).map(([slot, g]) => {
+        const lvl = h.gear[slot], top = lvl >= a.gear_cap, cost = h.costs[slot];
+        const can = !top && !away && !visiting && Object.entries(cost).every(([k, v]) => (view.state.resources[k] || 0) >= v);
+        return `<div class="gearRow"><span class="gearName">${esc(g.name)}</span><span class="hi">${lvl}</span><span class="dim small">/ ${a.gear_cap}</span>` +
+          (visiting ? '' : top ? `<span class="dim small">at the top for your tech level</span>`
+            : `<button data-adv-gear="${h.id}:${slot}" ${can ? '' : 'disabled'} title="${esc(g.desc)} Costs ${esc(plain(cost).replace(/<[^>]+>/g, ''))}. Shift-click: up to 10 levels.">Improve</button>` +
+              `<span class="small">${goods(cost)}</span>`) + `</div>`;
+      }).join('');
+      return `<div class="heroCard ${h.in_party ? 'inParty' : ''}"><div class="heroHead"><span class="heroName">${esc(h.name)}</span>` +
+        `<span class="dim">${esc(c.name)}, level ${h.level}</span></div>` +
+        `<div style="display:flex;gap:10px;align-items:center"><pre class="heroArt">${esc(HERO_ART[h.cls] || '')}</pre>` +
+        `<div class="small">${advStats(h.now)}<div class="dim">Experience ${num(h.xp)} / ${num(h.xp_needed)}</div>` +
+        (away ? '<div class="hi">Away on an adventure</div>' : h.in_party ? '<div class="good">In the party</div>' : '<div class="dim">Staying home</div>') + `</div></div>` +
+        gear +
+        (visiting ? '' : `<div class="bar" style="margin-top:6px">` +
+          (h.in_party ? `<button data-adv-party="${h.id}" data-on="0" ${a.trip ? 'disabled' : ''}>Take out of party</button>`
+                      : `<button data-adv-party="${h.id}" data-on="1" ${a.trip || party.length >= a.party_size ? 'disabled' : ''}>Add to party</button>`) +
+          `<button data-adv-dismiss="${h.id}" ${away ? 'disabled' : ''}>Dismiss</button></div>`) + `</div>`;
+    }).join('') + `</div>` : `<p class="dim">No heroes yet.</p>`) + `</div>`;
+  // ---- recruiting
+  if (!visiting) {
+    const full = a.heroes.length >= a.cap, afford = Object.entries(a.recruit).every(([k, v]) => (view.state.resources[k] || 0) >= v);
+    html += `<details class="panel" data-fold="advRecruit" ${isOpen('advRecruit', a.heroes.length < 3) ? 'open' : ''}><summary class="cat">Recruit a hero</summary>` +
+      `<div class="small">Next hero costs ${goods(a.recruit)}` + (full ? ` <span class="bad">Your city has room for ${a.cap} heroes: dismiss one or build an Adventurers' Guild or Hall of Heroes.</span>` : '') + `</div>` +
+      `<div class="heroGrid" style="margin-top:8px">` + Object.entries(D.classes).map(([k, c]) =>
+        `<div class="heroCard"><div class="heroHead"><span class="heroName">${esc(c.name)}</span></div>` +
+        `<div style="display:flex;gap:10px;align-items:center"><pre class="heroArt">${esc(HERO_ART[k] || '')}</pre><div class="small">${advStats(c.stats)}</div></div>` +
+        `<div class="small dim">${esc(c.desc)}</div>` +
+        `<div class="bar" style="margin-top:6px"><button data-adv-recruit="${k}" ${full || !afford ? 'disabled' : ''}>Recruit a ${esc(c.name)}</button></div></div>`).join('') +
+      `</div></details>`;
+  }
+  // ---- where to go
+  const places = a.places.slice().sort((x, y) => x.distance - y.distance || x.delve - y.delve || x.area - y.area);
+  const shown = advAllPlaces ? places : places.slice(0, 12);
+  const canGo = !visiting && !a.trip && !(a.rest > now) && party.length;
+  html += `<div class="panel"><h2>Where to go</h2><p class="dim small" style="margin-top:0">Every area you own has a lair. ` +
+    `The further from home, the harder and the richer; each win there opens a deeper delve. Ratings compare your party now with the enemies.</p>` +
+    `<div class="scroll"><table><tr><th>Lair</th><th>Area</th><th class="n">Delve</th><th>Rating</th><th class="n">Enemies</th><th class="n">Time</th><th></th></tr>` +
+    shown.map(pl => `<tr><td>${esc(pl.lair)}</td><td>${esc(pl.name)}</td><td class="n">${pl.delve}</td>` +
+      `<td class="advRating ${esc(pl.rating)}">${esc(pl.rating)}</td>` +
+      `<td class="n" title="${esc(pl.enemies.map(e => `${e.name}: ${e.hp} HP, ${e.atk} Atk, ${e.def} Def, ${e.spd} Spd`).join('\n'))}">${pl.enemies.length} <span class="dim small">(strength ${num(pl.power)})</span></td>` +
+      `<td class="n">${duration(pl.time)}</td>` +
+      `<td>${visiting ? '' : `<button data-adv-go="${pl.area}" ${canGo ? '' : 'disabled'}>Set out</button>`}</td></tr>`).join('') +
+    `</table></div>` + (places.length > 12 ? `<div class="bar"><button data-adv-all>${advAllPlaces ? 'Show the nearest 12' : `Show all ${places.length}`}</button></div>` : '') + `</div>`;
+  // ---- what helps
+  const src = a.sources || {};
+  html += `<details class="panel" data-fold="advBonus" ${isOpen('advBonus', false) ? 'open' : ''}><summary class="cat">What helps your adventurers</summary>` +
+    `<div class="scroll"><table><tr><th>Bonus</th><th class="n">In all</th><th>From</th></tr>` +
+    Object.entries(ADV_BONUS).map(([k, label]) => `<tr><td>${esc(label)}</td><td class="n ${a.bonuses[k] ? 'good' : 'dim'}">${a.bonuses[k] ? '+' + Math.round(a.bonuses[k] * 1000) / 10 + '%' : '-'}</td>` +
+      `<td class="small">${(src[k] || []).map(([from, x]) => `${esc(from)} <span class="good">+${Math.round(x * 1000) / 10}%</span>`).join(', ') || '<span class="dim">nothing yet</span>'}</td></tr>`).join('') +
+    `</table></div><p class="dim small" style="margin-bottom:0">Adventure buildings and their additions, your ideology (its own bonus, perks, rituals and tree), ` +
+    `Cauldron brews (Hero's Draught, Seeker's Brew), enshrined artifacts and trained people all add to these. Hexes that slow expeditions slow adventures too.</p></details>`;
+  // ---- reports
+  html += `<div class="panel"><h2>Adventure reports</h2>` + (a.reports.length ? a.reports.map((r, n) =>
+    `<details class="fold" data-fold="advRep:${r.t}" ${isOpen('advRep:' + r.t, n === 0) ? 'open' : ''}><summary>` +
+    `<span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> at the ${esc(r.lair)} in ${esc(r.area)} (delve ${r.delve}) <span class="dim small">${clock(r.t)}</span></summary>` +
+    `<div class="small">` + (r.won ? `Brought home ${plain(r.loot)}` + (r.egg ? `, a ${esc(r.egg.toLowerCase())} beast egg` : '') + (r.artifact ? `, an artifact: ${esc(r.artifact)}` : '') + '. ' : '') +
+    `Every hero gained ${num(r.xp)} experience. ${r.rounds} rounds.</div>` +
+    `<div class="small dim">Left standing: ${r.left.filter(u => u.hp > 0).map(u => `${esc(u.name)} (${num(u.hp)}/${num(u.max)})`).join(', ') || 'nobody'}</div>` +
+    (r.story.length ? `<ul class="advStory small">${r.story.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '') + `</details>`).join('')
+    : `<p class="dim">No adventures yet.</p>`) + `</div>`;
+  setHTMLKeep($('adventureBody'), html);
+  renderBattles();
+}
+function renderBattles() {
+  const a = view.adventure, R = view.defs.resources, D = view.defs.adventure;
+  $('battlePanel').hidden = visiting;
+  if (visiting) return;
+  if (!$('battleBetRes').options.length) {
+    $('battleBetRes').innerHTML = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
+    $('battleBetRes').value = 'gold';
+  }
+  const me = view.state.name, all = view.market.battles || [], forMe = all.filter(b => b.to === me), sent = all.filter(b => b.city === me);
+  $('battleCount').textContent = forMe.length ? `(${forMe.length} for you)` : sent.length ? `(${sent.length} sent)` : '';
+  const who = p => p.map(u => u.beast ? `${esc(u.name)} <span class="dim">(beast, ${u.level})</span>` : `${esc(u.name)} <span class="dim">(${esc((D.classes[u.cls] || {}).name || '')}, ${u.level})</span>`).join(', ');
+  const materials = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
+  setHTMLKeep($('battles'), forMe.length ? `<table><tr><th>From</th><th>Their party</th><th class="n">Strength</th><th>Your answer</th></tr>` +
+    forMe.map(b => `<tr><td>${esc(b.city)}</td><td class="small">${who(b.party)}</td><td class="n">${num(b.power)} <span class="dim small">(yours ${num(a.power)})</span></td><td>` +
+      `<div class="buy"><input data-battle-qty="${b.id}" data-k="battle${b.id}" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" style="width:90px"> ` +
+      `<select data-battle-res="${b.id}">${materials}</select> <button data-battle-accept="${b.id}" ${a.trip ? 'disabled title="Your party is away"' : ''}>Accept</button> ` +
+      `<button data-battle-cancel="${b.id}">Decline</button></div><div data-battle-note="${b.id}" class="small"></div></td></tr>`).join('') + `</table>`
+    : `<span class="dim small">None waiting.</span>`, fillBattles);
+  setHTMLKeep($('battlesSent'), sent.length ? `<table><tr><th>To</th><th>Your bet</th><th></th></tr>` +
+    sent.map(b => `<tr><td>${esc(b.to)}</td><td>${esc(b.bet.text)} <span class="dim small">(x${b.boost})</span></td><td><button data-battle-cancel="${b.id}">Withdraw</button></td></tr>`).join('') + `</table>`
+    : `<span class="dim small">None.</span>`);
+  setHTMLKeep($('battleResults'), (a.battles || []).length ? a.battles.map(r => {
+    const me = r.sides[0], foe = r.sides[1];
+    return `<details class="fold" data-fold="battle:${r.id}" ${isOpen('battle:' + r.id, false) ? 'open' : ''}><summary><span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> ` +
+      `against ${esc(foe.city)} <span class="dim small">${clock(r.t)}</span></summary>` +
+      `<div class="small">${r.won ? `You won ${esc(r.prize)}.` : `You lost your bet of ${esc(me.bet)}.`} Your party: strength ${num(me.power)} (x${me.boost} from your bet); ` +
+      `theirs: strength ${num(foe.power)} (bet ${esc(foe.bet)}, x${foe.boost}).</div>` +
+      (r.story.length ? `<ul class="advStory small">${r.story.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '') + `</details>`;
+  }).join('') : `<span class="dim small">No party battles yet.</span>`);
+  fillBattles();
+}
+// Put what was typed back into the answer boxes, and say what each bet would do.
+function fillBattles() {
+  const q = amount($('battleBetQty').value);
+  $('battlePreview').textContent = q >= 1 ? `Betting ${num(q)} raises every fighter in your party by x${advBoost(q)}.` : '';
+  for (const box of $('battles').querySelectorAll('[data-battle-qty]')) {
+    const id = +box.dataset.battleQty, res = $('battles').querySelector(`[data-battle-res="${id}"]`), out = $('battles').querySelector(`[data-battle-note="${id}"]`);
+    if (!battleQty.has(id)) battleQty.set(id, '500');
+    if (!battleRes.has(id)) battleRes.set(id, 'gold');
+    if (box.value !== battleQty.get(id)) box.value = battleQty.get(id);
+    if (res.value !== battleRes.get(id)) res.value = battleRes.get(id);
+    const bet = amount(box.value);
+    out.textContent = bet >= 1 ? `Your party would fight at x${advBoost(bet)}.` : 'Type how much to bet.';
+  }
+}
+$('battles').addEventListener('input', e => {
+  const d = e.target.dataset;
+  if (d.battleQty) battleQty.set(+d.battleQty, e.target.value);
+  if (d.battleRes) battleRes.set(+d.battleRes, e.target.value);
+  fillBattles();
+});
+$('battles').addEventListener('change', e => { if (e.target.dataset.battleRes) { battleRes.set(+e.target.dataset.battleRes, e.target.value); fillBattles(); } });
+$('battleForm').addEventListener('input', () => { if (view) fillBattles(); });
+$('battleForm').onsubmit = e => {
+  e.preventDefault();
+  const to = $('battleTo').value.trim(), qty = amount($('battleBetQty').value);
+  if (!to) { say('Type the name of the city to challenge.'); return; }
+  if (!(qty >= 1)) { say('Say how much to bet.'); return; }
+  act('battle_post', { to, bet: { res: $('battleBetRes').value, qty } });
+};
+$('battlePanel').addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b || !view) return;
+  const d = b.dataset;
+  if (d.battleAccept) {
+    const id = +d.battleAccept, qty = amount(battleQty.get(id) || '');
+    if (!(qty >= 1)) { say('Say how much to bet.'); return; }
+    await act('battle_accept', { battle: id, bet: { res: battleRes.get(id) || 'gold', qty } });
+  } else if (d.battleCancel) await act('battle_cancel', { battle: +d.battleCancel });
+});
+$('adventureBody').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || !view || b.disabled) return;
+  const d = b.dataset, a = view.adventure;
+  if (d.advRecruit) act('adv_recruit', { cls: d.advRecruit });
+  else if (d.advGear) { const [hero, slot] = d.advGear.split(':'); act('adv_gear', { hero: +hero, slot, times: e.shiftKey ? 10 : 1 }); }
+  else if (d.advParty) act('adv_party', { hero: +d.advParty, on: d.on === '1' });
+  else if (d.advDismiss) {
+    const h = a.heroes.find(x => x.id === +d.advDismiss);
+    if (h && confirm(`Dismiss ${h.name}? They leave for good, with their gear; what was spent on them is not given back.`)) act('adv_dismiss', { hero: h.id });
+  }
+  else if (d.advGo) act('adv_start', { target: +d.advGo });
+  else if ('advAll' in d) { advAllPlaces = !advAllPlaces; renderAdventure(); }
+});
+
 // The pot is drawn on its own, so the bubbling never makes the rest of the tab be drawn again.
 function drawPot() {
   if (!view || !$('potArt')) return;
@@ -5808,10 +6045,10 @@ window.addEventListener('resize', fitBoardBar);
 function renderBoard() {
   if (!board || !view) return;
   const R = view.defs.resources;
-  const general = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas'], ['beast', 'Beast level'], ['quests', 'Quests']];
+  const general = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas'], ['beast', 'Beast level'], ['party', 'Party'], ['quests', 'Quests']];
   const all = [...general, ...Object.entries(R)];
   const views = { overview: ['Overview', general], materials: ['Materials', Object.entries(R)], all: ['Everything', all] };
-  const val = (c, k) => k in R ? c.resources[k] : c[k];
+  const val = (c, k) => k in R ? c.resources[k] : (c[k] || 0);
   const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})`
     : k === 'population' && c.trained ? `<span title="${num(c.population - c.trained)} workers + ${num(c.trained)} trained">${num(c.population)}</span><div class="dim small">${num(c.trained)} trained</div>`
     : k === 'research' && c.mastery ? `<span title="${num(c.researched)} researched + ${num(c.mastery)} Mastery levels">${num(val(c, k))}</span>`
@@ -6891,7 +7128,7 @@ $('banForm').onsubmit = e => {
   if (name) { act('ban', { target: name }); $('banName').value = ''; }
 };
 // Only the main tab is bookmarkable. Filters, tiles, areas and scrolling stay local.
-const URL_TABS = new Set(['city','people','beast','explore','research','ideology','cauldron','market','social','board','stats','guide','settings']);
+const URL_TABS = new Set(['city','people','beast','explore','research','ideology','cauldron','adventure','market','social','board','stats','guide','settings']);
 let urlTab = null;
 function readTabRoute() {
   const requested = new URLSearchParams(location.hash.slice(1)).get('tab');

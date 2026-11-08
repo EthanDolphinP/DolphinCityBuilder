@@ -538,6 +538,7 @@ def startup():
         MARKET.setdefault("beast_offers", [])
         MARKET.setdefault("artifact_offers", [])
         MARKET.setdefault("duels", [])
+        MARKET.setdefault("battles", [])
         MARKET.setdefault("debts", [])
         for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
             offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
@@ -706,6 +707,7 @@ def _city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=F
     out["state"] = _sent_state(state, out["area"])
     out["now"] = now
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]),
+                         battles=market.battles_view(MARKET, state["name"]),
                          artifact_offers=market.artifact_offers_view(MARKET),
                          debts=[d for d in market.debts_view(MARKET, now) if state["name"] in (d["debtor"], d["creditor"])])
     out["cities"] = all_city_names()
@@ -816,6 +818,7 @@ def handle_get(path, query, token, now):
         out["state"].pop("social", None)    # who a city deals with, and its lists, are its own business
         out["state"].pop("messages", None)
         out["market"]["duels"] = []     # another city's challenges are its own business
+        out["market"]["battles"] = []
         return 200, out
 
     return 404, {"error": "Not found."}
@@ -825,7 +828,7 @@ def handle_get(path, query, token, now):
 # would look a list or an object up in its tables. Anything else there is dropped, and the action then
 # says what is missing. "bet" (and a beast trade's "want") may be small objects, whose own name fields are checked too.
 NAME_FIELDS = {"action", "building", "addition", "research", "ideology", "perk", "ritual", "give", "want", "to", "text",
-               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse", "recipe"}
+               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse", "recipe", "cls", "slot"}
 
 
 def _clean(data, inner=False):
@@ -937,6 +940,14 @@ def handle_post(path, data, token, now):
     elif action == "duel_accept":
         error = market.accept_duel(MARKET, state, now, data.get("duel"),
                                    lambda other: find_city(other, now), data.get("beast"), data.get("bet"))
+    elif action == "battle_post":
+        error = market.post_battle(MARKET, state, now, data, lambda other: find_city(other, now))
+    elif action == "battle_cancel":
+        error = market.cancel_battle(MARKET, state, now, data.get("battle"), lambda other: find_city(other, now))
+    elif action == "battle_accept":
+        error, said = market.accept_battle(MARKET, state, now, data.get("battle"), lambda other: find_city(other, now), data.get("bet"))
+        if said:
+            discord_bot.announce("⚔️ " + said)
     elif action == "offer_cancel":
         error = market.cancel(MARKET, state, now, data.get("offer"))
     elif action == "offer_accept":
