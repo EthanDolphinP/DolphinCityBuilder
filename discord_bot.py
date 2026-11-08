@@ -30,6 +30,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import subprocess
 import os
@@ -633,6 +634,13 @@ WEEKLY_FILE = _data_dir() / "discord_weekly.json"
 WEEK = 7 * 24 * 3600
 WEEKLY_AT = (6, 17)          # Sunday (weekday 6), 17:00 UTC: when the weekly recap is posted
 ROLE_COLOURS = [0x95A5A6, 0x7F8C8D, 0x3498DB, 0x2ECC71, 0x9B59B6, 0xE6C35C]     # Tribe ... Megacity
+GEN_COLOURS = [0xE67E22, 0xE74C3C, 0xC0392B, 0x8E44AD, 0x2C3E50]     # Generation 2, 3, 4, 5, 6 and on
+GEN_ROLE = re.compile(r"^Generation (\d+)$", re.I)
+
+
+def gen_role(n):
+    """The role for a vassal city of generation n (2 and up; a first city has none), and its colour."""
+    return f"Generation {n}", GEN_COLOURS[min(n - 2, len(GEN_COLOURS) - 1)]
 
 
 def _load(path, default):
@@ -721,6 +729,8 @@ def city_roles(state):
     out = [game.TECH_LEVELS[state["tech"]]["name"]]
     if ideology.chosen(state):
         out.append(ideology.chosen(state)["name"])
+    if game.generation(state) > 1:
+        out.append(gen_role(game.generation(state))[0])
     return out
 
 
@@ -735,6 +745,11 @@ def sync_roles(pairs):
             tech, ideo = _role_names()
             managed = {n.lower(): colour for n, colour in tech + ideo}
             roles = {r["name"].lower(): r for r in _call(settings, "GET", f"/guilds/{guild}/roles")}
+            # generation roles: every one the server has (to take an old one away) and every one wanted
+            for name in list(roles) + [n.lower() for _, wanted in pairs for n in wanted]:
+                m = GEN_ROLE.match(name)
+                if m and int(m.group(1)) >= 2:
+                    managed[name] = gen_role(int(m.group(1)))[1]
             for user, wanted in pairs:
                 for name in wanted:
                     if name.lower() not in roles:
@@ -754,7 +769,7 @@ def sync_roles(pairs):
                     elif role["id"] in have and role["id"] not in want:
                         _call(settings, "DELETE", f"/guilds/{guild}/members/{user}/roles/{role['id']}")
         except Exception as error:
-            print(f"Discord roles failed: {error}. The bot needs Manage Roles, and its role above the tech and ideology roles.",
+            print(f"Discord roles failed: {error}. The bot needs Manage Roles, and its role above the tech, ideology and generation roles.",
                   file=sys.stderr)
     threading.Thread(target=run, daemon=True).start()
 

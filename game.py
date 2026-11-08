@@ -4087,6 +4087,19 @@ for _aid, _more in {
     "rare_reagents": ["grand_apothecary", "arcane_distillery", "witchs_garden"],
 }.items():
     ADDITIONS[_aid]["for"] += [b for b in _more if b not in ADDITIONS[_aid]["for"]]
+ADDITIONS["commuter_line"] = {"name": "Commuter Line", "for": ["maglev_hub"], "cost": {"stone": 300, "tools": 100, "gold": 300},
+                              "attracts": 1, "desc": "Trains in from the suburbs: one more arrival per meal."}
+
+
+def _no_use(aid, bid):
+    """An addition that makes more each cycle, or makes a building faster, does nothing on a building that works no
+    cycle (a generator, the Maglev Hub, a fountain): such pairs are never offered (and migrate() takes them off)."""
+    a = ADDITIONS[aid]
+    return bool(a.get("produces") or a.get("speed")) and not BUILDINGS[bid].get("time")
+
+
+for _aid, _a in ADDITIONS.items():
+    _a["for"] = [b for b in _a["for"] if not _no_use(_aid, b)]
 
 # Kinds of area an expedition can find. Fields:
 #   weight   how common it is (0 = never found by exploring)
@@ -4600,6 +4613,13 @@ def migrate(state, now):
                 if tile["terrain"] == "water":      # from before rivers, lakes and oceans
                     tile.update(terrain="lake", fish=50)
                 tile.setdefault("fish", 0)
+                useless = [aid for aid in tile["additions"] if tile["building"] and _no_use(aid, tile["building"])]
+                for aid in useless:      # attached before such pairs were taken out: off again, with all it cost back
+                    tile["additions"].remove(aid)
+                    for k, v in ADDITIONS[aid]["cost"].items():
+                        state["resources"][k] = state["resources"].get(k, 0) + v
+                    log(state, now, f"{ADDITIONS[aid]['name']} did nothing on the {BUILDINGS[tile['building']]['name']} in "
+                                    f"{area_name(area)}, so it was taken off and its cost ({fmt_goods(ADDITIONS[aid]['cost'])}) given back.")
     if state.get("priorities", 1) < PRIORITY_VERSION:     # "first" was 1 before "high" came in; it is 2 now
         for area in state["areas"]:
             for row in area["tiles"]:
@@ -7266,6 +7286,7 @@ def found_vassal(lord, vassal, now):
     log(lord, now, f"Paid {fmt_goods(VASSAL_COST)} and founded the vassal city {vassal['name']}. "
                    f"{lord['name']} is locked forever; {vassal['name']} gets {round(VASSAL_SHARE * 100)}% of what it made each hour.")
     vassal["tutorial"] = {"at": TUTORIAL_STEPS[-1], "done": True, "skippable": True, "gifts": []}   # its player knows the game
+    tags.share_special(lord, vassal, now)          # tags the admin gave belong to the whole line
     # The lord's active beast goes with the player, in place of the common egg a new city starts with.
     beast = beasts.active(lord)
     if beast:

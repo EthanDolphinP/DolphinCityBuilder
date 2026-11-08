@@ -126,7 +126,30 @@ def _loaded(name, now, create=False):
             return None
         CITIES[name] = state
         SAVED_AT[name] = state["updated"]
+        _share_line_tags(state, now)
     return state
+
+
+def line_of(name, now):
+    """Every city in `name`'s line, first to last: the locked cities before it, itself, and the vassals after it."""
+    head = head_of(name, now)
+    state = _loaded(head, now)
+    if not state:
+        return [name]
+    return list(dict.fromkeys((state.get("vassal") or {}).get("line", []) + [head]))
+
+
+def _share_line_tags(state, now):
+    """Tags the admin gives belong to a whole line of vassal cities: the first time a line's newest city is loaded
+    (lines founded before this was so), every city in it gets every such tag any of them has."""
+    if not state.get("vassal") or state.get("locked") or state.get("line_tags"):
+        return
+    state["line_tags"] = 1
+    line = [s for s in (_loaded(n, now) for n in line_of(state["name"], now)) if s]
+    for one in line:
+        for other in line:
+            if other is not one and tags.share_special(one, other, now):
+                DIRTY.add(other["name"])
 
 
 def get_city(name, now, create=False):
@@ -595,8 +618,10 @@ def deliver_tags(now):
         return
     for job in waiting:
         names = all_city_names() if job["to"] == "all" else [job["to"]]
+        # a tag the admin gives belongs to the city's whole line: its locked cities and its vassals too
+        names = list(dict.fromkeys(n for name in names if find_city(name, now) or job["to"] != "all" for n in line_of(name, now)))
         for name in names:
-            state = find_city(name, now)
+            state = get_city(name, now)
             if not state:
                 continue
             if job.get("take"):

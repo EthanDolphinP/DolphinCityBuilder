@@ -161,6 +161,26 @@ def give(state, now, tag):
     return name
 
 
+def special(state):
+    """{tag id: its custom name or None} of the city's tags given by the admin (they belong to the city's whole line:
+    the locked cities before it and the vassals after it)."""
+    book = state.get("tags", {})
+    return {t: book.get("custom", {}).get(t) for t in book.get("have", {})
+            if t in GIVEN or t in book.get("custom", {})}
+
+
+def share_special(src, dst, now):
+    """Give `dst` every admin-given tag `src` has that it doesn't. True if it got any."""
+    book, got = _book(dst), False
+    for tag_id, name in special(src).items():
+        if tag_id not in book["have"]:
+            book["have"][tag_id] = src["tags"]["have"][tag_id]
+            if name:
+                book["custom"][tag_id] = name
+            got = True
+    return got
+
+
 def take(state, tag):
     """The admin takes a tag back (by id or name). True if the city had it."""
     book = _book(state)
