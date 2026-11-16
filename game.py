@@ -1541,8 +1541,8 @@ BUILDINGS = {
     "adventurers_guild": {
         "name": "Adventurers' Guild", "glyph": "\u0490", "tech": 2, "category": "support", "research": "heroic_tales", "unique": True,
         "terrain": ["plains", "forest", "hill", "desert"], "cost": {"wood": 150, "stone": 100, "gold": 80},
-        "adv_xp": 0.15, "hero_slots": 4,
-        "desc": "A noisy hall of notice boards and tall tales: heroes gain more experience, and the city has room for 4 more. A city can have one.",
+        "adv_xp": 0.15, "hero_slots": 4, "adv_parties": 1,
+        "desc": "A noisy hall of notice boards and tall tales: heroes gain more experience, the city has room for 4 more, and they can go out as two parties at once. A city can have one.",
     },
     "sparring_ring": {
         "name": "Sparring Ring", "glyph": "\u0166", "tech": 2, "category": "support", "research": "heroic_tales", "unique": True,
@@ -1565,14 +1565,14 @@ BUILDINGS = {
     "mercenary_camp": {
         "name": "Mercenary Camp", "glyph": "\u01a4", "tech": 4, "category": "support", "research": "mercenary_contracts", "unique": True,
         "terrain": ["plains", "forest", "hill", "desert"], "cost": {"wood": 300, "tools": 150, "gold": 400},
-        "adv_power": 0.1, "adv_speed": 0.15,
-        "desc": "Hard folk who know the roads, for hire: the party is stronger and adventures are quicker. A city can have one.",
+        "adv_power": 0.1, "adv_speed": 0.15, "adv_parties": 1,
+        "desc": "Hard folk who know the roads, for hire: the party is stronger, adventures are quicker, and one more party can be out at once. A city can have one.",
     },
     "hall_of_heroes": {
         "name": "Hall of Heroes", "glyph": "\u2021", "tech": 5, "category": "support", "research": "legends", "unique": True, "power": 5,
         "terrain": ["plains", "hill", "desert"], "cost": {"stone": 800, "gold": 1000, "electronics": 60, "knowledge": 400},
-        "adv_power": 0.15, "adv_xp": 0.25, "hero_slots": 4,
-        "desc": "Statues of every hero the city ever had: the party is stronger, heroes learn faster, and there is room for 4 more. A city can have one.",
+        "adv_power": 0.15, "adv_xp": 0.25, "hero_slots": 4, "adv_parties": 1,
+        "desc": "Statues of every hero the city ever had: the party is stronger, heroes learn faster, there is room for 4 more, and one more party can be out at once. A city can have one.",
     },
     # ---- wonders: one set for each ideology, opened at big milestones (see WONDER_* below) ----
     "shrine_of_plenty": {
@@ -4490,7 +4490,7 @@ FEATURE_ACTIONS = {      # actions that need a system open
     "cauldron_set": "cauldron",
     "training_set": "training", "train_idle": "training",
     "artifact_craft": "artifacts", "artifact_enshrine": "artifacts", "artifact_offer_post": "artifacts", "artifact_offer_accept": "artifacts",
-    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures",
+    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures", "adv_beast": "adventures",
     "adv_start": "adventures", "battle_post": "adventures", "battle_accept": "adventures",
 }
 
@@ -5823,14 +5823,57 @@ def _apply_blueprint(state, now, area, x, y, bp):
     elif tile["building"] != bp["building"]:
         return False, 0, "That tile has another building."
     added = 0
+    skipped = None
     for aid in bp["additions"]:
         if aid in tile["additions"]:
+            continue
+        problem = addition_problem(state, area, x, y, aid)
+        if problem:         # this one can't go here (no room, research, what is next to it): the rest still can
+            skipped = skipped or f"Can't add {ADDITIONS[aid]['name']}: {problem}."
             continue
         error = add_addition(state, now, area, x, y, aid, quiet=True)
         if error:
             return built, added, error
         added += 1
-    return built, added, None
+    return built, added, None if added or built else skipped
+
+
+def blueprint_gaps(state, area, x, y, bp):
+    """The blueprint's additions this building lacks that could go on it now (in order, room allowing; cost aside)."""
+    tile = area["tiles"][y][x]
+    room = MAX_ADDITIONS - len(tile["additions"])
+    out = []
+    for aid in bp["additions"]:
+        if room <= len(out):
+            break
+        if aid in tile["additions"] or aid in out:
+            continue
+        problem = addition_problem(state, area, x, y, aid)
+        if problem is None:
+            out.append(aid)
+    return out
+
+
+def blueprints_behind(state):
+    """{blueprint id: [buildings in each area that could take some of its additions]}, for the page's buttons."""
+    book = state.get("blueprints") or []
+    if not book:
+        return {}
+    wanted = {bp["building"] for bp in book}
+    where = {}
+    for ai, area in enumerate(state["areas"]):
+        for y, row in enumerate(area["tiles"]):
+            for x, t in enumerate(row):
+                if t["building"] in wanted:
+                    where.setdefault(t["building"], []).append((ai, area, x, y))
+    out = {}
+    for bp in book:
+        counts = [0] * len(state["areas"])
+        for ai, area, x, y in where.get(bp["building"], []):
+            if blueprint_gaps(state, area, x, y, bp):
+                counts[ai] += 1
+        out[bp["id"]] = counts
+    return out
 
 
 def blueprint_place(state, now, area, x, y, bp_id):
@@ -5873,7 +5916,7 @@ def blueprint_all(state, now, bp_id, mode, scope, ai, terrain=None, most=None):
                 if tiles >= most or stop:
                     break
                 if mode == "upgrade":
-                    if tile["building"] != bid or all(a in tile["additions"] for a in bp["additions"]):
+                    if tile["building"] != bid or not blueprint_gaps(state, area, x, y, bp):
                         continue
                 elif tile["building"] or tile["animal"] or (terrain and tile["terrain"] != terrain) \
                         or placement_problem(state, area, x, y, bid):
@@ -5885,7 +5928,7 @@ def blueprint_all(state, now, bp_id, mode, scope, ai, terrain=None, most=None):
                 if error and error.startswith("Not enough"):
                     stop = error
     if not tiles:
-        return stop or ("No building of that kind is missing any of the blueprint's additions." if mode == "upgrade"
+        return stop or ("No building of that kind can take any more of the blueprint's additions." if mode == "upgrade"
                         else "There is no free tile it can go on" + (" of that land" if terrain else "") + ".")
     where_ = area_name(areas[0]) if scope == "area" else "every area"
     log(state, now, (f"Blueprint {_blueprint_name(bp)} in {where_}: " +
@@ -6393,9 +6436,12 @@ def apply_action(state, now, action, data):
     if action == "adv_gear":
         return adventure.upgrade(state, now, data.get("hero"), data.get("slot"), data.get("times", 1))
     if action == "adv_party":
-        return adventure.set_party(state, now, data.get("hero"), bool(data.get("on")))
+        n = data.get("party", 0 if data.get("on") else None) if "party" in data or "on" in data else None
+        return adventure.set_party(state, now, data.get("hero"), n)
+    if action == "adv_beast":
+        return adventure.set_beast_party(state, now, data.get("party"))
     if action == "adv_start":
-        return adventure.start(state, now, data.get("target"))
+        return adventure.start(state, now, data.get("target"), data.get("party", 0))
     if action == "beast_active":
         return beasts.set_active(state, now, data.get("beast"))
     if action == "breed_set":
@@ -6761,6 +6807,7 @@ def _view(state, ai, detail):
         "features": features_view(state),
         "vassal": vassal_view(state),
         "adventure": adventure.view(state, state["updated"]) if feature_open(state, "adventures") else None,
+        "blueprints_behind": blueprints_behind(state),
         "reports": state["reports"],
         "explore": {
             "destinations": explore,
@@ -7300,7 +7347,9 @@ def found_vassal(lord, vassal, now):
     # ...and so do the heroes (home from any adventure: the trip is called off)
     party = lord.pop("adventure", None)
     if party and party.get("heroes"):
-        party.update(trip=None, rest=0, depth={}, reports=[])
+        adventure.migrate({"adventure": party})
+        adventure.call_home(party)
+        party.update(depth={}, reports=[])
         vassal["adventure"] = party
         log(vassal, now, f"{len(party['heroes'])} heroes came along from {lord['name']}.")
     lines = ", ".join(vassal["vassal"]["line"])

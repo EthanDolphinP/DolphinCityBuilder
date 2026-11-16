@@ -35,6 +35,7 @@ MIN, HOUR = 60, 3600
 OPENS_TECH = 2                     # a Town (see game.FEATURES)
 PARTY_SIZE = [0, 0, 3, 4, 5, 6]    # heroes who go out together, by tech level
 BASE_HEROES = 6                    # heroes a city can keep (more from buildings: "hero_slots")
+MAX_PARTIES = 6                    # parties out at once: 1, and 1 more for each "adv_parties" (adventure buildings)
 STAT_SPREAD = 0.15                 # a hero's stats are rolled within this of its class's
 LEVEL_STEP = 0.07                  # every level past the first: all stats this much more
 MAX_LEVEL = 200
@@ -124,8 +125,69 @@ FIGHT_ROUNDS = 60
 
 
 def _store(state):
-    return state.setdefault("adventure", {"next_id": 1, "heroes": [], "party": [], "trip": None, "depth": {},
-                                          "reports": [], "rest": 0})
+    store = state.setdefault("adventure", {"next_id": 1, "heroes": [], "parties": [_new_party()], "beast_party": 0,
+                                           "depth": {}, "reports": []})
+    if "parties" not in store:
+        migrate(state)
+    return store
+
+
+def _new_party():
+    return {"heroes": [], "trip": None, "rest": 0}
+
+
+# ---- parties ----
+# The heroes can be split into several parties (as many as parties_allowed), each going out, fighting and resting
+# on its own; or put together in one for a harder lair. Each party holds up to party_size heroes. Party 1 is the one
+# that fights other cities' parties. The active beast goes with one party (store["beast_party"]).
+
+def parties_allowed(state):
+    import game
+    return max(1, min(MAX_PARTIES, 1 + int(game.city_stat(state, "adv_parties"))))
+
+
+def parties(state):
+    """The city's parties, as many as it is allowed (a party past that, once home, is broken up)."""
+    store = _store(state)
+    ps = store["parties"]
+    allowed = parties_allowed(state)
+    while len(ps) < allowed:
+        ps.append(_new_party())
+    while len(ps) > allowed and not ps[-1]["trip"]:
+        ps.pop()
+    if store.get("beast_party", 0) >= len(ps):
+        store["beast_party"] = 0
+    return ps
+
+
+def party_of(state, hero_id):
+    """The index of the party this hero is in, or None (staying home)."""
+    return next((n for n, p in enumerate(_store(state)["parties"]) if hero_id in p["heroes"]), None)
+
+
+def away_ids(state):
+    return {i for p in _store(state)["parties"] if p["trip"] for i in p["trip"]["party"]}
+
+
+def _party_name(n):
+    return f"Party {n + 1}"
+
+
+def away(state):
+    """A trip under way, or None (the first one found)."""
+    return next((p["trip"] for p in _store(state)["parties"] if p["trip"]), None)
+
+
+def resting(state, now, n=0):
+    ps = _store(state)["parties"]
+    rest = ps[n].get("rest", 0) if n < len(ps) else 0
+    return rest if rest > now else 0
+
+
+def call_home(store):
+    """Every party home at once, rested (the heroes are moving to a vassal city)."""
+    for p in store.get("parties", []):
+        p.update(trip=None, rest=0)
 
 
 def bonus(state, key):
@@ -210,16 +272,6 @@ def xp_needed(level):
     return round(40 * 1.22 ** (level - 1))
 
 
-def away(state):
-    """The trip under way, or None."""
-    return _store(state).get("trip")
-
-
-def resting(state, now):
-    rest = _store(state).get("rest", 0)
-    return rest if rest > now else 0
-
-
 # ---- the fighters ----
 
 def _roles(state, ids):
@@ -253,17 +305,19 @@ def party_beast(state):
     return beast if beast and beast["stage"] != "egg" else None
 
 
-def team(state, ids=None):
-    """The party as fighters: [{"name", "role", "hp", "atk", "def", "spd", "hero" or "beast"}]."""
+def team(state, ids=None, n=0):
+    """Party `n` (or these heroes, with the beast if it goes with party `n`) as fighters:
+    [{"name", "role", "hp", "atk", "def", "spd", "hero" or "beast"}]."""
     store = _store(state)
-    ids = [i for i in (store["party"] if ids is None else ids) if get(state, i)]
+    ps = store["parties"]
+    ids = [i for i in ((ps[n]["heroes"] if n < len(ps) else []) if ids is None else ids) if get(state, i)]
     inspire = _roles(state, ids).get("inspire", 0)
     out = []
     for h in (get(state, i) for i in ids):
         out.append(dict(hero_stats(state, h, inspire), name=h["name"], role=CLASSES[h["cls"]]["role"], hero=h["id"],
                         cls=h["cls"], level=h["level"]))
     beast = party_beast(state)
-    if beast:
+    if beast and store.get("beast_party", 0) == n:
         out.append(dict(beast_stats(state, beast), name=beasts.title(beast), role=None, beast=beast["id"], level=beast["level"]))
     return out
 
@@ -357,10 +411,9 @@ def lair(state, ai):
     return LAIRS[rng.randrange(len(LAIRS))]
 
 
-def trip_time(state, ai, ids=None):
-    """Seconds an adventure into area `ai` takes, there and back, fight and all."""
-    store = _store(state)
-    scouts = _roles(state, store["party"] if ids is None else ids).get("scout", 0)
+def trip_time(state, ai, ids):
+    """Seconds an adventure into area `ai` takes for these heroes, there and back, fight and all."""
+    scouts = _roles(state, ids).get("scout", 0)
     speed = (1 + bonus(state, "adv_speed") + SCOUT_SPEED * scouts) * ideology.curse_factor(state, "explore")
     return ADV_TIME * (1 + TIME_STEP * _steps(state, ai)) / max(0.1, speed)
 
@@ -414,8 +467,10 @@ def recruit(state, now, cls, name=None):
             "gear": {slot: 0 for slot in GEAR}}
     store["next_id"] += 1
     store["heroes"].append(hero)
-    if len(store["party"]) < party_size(state):
-        store["party"].append(hero["id"])
+    for party in parties(state):
+        if not party["trip"] and len(party["heroes"]) < party_size(state):
+            party["heroes"].append(hero["id"])
+            break
     game.tally(state, "heroes")
     game.log(state, now, f"{hero['name']} the {CLASSES[cls]['name']} joined your adventurers, for {game.fmt_goods(cost)}.")
     return None
@@ -427,29 +482,50 @@ def dismiss(state, now, hero_id):
     if not hero:
         return "You have no such hero."
     store = _store(state)
-    if store.get("trip") and hero_id in store["trip"]["party"]:
+    if hero_id in away_ids(state):
         return f"{hero['name']} is away on an adventure."
     store["heroes"].remove(hero)
-    store["party"] = [i for i in store["party"] if i != hero_id]
+    for p in store["parties"]:
+        p["heroes"] = [i for i in p["heroes"] if i != hero_id]
     game.log(state, now, f"{hero['name']} the {CLASSES[hero['cls']]['name']} left your adventurers.")
     return None
 
 
-def set_party(state, now, hero_id, on):
+def set_party(state, now, hero_id, n):
+    """Move a hero into party `n`, or (n None) keep them home."""
     hero = get(state, hero_id)
     if not hero:
         return "You have no such hero."
-    store = _store(state)
-    if store.get("trip"):
-        return "The party is away: change it when it is back."
-    if on:
-        if hero_id in store["party"]:
+    ps = parties(state)
+    if n is not None and not (isinstance(n, int) and not isinstance(n, bool) and 0 <= n < len(ps)):
+        return "Pick a party."
+    if hero_id in away_ids(state):
+        return f"{hero['name']} is away on an adventure: move them when they are back."
+    if n is not None:
+        if hero_id in ps[n]["heroes"]:
             return None
-        if len(store["party"]) >= party_size(state):
-            return f"The party is full ({party_size(state)} heroes). Take someone out first."
-        store["party"].append(hero_id)
-    else:
-        store["party"] = [i for i in store["party"] if i != hero_id]
+        if ps[n]["trip"]:
+            return f"{_party_name(n)} is away."
+        if len(ps[n]["heroes"]) >= party_size(state):
+            return f"{_party_name(n)} is full ({party_size(state)} heroes). Take someone out first."
+    for p in ps:
+        p["heroes"] = [i for i in p["heroes"] if i != hero_id]
+    if n is not None:
+        ps[n]["heroes"].append(hero_id)
+    return None
+
+
+def set_beast_party(state, now, n):
+    """Which party the active beast goes out with."""
+    ps = parties(state)
+    if not (isinstance(n, int) and not isinstance(n, bool) and 0 <= n < len(ps)):
+        return "Pick a party."
+    beast = party_beast(state)
+    if beast and beast.get("adventure"):
+        return "Your beast is away on an adventure: change this when it is back."
+    if ps[n]["trip"]:
+        return f"{_party_name(n)} is away."
+    _store(state)["beast_party"] = n
     return None
 
 
@@ -462,8 +538,7 @@ def upgrade(state, now, hero_id, slot, times=1):
         return "Pick a piece of gear."
     if not isinstance(times, int) or isinstance(times, bool) or not 1 <= times <= 100:
         times = 1
-    store = _store(state)
-    if store.get("trip") and hero_id in store["trip"]["party"]:
+    if hero_id in away_ids(state):
         return f"{hero['name']} is away on an adventure."
     done = 0
     for _ in range(times):
@@ -485,25 +560,35 @@ def upgrade(state, now, hero_id, slot, times=1):
     return None
 
 
-def start(state, now, ai):
+def start(state, now, ai, n=0):
     import game
     store = _store(state)
+    ps = parties(state)
     if not isinstance(ai, int) or isinstance(ai, bool) or not 0 <= ai < len(state["areas"]):
         return "Pick somewhere to go."
-    if store.get("trip"):
-        return "The party is already away."
-    if resting(state, now):
-        return "The party is resting after its last fight."
-    ids = [i for i in store["party"] if get(state, i)]
+    if not (isinstance(n, int) and not isinstance(n, bool) and 0 <= n < len(ps)):
+        return "Pick a party."
+    party, name = ps[n], _party_name(n)
+    if party["trip"]:
+        return f"{name} is already away."
+    if resting(state, now, n):
+        return f"{name} is resting after its last fight."
+    ids = [i for i in party["heroes"] if get(state, i)]
     if not ids:
-        return "Put at least one hero in the party first."
-    beast = party_beast(state)
+        return f"Put at least one hero in {name} first."
+    other = next((m for m, p in enumerate(ps) if p["trip"] and p["trip"]["area"] == ai), None)
+    if other is not None:
+        return f"{_party_name(other)} is already in that lair. Pick another, or wait for it to come back."
+    beast = party_beast(state) if store.get("beast_party", 0) == n else None
+    if beast and beast.get("adventure"):
+        beast = None
     took = trip_time(state, ai, ids)
-    store["trip"] = {"area": ai, "depth": depth(state, ai), "party": ids, "beast": beast["id"] if beast else None,
+    party["heroes"] = ids
+    party["trip"] = {"area": ai, "depth": depth(state, ai), "party": ids, "beast": beast["id"] if beast else None,
                      "left": now, "back": now + took}
     if beast:
         beast["adventure"] = True
-    game.log(state, now, f"The party set out for the {lair(state, ai)} in {game.area_name(state['areas'][ai])} "
+    game.log(state, now, f"{name} set out for the {lair(state, ai)} in {game.area_name(state['areas'][ai])} "
                          f"(delve {depth(state, ai) + 1}): back in {_dur(took)}.")
     return None
 
@@ -514,19 +599,23 @@ def _dur(sec):
 
 
 def tick(state, now):
-    """The party comes home once its adventure is over: the fight is fought then."""
-    store = state.get("adventure")
-    trip = store and store.get("trip")
-    if not trip or now < trip["back"]:
+    """Each party comes home once its adventure is over: the fight is fought then (in the order they end)."""
+    if not state.get("adventure"):
         return
-    _finish(state, trip)
+    ps = _store(state)["parties"]
+    done = sorted((p["trip"]["back"], n) for n, p in enumerate(ps) if p["trip"] and now >= p["trip"]["back"])
+    for _, n in done:
+        _finish(state, n)
 
 
-def _finish(state, trip):
+def _finish(state, n):
     import artifacts
     import game
-    store, when, ai = _store(state), trip["back"], trip["area"]
-    store["trip"] = None
+    store = _store(state)
+    party = store["parties"][n]
+    trip, name = party["trip"], _party_name(n)
+    when, ai = trip["back"], trip["area"]
+    party["trip"] = None
     beast = beasts.get(state, trip["beast"]) if trip.get("beast") else None
     if beast:
         beast.pop("adventure", None)
@@ -544,7 +633,7 @@ def _finish(state, trip):
     roles = _roles(state, ids)
     xp = HERO_XP * HERO_XP_STEP ** steps * (1 + bonus(state, "adv_xp") + BARD_XP * roles.get("inspire", 0))
     xp = round(xp if won else xp * LOST_XP)
-    report = {"t": when, "area": game.area_name(state["areas"][ai]), "lair": lair(state, ai), "delve": trip["depth"] + 1,
+    report = {"t": when, "party": name, "area": game.area_name(state["areas"][ai]), "lair": lair(state, ai), "delve": trip["depth"] + 1,
               "won": won, "rounds": rounds, "story": story, "left": left[0], "xp": xp, "loot": {}, "egg": None, "artifact": None}
     for h in (get(state, i) for i in ids):
         give_xp(state, when, h, xp)
@@ -569,14 +658,14 @@ def _finish(state, trip):
         game.tally(state, "deepest_delve", 0)
         state["totals"]["deepest_delve"] = max(state["totals"].get("deepest_delve", 0), trip["depth"] + 1)
         beasts.note(state, when, "adventure")
-        game.log(state, when, f"*** The party won at the {report['lair']} in {report['area']} (delve {report['delve']}) and brought home "
+        game.log(state, when, f"*** {name} won at the {report['lair']} in {report['area']} (delve {report['delve']}) and brought home "
                               f"{game.fmt_goods(loot)}" + (f", a {report['egg'].lower()} beast egg" if report["egg"] else "")
                               + (f" and a {report['artifact']}" if report["artifact"] else "") + ". ***")
     else:
-        store["rest"] = when + REST_TIME * (1 + 0.15 * steps) / (1 + bonus(state, "adv_heal"))
+        party["rest"] = when + REST_TIME * (1 + 0.15 * steps) / (1 + bonus(state, "adv_heal"))
         game.tally(state, "adventures_lost")
-        game.log(state, when, f"The party was beaten at the {report['lair']} in {report['area']} (delve {report['delve']}) and "
-                              f"limped home. It rests for {_dur(store['rest'] - when)}.")
+        game.log(state, when, f"{name} was beaten at the {report['lair']} in {report['area']} (delve {report['delve']}) and "
+                              f"limped home. It rests for {_dur(party['rest'] - when)}.")
     store["reports"].append(report)
     del store["reports"][:-REPORTS_KEPT]
 
@@ -594,13 +683,16 @@ def give_xp(state, now, hero, amount):
 
 
 def battle_team(state):
-    """The party as it fights another city's, or (None, why not)."""
-    store = _store(state)
-    if store.get("trip"):
-        return None, "The party is away on an adventure."
+    """Party 1 as it fights another city's party, or (None, why not)."""
+    ps = _store(state)["parties"]
+    if ps and ps[0]["trip"]:
+        return None, "Party 1 is away on an adventure."
     units = team(state)
+    beast = party_beast(state)
+    if beast and beast.get("adventure"):
+        units = [u for u in units if not u.get("beast")]
     if not any(u.get("hero") for u in units):
-        return None, "Put at least one hero in the party first."
+        return None, "Put at least one hero in Party 1 first (it is the one that fights other cities' parties)."
     return units, None
 
 
@@ -621,7 +713,7 @@ def party_power(state):
         return 0
     import game
     with game._stats_cached():
-        return power(team(state))
+        return max(power(team(state, n=n)) for n in range(len(_store(state)["parties"])))
 
 
 def migrate(state):
@@ -629,7 +721,9 @@ def migrate(state):
     if store:
         store.setdefault("depth", {})
         store.setdefault("reports", [])
-        store.setdefault("rest", 0)
+        if "parties" not in store:      # from before there could be several parties: the one party becomes Party 1
+            store["parties"] = [{"heroes": store.pop("party", []), "trip": store.pop("trip", None), "rest": store.pop("rest", 0)}]
+            store["beast_party"] = 0
 
 
 # ---- what the page gets ----
@@ -638,21 +732,29 @@ def defs():
     return {"classes": {k: {"name": c["name"], "desc": c["desc"], "role": c["role"], "stats": dict(zip(STAT_NAMES, c["stats"]))}
                         for k, c in CLASSES.items()},
             "gear": {k: {"name": g["name"], "desc": g["desc"], "stats": g["stats"]} for k, g in GEAR.items()},
-            "stats": STAT_NAMES, "party_size": PARTY_SIZE, "gear_cap": GEAR_CAP, "opens": OPENS_TECH}
+            "stats": STAT_NAMES, "party_size": PARTY_SIZE, "gear_cap": GEAR_CAP, "opens": OPENS_TECH, "max_parties": MAX_PARTIES}
 
 
 def view(state, now):
     import game
     store = _store(state)
     with game.reading():
-        ids = [i for i in store["party"] if get(state, i)]
-        inspire = _roles(state, ids).get("inspire", 0)
-        mine = power(team(state))
-        heroes = [{**h, "role": CLASSES[h["cls"]]["role"], "now": hero_stats(state, h, inspire if h["id"] in ids else 0),
-                   "xp_needed": xp_needed(h["level"]), "in_party": h["id"] in ids,
-                   "away": bool(store.get("trip") and h["id"] in store["trip"]["party"]),
-                   "costs": {slot: gear_cost(state, h, slot) for slot in GEAR}} for h in store["heroes"]]
+        ps = parties(state)
+        gone = away_ids(state)
         beast = party_beast(state)
+        inspire_of = {}
+        out_parties = []
+        for n, p in enumerate(ps):
+            ids = [i for i in p["heroes"] if get(state, i)]
+            inspire = _roles(state, ids).get("inspire", 0)
+            for i in ids:
+                inspire_of[i] = inspire
+            out_parties.append({"heroes": ids, "trip": p["trip"], "rest": resting(state, now, n),
+                                "power": power(team(state, n=n)), "beast": store.get("beast_party", 0) == n})
+        heroes = [{**h, "role": CLASSES[h["cls"]]["role"], "now": hero_stats(state, h, inspire_of.get(h["id"], 0)),
+                   "xp_needed": xp_needed(h["level"]), "party": party_of(state, h["id"]), "away": h["id"] in gone,
+                   "costs": {slot: gear_cost(state, h, slot) for slot in GEAR}} for h in store["heroes"]]
+        busy = {p["trip"]["area"]: n for n, p in enumerate(ps) if p["trip"]}
         places = []
         for ai, area in enumerate(state["areas"]):
             foes = enemies(state, ai)
@@ -660,11 +762,15 @@ def view(state, now):
             places.append({"area": ai, "name": game.area_name(area), "lair": lair(state, ai), "env": area.get("env"),
                            "distance": abs(area["rx"]) + abs(area["ry"]), "delve": depth(state, ai) + 1,
                            "enemies": [{"name": f["name"], "hp": f["hp"], "atk": f["atk"], "def": f["def"], "spd": f["spd"]} for f in foes],
-                           "power": theirs, "rating": rating(mine, theirs), "time": round(trip_time(state, ai))})
+                           "power": theirs, "busy": busy.get(ai),
+                           "ratings": [rating(q["power"], theirs) for q in out_parties],
+                           "times": [round(trip_time(state, ai, q["heroes"])) for q in out_parties]})
         bonuses = {k: round(bonus(state, k), 3) for k in BONUSES}
-    return {"open": state["tech"] >= OPENS_TECH, "heroes": heroes, "party": ids, "party_size": party_size(state),
-            "cap": hero_cap(state), "recruit": recruit_cost(state), "gear_cap": gear_cap(state), "power": mine,
-            "beast": dict(beast_stats(state, beast), name=beasts.title(beast), level=beast["level"], id=beast["id"]) if beast else None,
-            "trip": store.get("trip"), "rest": resting(state, now), "places": places, "reports": store["reports"][::-1],
+    return {"open": state["tech"] >= OPENS_TECH, "heroes": heroes, "parties": out_parties, "party_size": party_size(state),
+            "parties_allowed": len(ps), "cap": hero_cap(state), "recruit": recruit_cost(state), "gear_cap": gear_cap(state),
+            "power": out_parties[0]["power"],
+            "beast": dict(beast_stats(state, beast), name=beasts.title(beast), level=beast["level"], id=beast["id"],
+                          away=bool(beast.get("adventure"))) if beast else None,
+            "places": places, "reports": store["reports"][::-1],
             "bonuses": bonuses, "sources": bonus_sources(state), "battles": state.get("battles", [])[::-1],
             "words": {k: ideology.describe({k: v})[0] if v else "" for k, v in bonuses.items()}}

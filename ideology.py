@@ -864,6 +864,7 @@ def describe(eff):
         "adv_beast": lambda x: f"Your beast fights {pct(x)} harder on adventures",
         "adv_cost": lambda x: f"Heroes and their gear cost {pct(x / (1 + x))} less",
         "hero_slots": lambda x: f"Room for {x:g} more heroes",
+        "adv_parties": lambda x: f"{x:g} more adventuring part{'y' if x == 1 else 'ies'} out at once",
     }
     for key, x in eff.items():
         if key in words and x:

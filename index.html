@@ -1022,6 +1022,8 @@
               </div>
               <div id="buildCats" class="bar areaChips"></div>
               <div id="buildRecent" class="bar areaChips"></div>
+            </div>
+            <div id="blueprintArea" hidden>
               <div id="blueprintBox"></div>
               <div id="bpMostRow" class="bar" hidden><span class="dim small">Fill at most</span><input id="bpMost" type="text" inputmode="numeric" autocomplete="off" placeholder="every free tile" style="width:110px" title="How many tiles a fill builds on at most; empty: as many as fit"><span class="dim small">tiles</span></div>
             </div>
@@ -2459,7 +2461,7 @@ const HOWTO = [
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
   ['Blueprints', 'For big cities. Select one of your buildings and press "Save this as a blueprint": it keeps the building and its additions, in the order they are attached. On an empty tile the blueprints that fit there are listed: one click builds the building with all its additions. A blueprint can also build itself on every free tile of the same land (in this area or in all of them), or on any free land it fits, up to as many tiles as you say; tiles with wild animals are left alone. On a building, a blueprint can bring every one of that building, in this area or in all of them, up to the blueprint, adding whatever additions each is missing while there is room. Everything is paid for tile by tile, so a big job simply stops where the materials run out. Blueprints are saved with your city.'],
-  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Up to 3 heroes go out at Town, 4 at City, 5 at Metropolis and 6 at Megacity, with your active beast fighting beside them if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. In Party battles your party fights another city\'s for a bet, as beasts do in duels.'],
+  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Heroes go out in parties of up to 3 at Town, 4 at City, 5 at Metropolis and 6 at Megacity. A city has one party; the Adventurers\' Guild, Mercenary Camp and Hall of Heroes each let one more go out at the same time, so heroes can be split into small parties (even one hero each) for easy lairs, or kept together for a hard one. Only one party can be in a lair at a time, each rests on its own after a beating, and Party 1 is the one that fights other cities\' parties. Your active beast fights beside the party you pick, if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. In Party battles your party fights another city\'s for a bet, as beasts do in duels.'],
   ['Cauldron', 'The Cauldron tab is open from the start. Set one recipe and how much of it goes in: every hour the cauldron takes those ingredients and brews for that hour, again and again, even while you are away, until you change or stop it. Only one brew works at a time, and each does two or three things: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster and cheaper expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. Putting in more makes the brew stronger, never longer, with no top: each extra handful adds a little less than the one before. If an hour\'s ingredients are not there, the cauldron goes cold for that hour and tries again the next. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
 
   ['Hexes, sabotage and rivals', 'Each ideology can also act against another city in its own way: The Old Faith lays Hexes, Progress commits Sabotage, Commerce sets Embargoes, Kinship with the Wild spreads Blights, The Wayfarers send Misfortunes and Community starts Feuds. Each has five, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can act against cities from one tech level below yours to two above, and each of yours can be on one city at a time; those from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Anything rivals have done to your city is shown on the Ideology tab and wears off by itself.'],
@@ -3014,10 +3016,10 @@ function render() {
     timers['ritual:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
   if (view.cauldron && view.cauldron.until > view.now)
     timers.cauldron = { cycle: view.cauldron.until - view.now, progress: 0, speed: 1, waiting: [] };
-  if (view.adventure && view.adventure.trip)
-    timers.adv = { cycle: Math.max(0, view.adventure.trip.back - view.now), progress: 0, speed: 1, waiting: [] };
-  if (view.adventure && view.adventure.rest > view.now)
-    timers.advRest = { cycle: view.adventure.rest - view.now, progress: 0, speed: 1, waiting: [] };
+  ((view.adventure || {}).parties || []).forEach((p, n) => {
+    if (p.trip) timers['adv:' + n] = { cycle: Math.max(0, p.trip.back - view.now), progress: 0, speed: 1, waiting: [] };
+    if (p.rest > view.now) timers['advRest:' + n] = { cycle: p.rest - view.now, progress: 0, speed: 1, waiting: [] };
+  });
   ((view.ideology.curses || {}).on_me || []).forEach((x, n) => { timers['cursed:' + n] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] }; });
   for (const [id, x] of Object.entries((view.ideology.curses || {}).cursing || {}))
     timers['cursing:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
@@ -3603,7 +3605,7 @@ function renderTile() {
   const box = $('tileInfo');
   const building = sel && !visiting && view.state.areas[view.area].tiles[sel.y][sel.x].building === null;
   $('buildTools').hidden = !building;
-  if (!building) setHTML($('buildList'), '');
+  if (!building) { setHTML($('buildList'), ''); $('blueprintArea').hidden = true; }
   $('inspector').classList.toggle('selected', !!sel);
   if (!sel && !gfx()) { setHTML(box, '<span class="dim">Select a tile on the map.</span>'); return; }
   if (!sel) { setHTML(box, `<div class="inspector-empty">${icon('pin')}<strong>Your city, tile by tile</strong><p>Select a building to manage it.<br>Select empty land to see what fits.</p><div class="owned-badge">${icon('check')} Built</div> <span class="state-badge missing">Empty land</span></div>`); return; }
@@ -3672,10 +3674,11 @@ function renderTile() {
   } else if (!visiting) {
     // ---- what can be built here ----
     setHTML(box, html);
-    if (waiting) { setHTML($('buildList'), `<p class="dim">Loading what can be built here...</p>`); return; }
+    if (waiting) { $('blueprintArea').hidden = true; setHTML($('buildList'), `<p class="dim">Loading what can be built here...</p>`); return; }
     renderBuildList(info);
     setHTML($('blueprintBox'), blueprintsFree(info, t));
-    $('bpMostRow').hidden = !$('blueprintBox').querySelector('[data-bp-all]');
+    $('blueprintArea').hidden = false;
+    bpMostShow();
     return;
   }
   if (t.building && !visiting && !waiting) html += blueprintsBuilt(t);
@@ -3688,12 +3691,11 @@ const bpCost = bp => { const out = {};
   for (const part of [view.defs.buildings[bp.building], ...bp.additions.map(a => view.defs.additions[a])])
     for (const [k, v] of Object.entries(part.cost)) out[k] = (out[k] || 0) + v;
   return out; };
-// How many of this building, here or in every area, are missing some of the blueprint's additions.
+// How many of this building, here or in every area, could still take some of the blueprint's additions
+// (worked out by the server: room, research and what is next to each building all count).
 function bpBehind(bp, onlyHere) {
-  let n = 0;
-  view.state.areas.forEach((a, i) => { if (onlyHere && i !== view.area) return;
-    for (const row of a.tiles) for (const t of row) if (t.building === bp.building && bp.additions.some(x => !(t.additions || []).includes(x))) n++; });
-  return n;
+  const counts = (view.blueprints_behind || {})[bp.id] || [];
+  return onlyHere ? counts[view.area] || 0 : counts.reduce((x, y) => x + y, 0);
 }
 function blueprintsBuilt(t) {
   const bps = (view.state.blueprints || []), mine = bps.filter(b => b.building === t.building);
@@ -3708,7 +3710,7 @@ function blueprintsBuilt(t) {
     const missing = bp.additions.filter(a => !t.additions.includes(a)), here = bpBehind(bp, true), all = bpBehind(bp, false);
     html += `<div class="card"><div class="head"><span class="hi">${esc(bpName(bp))}</span><button data-bp-del="${bp.id}">Delete</button></div>` +
       `<div class="bar" style="margin-top:4px">` +
-      (missing.length ? `<button data-bp-place="${bp.id}">Add its additions here</button>` : '') +
+      (missing.length && t.additions.length < view.defs.max_additions ? `<button data-bp-place="${bp.id}">Add its additions here</button>` : '') +
       `<button data-bp-all="${bp.id}:upgrade:area" ${here ? '' : 'disabled'}>Upgrade every one in this area (${num(here)})</button>` +
       `<button data-bp-all="${bp.id}:upgrade:all" ${all ? '' : 'disabled'}>Upgrade every one in all areas (${num(all)})</button></div>` +
       `<div class="dim small">Brings each ${esc(B.name)} up to the blueprint: adds the additions it is missing, as long as there is room and materials.</div></div>`;
@@ -3721,7 +3723,8 @@ function blueprintsFree(info, t) {
   const fits = new Map((info.build || []).map(o => [o.id, o]));
   const ok = bps.filter(bp => fits.has(bp.building) && !fits.get(bp.building).problem);
   const terr = view.defs.terrains[t.terrain].name;
-  return `<div class="cat" style="margin-top:8px">Blueprints that fit here</div>` + (ok.length ? ok.map(bp => {
+  return `<details class="fold" data-fold="bpFree" ${isOpen('bpFree', ok.length > 0 && ok.length <= 2) ? 'open' : ''}>` +
+    `<summary class="cat">Blueprints that fit here <span class="count">${ok.length}</span></summary>` + (ok.length ? ok.map(bp => {
     const cost = bpCost(bp), can = Object.entries(cost).every(([k, v]) => (view.state.resources[k] || 0) >= v);
     return `<div class="card"><div class="head"><span class="hi">${esc(bpName(bp))}</span>` +
       `<button data-bp-place="${bp.id}" ${can ? '' : 'disabled'}>Build here</button></div>` +
@@ -3731,8 +3734,10 @@ function blueprintsFree(info, t) {
       `<button data-bp-all="${bp.id}:build:all:">any land, all areas</button></div></div>`;
   }).join('') : `<div class="dim small">None of your ${bps.length} blueprint${bps.length === 1 ? '' : 's'} can stand here.</div>`) +
     `<details class="fold" data-fold="bpList"><summary class="small">All your blueprints (${bps.length})</summary>` +
-    bps.map(bp => `<div class="bar"><span class="small">${esc(bpName(bp))}</span><button data-bp-del="${bp.id}">Delete</button></div>`).join('') + `</details>`;
+    bps.map(bp => `<div class="bar"><span class="small">${esc(bpName(bp))}</span><button data-bp-del="${bp.id}">Delete</button></div>`).join('') + `</details></details>`;
 }
+// The "fill at most" box shows only while the blueprints that fit here are open and some can fill.
+const bpMostShow = () => { $('bpMostRow').hidden = !$('blueprintBox').querySelector('details[open] [data-bp-all]'); };
 function blueprintClick(b) {
   const d = b.dataset, t = view.state.areas[view.area].tiles[sel.y][sel.x];
   if ('bpSave' in d) return act('blueprint_save', { building: t.building, additions: t.additions });
@@ -5386,7 +5391,7 @@ const HERO_ART = { warrior: ' o \n[|]\n/ \\', ranger: ' o \n/|)\n/ \\', mage: ' 
 const ADV_STAT = { hp: 'HP', atk: 'Atk', def: 'Def', spd: 'Spd' };
 const ADV_BONUS = { adv_power: 'Party strength', adv_speed: 'Adventure speed', adv_loot: 'Loot', adv_xp: 'Hero experience',
                     adv_heal: 'Recovery', adv_beast: 'Beast on adventures', adv_cost: 'Cheaper heroes and gear' };
-let advAllPlaces = false;
+let advAllPlaces = false, advSend = 0;     // all lairs or the nearest; which party "Set out" sends
 const battleQty = new Map(), battleRes = new Map();     // challenge id -> what the player typed to bet on it
 const advStats = st => Object.entries(ADV_STAT).map(([k, label]) => `${label} <span class="hi">${num(st[k])}</span>`).join(' &middot; ');
 const advBoost = qty => Math.round((1 + 0.1 * Math.log2(1 + qty / 200)) * 100) / 100;
@@ -5399,24 +5404,31 @@ function renderAdventure() {
   }
   const a = view.adventure, D = view.defs.adventure, now = view.now;
   const byId = new Map(a.heroes.map(h => [h.id, h]));
-  const party = a.party.map(i => byId.get(i)).filter(Boolean);
-  const place = a.trip && a.places[a.trip.area];
-  // ---- the party
-  let status;
-  if (a.trip)
-    status = `<div>Away at the <span class="hi">${esc(place ? place.lair : 'lair')}</span> in ${esc(place ? place.name : 'a far area')} ` +
-      `(delve ${a.trip.depth + 1}). ` + (a.trip.back > now ? `Back in <span class="hi" data-timer="adv"></span>.` : 'Coming home now.') + `</div>`;
-  else if (a.rest > now)
-    status = `<div class="bad">Resting after a beating. Ready to set out again in <span class="hi" data-timer="advRest"></span>.</div>`;
-  else
-    status = party.length ? `<div class="good">At home and ready. Pick somewhere to go below.</div>`
-      : `<div class="dim">Nobody is in the party yet. Recruit a hero below.</div>`;
-  let html = `<div class="panel"><h2>Your party</h2>${status}` +
-    kv([['Strength', `<span class="hi">${num(a.power)}</span> <span class="dim small">(a rough measure: compare it with the enemies' below)</span>`],
-        ['Heroes', party.length ? party.map(h => `${esc(h.name)} <span class="dim">the ${esc(D.classes[h.cls].name)}, level ${h.level}</span>`).join(', ') : '<span class="dim">none</span>'],
-        ['Party size', `${party.length} of ${a.party_size} <span class="dim small">(more at higher tech levels)</span>`],
-        ['Beast', a.beast ? `${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span> <span class="small">${advStats(a.beast)}</span>`
-                          : '<span class="dim">Your active beast goes along once it has hatched.</span>']]) + `</div>`;
+  const P = a.parties, size = a.party_size, pname = n => `Party ${n + 1}`;
+  if (advSend >= P.length) advSend = 0;
+  const partyStatus = (p, n) => {
+    const place = p.trip && a.places[p.trip.area];
+    if (p.trip) return `<span>Away at the <span class="hi">${esc(place ? place.lair : 'lair')}</span> in ${esc(place ? place.name : 'a far area')} ` +
+      `(delve ${p.trip.depth + 1}). ` + (p.trip.back > now ? `Back in <span class="hi" data-timer="adv:${n}"></span>.` : 'Coming home now.') + `</span>`;
+    if (p.rest > now) return `<span class="bad">Resting after a beating: ready in <span class="hi" data-timer="advRest:${n}"></span>.</span>`;
+    return p.heroes.length ? `<span class="good">At home and ready.</span>` : `<span class="dim">Empty: put heroes in it below.</span>`;
+  };
+  let html = `<div class="panel"><h2>Your parties <span class="dim small">${P.length} of ${D.max_parties}</span></h2>` +
+    `<p class="dim small" style="margin-top:0">Split your heroes into parties that go out at the same time, down to a hero each, or put them together ` +
+    `for a harder lair. Each party holds up to ${size} heroes (more at higher tech levels). ` +
+    (P.length < D.max_parties ? `The Adventurers' Guild, Mercenary Camp and Hall of Heroes each let one more party out at once. ` : '') +
+    `Party 1 is the one that fights other cities' parties. Your beast goes with one party.</p><div class="heroGrid">` +
+    P.map((p, n) => `<div class="heroCard ${p.trip ? '' : p.heroes.length ? 'inParty' : ''}"><div class="heroHead"><span class="heroName">${pname(n)}</span>` +
+      `<span class="dim small">${p.heroes.length} of ${size} heroes</span></div><div class="small">${partyStatus(p, n)}</div>` +
+      kv([['Strength', `<span class="hi">${num(p.power)}</span>`],
+          ['Heroes', p.heroes.length ? p.heroes.map(i => byId.get(i)).filter(Boolean).map(h => `${esc(h.name)} <span class="dim">(${esc(D.classes[h.cls].name)}, ${h.level})</span>`).join(', ') : '<span class="dim">none</span>'],
+          ['Beast', p.beast ? (a.beast ? `${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span>` : '<span class="dim">goes with this party once it has hatched</span>')
+            : visiting ? '<span class="dim">-</span>' : `<button data-adv-beast="${n}" ${p.trip || (a.beast && a.beast.away) ? 'disabled' : ''}>Send the beast with ${pname(n)}</button>`]]) +
+      (visiting || p.trip || !p.heroes.length || p.rest > now ? '' :
+        `<div class="bar" style="margin-top:4px"><button data-adv-pick="${n}" ${advSend === n ? 'class="on" disabled' : ''}>${advSend === n ? 'Chosen below' : 'Choose where to send it'}</button></div>`) +
+      `</div>`).join('') + `</div>` +
+    (a.beast ? `<div class="small" style="margin-top:6px">Beast on adventures: ${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span> ${advStats(a.beast)}</div>` : '') +
+    `</div>`;
   // ---- the heroes
   html += `<div class="panel"><h2>Heroes <span class="dim small">${a.heroes.length} of ${a.cap}</span></h2>` +
     (a.heroes.length ? `<div class="heroGrid">` + a.heroes.map(h => {
@@ -5429,15 +5441,17 @@ function renderAdventure() {
             : `<button data-adv-gear="${h.id}:${slot}" ${can ? '' : 'disabled'} title="${esc(g.desc)} Costs ${esc(plain(cost).replace(/<[^>]+>/g, ''))}. Shift-click: up to 10 levels.">Improve</button>` +
               `<span class="small">${goods(cost)}</span>`) + `</div>`;
       }).join('');
-      return `<div class="heroCard ${h.in_party ? 'inParty' : ''}"><div class="heroHead"><span class="heroName">${esc(h.name)}</span>` +
+      return `<div class="heroCard ${h.party !== null ? 'inParty' : ''}"><div class="heroHead"><span class="heroName">${esc(h.name)}</span>` +
         `<span class="dim">${esc(c.name)}, level ${h.level}</span></div>` +
         `<div style="display:flex;gap:10px;align-items:center"><pre class="heroArt">${esc(HERO_ART[h.cls] || '')}</pre>` +
         `<div class="small">${advStats(h.now)}<div class="dim">Experience ${num(h.xp)} / ${num(h.xp_needed)}</div>` +
-        (away ? '<div class="hi">Away on an adventure</div>' : h.in_party ? '<div class="good">In the party</div>' : '<div class="dim">Staying home</div>') + `</div></div>` +
+        (away ? `<div class="hi">Away with ${pname(h.party)}</div>` : h.party !== null ? `<div class="good">In ${pname(h.party)}</div>` : '<div class="dim">Staying home</div>') + `</div></div>` +
         gear +
         (visiting ? '' : `<div class="bar" style="margin-top:6px">` +
-          (h.in_party ? `<button data-adv-party="${h.id}" data-on="0" ${a.trip ? 'disabled' : ''}>Take out of party</button>`
-                      : `<button data-adv-party="${h.id}" data-on="1" ${a.trip || party.length >= a.party_size ? 'disabled' : ''}>Add to party</button>`) +
+          `<label class="small">Party <select data-adv-party="${h.id}" ${away ? 'disabled' : ''}>` +
+            `<option value="" ${h.party === null ? 'selected' : ''}>Stay home</option>` +
+            P.map((p, n) => `<option value="${n}" ${h.party === n ? 'selected' : ''} ${h.party !== n && (p.trip || p.heroes.length >= size) ? 'disabled' : ''}>` +
+              `${pname(n)} (${p.heroes.length}/${size})${p.trip ? ', away' : ''}</option>`).join('') + `</select></label>` +
           `<button data-adv-dismiss="${h.id}" ${away ? 'disabled' : ''}>Dismiss</button></div>`) + `</div>`;
     }).join('') + `</div>` : `<p class="dim">No heroes yet.</p>`) + `</div>`;
   // ---- recruiting
@@ -5455,15 +5469,19 @@ function renderAdventure() {
   // ---- where to go
   const places = a.places.slice().sort((x, y) => x.distance - y.distance || x.delve - y.delve || x.area - y.area);
   const shown = advAllPlaces ? places : places.slice(0, 12);
-  const canGo = !visiting && !a.trip && !(a.rest > now) && party.length;
+  const sp = P[advSend], canGo = !visiting && !sp.trip && !(sp.rest > now) && sp.heroes.length;
   html += `<div class="panel"><h2>Where to go</h2><p class="dim small" style="margin-top:0">Every area you own has a lair. ` +
-    `The further from home, the harder and the richer; each win there opens a deeper delve. Ratings compare your party now with the enemies.</p>` +
+    `The further from home, the harder and the richer; each win there opens a deeper delve. Only one party can be in a lair at a time. ` +
+    `Ratings and times are for the party chosen here.</p>` +
+    (visiting ? '' : `<div class="bar"><span class="small">Send</span>` + P.map((p, n) =>
+      `<button data-adv-pick="${n}" class="${advSend === n ? 'on' : ''}">${pname(n)}${p.trip ? ' (away)' : p.rest > now ? ' (resting)' : !p.heroes.length ? ' (empty)' : ''}</button>`).join('') + `</div>`) +
     `<div class="scroll"><table><tr><th>Lair</th><th>Area</th><th class="n">Delve</th><th>Rating</th><th class="n">Enemies</th><th class="n">Time</th><th></th></tr>` +
     shown.map(pl => `<tr><td>${esc(pl.lair)}</td><td>${esc(pl.name)}</td><td class="n">${pl.delve}</td>` +
-      `<td class="advRating ${esc(pl.rating)}">${esc(pl.rating)}</td>` +
+      `<td class="advRating ${esc(pl.ratings[advSend])}">${esc(pl.ratings[advSend])}</td>` +
       `<td class="n" title="${esc(pl.enemies.map(e => `${e.name}: ${e.hp} HP, ${e.atk} Atk, ${e.def} Def, ${e.spd} Spd`).join('\n'))}">${pl.enemies.length} <span class="dim small">(strength ${num(pl.power)})</span></td>` +
-      `<td class="n">${duration(pl.time)}</td>` +
-      `<td>${visiting ? '' : `<button data-adv-go="${pl.area}" ${canGo ? '' : 'disabled'}>Set out</button>`}</td></tr>`).join('') +
+      `<td class="n">${duration(pl.times[advSend])}</td>` +
+      `<td>${visiting ? '' : pl.busy !== null && pl.busy !== undefined ? `<span class="dim small">${pname(pl.busy)} is there</span>`
+        : `<button data-adv-go="${pl.area}" ${canGo ? '' : 'disabled'}>Send ${pname(advSend)}</button>`}</td></tr>`).join('') +
     `</table></div>` + (places.length > 12 ? `<div class="bar"><button data-adv-all>${advAllPlaces ? 'Show the nearest 12' : `Show all ${places.length}`}</button></div>` : '') + `</div>`;
   // ---- what helps
   const src = a.sources || {};
@@ -5476,7 +5494,7 @@ function renderAdventure() {
   // ---- reports
   html += `<div class="panel"><h2>Adventure reports</h2>` + (a.reports.length ? a.reports.map((r, n) =>
     `<details class="fold" data-fold="advRep:${r.t}" ${isOpen('advRep:' + r.t, n === 0) ? 'open' : ''}><summary>` +
-    `<span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> at the ${esc(r.lair)} in ${esc(r.area)} (delve ${r.delve}) <span class="dim small">${clock(r.t)}</span></summary>` +
+    `${r.party ? esc(r.party) + ' ' : ''}<span class="${r.won ? 'good' : 'bad'}">${r.won ? 'won' : 'lost'}</span> at the ${esc(r.lair)} in ${esc(r.area)} (delve ${r.delve}) <span class="dim small">${clock(r.t)}</span></summary>` +
     `<div class="small">` + (r.won ? `Brought home ${plain(r.loot)}` + (r.egg ? `, a ${esc(r.egg.toLowerCase())} beast egg` : '') + (r.artifact ? `, an artifact: ${esc(r.artifact)}` : '') + '. ' : '') +
     `Every hero gained ${num(r.xp)} experience. ${r.rounds} rounds.</div>` +
     `<div class="small dim">Left standing: ${r.left.filter(u => u.hp > 0).map(u => `${esc(u.name)} (${num(u.hp)}/${num(u.max)})`).join(', ') || 'nobody'}</div>` +
@@ -5500,7 +5518,7 @@ function renderBattles() {
   setHTMLKeep($('battles'), forMe.length ? `<table><tr><th>From</th><th>Their party</th><th class="n">Strength</th><th>Your answer</th></tr>` +
     forMe.map(b => `<tr><td>${esc(b.city)}</td><td class="small">${who(b.party)}</td><td class="n">${num(b.power)} <span class="dim small">(yours ${num(a.power)})</span></td><td>` +
       `<div class="buy"><input data-battle-qty="${b.id}" data-k="battle${b.id}" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" style="width:90px"> ` +
-      `<select data-battle-res="${b.id}">${materials}</select> <button data-battle-accept="${b.id}" ${a.trip ? 'disabled title="Your party is away"' : ''}>Accept</button> ` +
+      `<select data-battle-res="${b.id}">${materials}</select> <button data-battle-accept="${b.id}" ${a.parties[0].trip ? 'disabled title="Party 1 is away"' : ''}>Accept</button> ` +
       `<button data-battle-cancel="${b.id}">Decline</button></div><div data-battle-note="${b.id}" class="small"></div></td></tr>`).join('') + `</table>`
     : `<span class="dim small">None waiting.</span>`, fillBattles);
   setHTMLKeep($('battlesSent'), sent.length ? `<table><tr><th>To</th><th>Your bet</th><th></th></tr>` +
@@ -5555,18 +5573,23 @@ $('battlePanel').addEventListener('click', async e => {
     await act('battle_accept', { battle: id, bet: { res: battleRes.get(id) || 'gold', qty } });
   } else if (d.battleCancel) await act('battle_cancel', { battle: +d.battleCancel });
 });
+$('adventureBody').addEventListener('change', e => {
+  const d = e.target.dataset;
+  if (d.advParty && !visiting) act('adv_party', { hero: +d.advParty, party: e.target.value === '' ? null : +e.target.value });
+});
 $('adventureBody').addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || !view || b.disabled) return;
   const d = b.dataset, a = view.adventure;
   if (d.advRecruit) act('adv_recruit', { cls: d.advRecruit });
   else if (d.advGear) { const [hero, slot] = d.advGear.split(':'); act('adv_gear', { hero: +hero, slot, times: e.shiftKey ? 10 : 1 }); }
-  else if (d.advParty) act('adv_party', { hero: +d.advParty, on: d.on === '1' });
+  else if (d.advBeast) act('adv_beast', { party: +d.advBeast });
+  else if (d.advPick) { advSend = +d.advPick; renderAdventure(); }
   else if (d.advDismiss) {
     const h = a.heroes.find(x => x.id === +d.advDismiss);
     if (h && confirm(`Dismiss ${h.name}? They leave for good, with their gear; what was spent on them is not given back.`)) act('adv_dismiss', { hero: h.id });
   }
-  else if (d.advGo) act('adv_start', { target: +d.advGo });
+  else if (d.advGo) act('adv_start', { target: +d.advGo, party: advSend });
   else if ('advAll' in d) { advAllPlaces = !advAllPlaces; renderAdventure(); }
 });
 
@@ -6831,6 +6854,7 @@ $('logTall').onclick = () => { const tall = $('log').classList.toggle('tall'); $
 $('tile').addEventListener('toggle', e => {   // remember which sections are open
   const key = e.target.dataset && e.target.dataset.fold;
   if (key) foldState.set(key, e.target.open);
+  if (key === 'bpFree') bpMostShow();
 }, true);
 function setHelpOpen(tip, open) {
   tip.querySelector('.help-popup').hidden = !open;
