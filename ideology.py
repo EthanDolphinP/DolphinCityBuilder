@@ -1037,6 +1037,42 @@ def quest_give(state, now, res=None, amount=None):
     return None
 
 
+QUEST_MOST = 500       # quests one "complete as many as I can" may finish
+
+
+def quest_complete(state, now, many=False):
+    """Finish the quest under way in one go, if the city has everything it still asks for; with `many`, then
+    the next and the next, while the city can afford them."""
+    ideo = chosen(state)
+    if not ideo:
+        return "Choose an ideology first: quests are its own."
+    word, done = ideo["quest_word"], 0
+    while done < (QUEST_MOST if many else 1):
+        quests = state.setdefault("quests", {"done": 0, "given": {}})
+        need = quest_need(state["ideology"], quests["done"])
+        given = quests.setdefault("given", {})
+        left = {r: q - given.get(r, 0) for r, q in need.items() if q - given.get(r, 0) > 0}
+        short = game._missing(state, left)
+        if short:
+            if not done:
+                return f"Not enough to finish {word} {quests['done'] + 1} yet (still need {game.fmt_goods(short)})."
+            break
+        game._pay(state, left)
+        n = quests["done"]
+        quests["done"] = n + 1
+        quests["given"] = {}
+        game.tally(state, "quests")
+        done += 1
+        if not many:
+            prize = ", ".join(describe(quest_reward(state["ideology"], n)))
+            game.log(state, now, f"{word} {n + 1} is complete! Its prize, for good: {prize}.")
+    if many:
+        last = state["quests"]["done"]
+        game.log(state, now, f"Completed {done} {ideo['quest_plural'].lower() if done != 1 else word.lower()} in one go "
+                             f"({word} {last - done + 1} to {last}). Their prizes are yours for good.")
+    return None
+
+
 def quest_view(state):
     ideo, ideo_id = chosen(state), state.get("ideology")
     if not ideo or ideo_id not in QUEST_REWARDS:

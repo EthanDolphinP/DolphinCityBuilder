@@ -911,6 +911,6 @@ def send_message(state, now, to, text, get_city):
 def read_messages(state, other):
     """The player has looked at what `other` wrote to them."""
     for m in _mailbox(state):
-        if m["city"] == other:
+        if other is None or m["city"] == other:      # None: every conversation
             m["read"] = True
     return None

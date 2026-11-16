@@ -1267,6 +1267,7 @@
         <details class="market-help"><summary>Reposting orders</summary><p class="dim small" style="margin-top:0">Offers of yours that sold out. Nothing here is on sale. Change the
           amounts by typing new ones or with the &times; and &divide; buttons, which change both sides and keep the
           price. Reactivate posts the order again with the amounts shown, taking the goods from your stock again.</p></details>
+        <div class="bar" style="margin-top:0"><button id="finishedAll" hidden>Reactivate all</button></div>
         <div id="finished" class="scroll"></div>
       </details>
 
@@ -2452,7 +2453,7 @@ const HOWTO = [
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
   ['Blueprints', 'For big cities. Select one of your buildings and press "Save this as a blueprint": it keeps the building and its additions, in the order they are attached. On an empty tile the blueprints that fit there are listed: one click builds the building with all its additions. A blueprint can also build itself on every free tile of the same land (in this area or in all of them), or on any free land it fits, up to as many tiles as you say; tiles with wild animals are left alone. On a building, a blueprint can bring every one of that building, in this area or in all of them, up to the blueprint, adding whatever additions each is missing while there is room. Everything is paid for tile by tile, so a big job simply stops where the materials run out. Blueprints are saved with your city.'],
-  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Heroes go out in parties of up to 3 at Town, 4 at City, 5 at Metropolis and 6 at Megacity. A city has one party; the Adventurers\' Guild, Mercenary Camp and Hall of Heroes each let one more go out at the same time, so heroes can be split into small parties (even one hero each) for easy lairs, or kept together for a hard one. Only one party can be in a lair at a time, each rests on its own after a beating, and Party 1 is the one that fights other cities\' parties. Your active beast fights beside the party you pick, if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. Heroes in no party sit on the bench (6 places): they don\'t fight, and can be swapped with someone in a party between adventures.'],
+  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Heroes go out in parties of up to 3 at Town, 4 at City, 5 at Metropolis and 6 at Megacity. A city has one party; the Adventurers\' Guild, Mercenary Camp and Hall of Heroes each let one more go out at the same time, so heroes can be split into small parties (even one hero each) for easy lairs, or kept together for a hard one. Only one party can be in a lair at a time, each rests on its own after a beating, and Party 1 is the one that fights other cities\' parties. Your active beast fights beside the party you pick, if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. Each party can be sent again to the lair it last went to in one press, and Improve all gear on a hero raises its weapon, armour and charm as far as you can pay. Heroes in no party sit on the bench (6 places): they don\'t fight, and can be swapped with someone in a party between adventures.'],
   ['Ranked arena', 'Your Party 1 can fight other cities\' Party 1 in the ranked arena on the Adventure tab, whether or not they are online (their heroes defend even while away). You are offered three cities near your rank; pick one and the fight happens at once. Winning gains rank points, more for beating a higher rank, and brings materials (more at higher ranks) and experience; losing costs points, and the city you fought gains or loses half as much. The ranks are Bronze, Silver, Gold, Platinum, Diamond, Master, Grandmaster and Legend, each but Legend in three divisions (III, II, I). Reaching a rank for the first time brings a bigger prize. You have up to 5 fights stored and get one back every 45 minutes. The cities offered change after each fight, every hour, or when you ask for others (every 10 minutes at most). The leaderboard\'s Arena column shows everyone\'s rank.'],
   ['Cauldron', 'The Cauldron tab is open from the start. Set one recipe and how much of it goes in: every hour the cauldron takes those ingredients and brews for that hour, again and again, even while you are away, until you change or stop it. Only one brew works at a time, and each does two or three things: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster and cheaper expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. Putting in more makes the brew stronger, never longer, with no top: each extra handful adds a little less than the one before. If an hour\'s ingredients are not there, the cauldron goes cold for that hour and tries again the next. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
 
@@ -3774,7 +3775,9 @@ function renderMastery() {
       `<div class="ideoCard ${m.open ? '' : 'locked'}"><span class="name">${esc(R[res])} <span class="dim">level ${x.level}</span></span>` +
       `<div class="small ${x.level ? 'good' : 'dim'}">${x.level ? `+${Math.round(x.bonus * 100)}% ${esc(R[res])} from every building` : 'Not started'}</div>` +
       `<div class="small">Next: +${Math.round((x.bonus + m.step) * 100)}% for ${goods(x.cost)}</div>` +
-      (own && m.open ? `<button data-master="${res}" ${x.affordable ? '' : 'disabled'}>Master ${esc(R[res])}</button>` : '') + `</div>`).join('') +
+      (own && m.open ? `<div class="bar" style="margin-top:4px"><button data-master="${res}" ${x.affordable ? '' : 'disabled'}>Master ${esc(R[res])}</button>` +
+        `<button data-master="${res}" data-times="10" ${x.affordable ? '' : 'disabled'} title="Up to 10 levels, while you can pay">+10</button>` +
+        `<button data-master="${res}" data-times="1000" ${x.affordable ? '' : 'disabled'} title="As many levels as you can pay for">Max</button></div>` : '') + `</div>`).join('') +
     `</div></details>`;
   setHTML($('mastery'), html);
 }
@@ -3815,7 +3818,8 @@ function renderResearch() {
   setHTML($('resSummary'),
     stat('Knowledge', num(state.resources.knowledge), rate ? `<span class="${rate > 0 ? 'good' : 'bad'}">${rateText(rate)}</span>` : 'none coming in') +
     stat('Researched', `${view.research.filter(r => r.done).length} / ${view.research.length}`, '') +
-    stat('Ready now', view.research.filter(ready).length, 'can be researched'));
+    stat('Ready now', view.research.filter(ready).length, view.research.some(ready) && !visiting
+      ? `<button data-research-all title="Research everything you can do and afford now, cheapest first">Research all I can</button>` : 'can be researched'));
   setHTML($('resFilters'), Object.entries(filters).map(([k, [label, test]]) =>
     `<button data-filter="${k}" class="${k === resFilter ? 'on' : ''}">${label} (${narrowed.filter(test).length})</button>`).join(''));
 
@@ -4749,6 +4753,7 @@ function renderSocial() {
   const unread = mail.filter(m => !m.read).length, to = $('msgTo').value.trim();
   $('socMsgCount').textContent = unread ? `(${unread} new)` : mail.length ? `(${talks.size} ${talks.size === 1 ? 'city' : 'cities'})` : '';
   setHTML($('socTalks'), talks.size ? `<span class="dim small">Conversations</span>` +
+    (unread && !visiting ? `<button data-read-all>Mark all read</button>` : '') +
     [...talks.entries()].sort((a, b) => b[1].last.t - a[1].last.t).map(([name, t]) =>
       `<button data-talk="${esc(name)}" class="chip ${name === to ? 'on' : ''}">${online.has(name) ? '<span class="good">*</span> ' : idle.has(name) ? '<span class="dim">*</span> ' : ''}${esc(name)}` +
       (t.unread ? ` <span class="good">${t.unread} new</span>` : '') + `</button>`).join('') : '');
@@ -4986,7 +4991,9 @@ function questPanel(i, iv, own) {
     `there is no time limit. Each one asks for ${Math.round((q.growth - 1) * 100)}% more than the last, and each one done gives a prize for good, ` +
     `a little bigger every time.</p>` +
     `<div class="cat">${esc(q.word)} ${q.done + 1}</div>` +
-    (own && questCanFinish(iv) ? `<p class="good" style="margin:4px 0">You have everything this ${esc(q.word.toLowerCase())} still asks for: press "Give all I can" to finish it.</p>` : '') +
+    (own && questCanFinish(iv) ? `<div class="bar" style="margin:4px 0"><span class="good">You have everything this ${esc(q.word.toLowerCase())} still asks for.</span>` +
+      `<button data-quest-complete>Complete ${esc(q.word)} ${q.done + 1}</button>` +
+      `<button data-quest-many title="Finish this one, then the next and the next, while you can afford them">Complete as many as I can</button></div>` : '') +
     `<div class="scroll"><table><tr><th>Asks for</th><th>Given</th><th></th><th>You have</th><th></th></tr>${rows}</table></div>` +
     (own ? `<div class="bar"><button data-quest-all>Give all I can</button></div>` : '') +
     `<p>Prize, for good: <span class="good">${q.prize.map(esc).join(', ')}</span></p>` +
@@ -5004,8 +5011,13 @@ $('ideologyBody').addEventListener('click', e => {      // the perk tabs and the
   }
 });
 $('ideologyBody').addEventListener('click', e => {      // the quest buttons
-  const qb = e.target.closest('[data-quest-give], [data-quest-all]');
-  if (qb && !visiting) act('quest_give', qb.dataset.questGive ? { res: qb.dataset.questGive } : {});
+  const qb = e.target.closest('[data-quest-give], [data-quest-all], [data-quest-complete], [data-quest-many]');
+  if (!qb || visiting || qb.disabled) return;
+  if ('questComplete' in qb.dataset) act('quest_complete');
+  else if ('questMany' in qb.dataset) {
+    if (confirm('Complete this one, then keep completing the next ones for as long as you can afford them? Each asks for more than the last, so this can spend a lot.')) act('quest_complete', { many: true });
+  }
+  else act('quest_give', qb.dataset.questGive ? { res: qb.dataset.questGive } : {});
 });
 // ---- artifacts: crafted from resources alone, three random stats, traded between any cities ----
 let artTimes = 100;                    // how many to craft in one go
@@ -5026,7 +5038,9 @@ function artifactPanel(i, iv, own) {
     `millions of crafts. Up to ${A.slots} work at once in your shrine (one of each kind), and your own ideology's work ${Math.round((A.attuned - 1) * 100)}% stronger.</p>`;
   // ---- the shrine
   const shrine = vault.filter(a => a.enshrined);
-  html += `<div class="cat">Shrine <span class="dim">(${shrine.length} of ${A.slots})</span></div>` +
+  const canFill = own && shrine.length < A.slots && vault.some(a => !a.enshrined && !shrine.some(x => x.kind === a.kind));
+  html += `<div class="cat">Shrine <span class="dim">(${shrine.length} of ${A.slots})</span>` +
+    (canFill ? ` <button class="mini" data-art-best title="Put your best artifacts into the empty places, one of each kind">Fill with my best</button>` : '') + `</div>` +
     (shrine.length ? shrine.map(a => `<div class="opt">${artName(a.kind)} &nbsp; ${artStats(a)}<br><span class="good small">${a.text.map(esc).join(', ')}</span>` +
       (own ? ` <button class="mini" data-art-unenshrine="${a.id}">Take out</button>` : '') + `</div>`).join('') +
       (av.total.length ? `<div class="small" style="margin-top:4px"><span class="dim">All together:</span> <span class="good">${av.total.map(esc).join(', ')}</span></div>` : '')
@@ -5092,6 +5106,7 @@ $('artifactMarket').addEventListener('click', e => {
 });
 $('artifactMarket').addEventListener('input', e => { if ('artFind' in e.target.dataset) { artFind = e.target.value; renderArtifactMarket(); } });
 $('ideologyBody').addEventListener('click', e => {
+  if (e.target.closest('[data-art-best]') && !visiting) { act('artifact_best'); return; }
   const b = e.target.closest('[data-art-times], [data-art-craft], [data-art-enshrine], [data-art-unenshrine], [data-art-sell], [data-art-sell-close], [data-art-post], [data-art-break], [data-art-buy], [data-art-withdraw]');
   if (!b || visiting) return;
   const d = b.dataset, A = view.defs.artifacts;
@@ -5421,9 +5436,13 @@ function renderAdventure() {
           ['Beast', p.beast ? (a.beast ? `${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span>` : '<span class="dim">goes with this party once it has hatched</span>')
             : visiting ? '<span class="dim">-</span>' : `<button data-adv-beast="${n}" ${p.trip || (a.beast && a.beast.away) ? 'disabled' : ''}>Send the beast with ${pname(n)}</button>`]]) +
       (visiting || p.trip || !p.heroes.length || p.rest > now ? '' :
-        `<div class="bar" style="margin-top:4px"><button data-adv-pick="${n}" ${advSend === n ? 'class="on" disabled' : ''}>${advSend === n ? 'Chosen below' : 'Choose where to send it'}</button></div>`) +
+        `<div class="bar" style="margin-top:4px"><button data-adv-pick="${n}" ${advSend === n ? 'class="on" disabled' : ''}>${advSend === n ? 'Chosen below' : 'Choose where to send it'}</button>` +
+        (p.last !== null && p.last !== undefined && a.places[p.last] ? `<button data-adv-again="${n}" ${a.places[p.last].busy !== null && a.places[p.last].busy !== undefined ? 'disabled title="Another party is there"' : ''}>` +
+          `Send again: ${esc(a.places[p.last].lair)} (delve ${a.places[p.last].delve})</button>` : '') + `</div>`) +
       `</div>`).join('') + `</div>` +
     (a.beast ? `<div class="small" style="margin-top:6px">Beast on adventures: ${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span> ${advStats(a.beast)}</div>` : '') +
+    (!visiting && P.filter(p => !p.trip && p.heroes.length && !(p.rest > now) && p.last !== null && p.last !== undefined).length > 1
+      ? `<div class="bar" style="margin-top:6px"><button data-adv-again-all>Send every ready party again</button><span class="dim small">each back to the lair it last went to</span></div>` : '') +
     `</div>`;
   // ---- the heroes
   const benchFull = a.bench.length >= a.bench_slots;
@@ -5451,6 +5470,7 @@ function renderAdventure() {
           (away ? '' : `<label class="small">Swap with <select data-adv-swap="${h.id}"><option value="">...</option>` +
             a.heroes.filter(o => o.id !== h.id && !o.away && o.party !== h.party).map(o =>
               `<option value="${o.id}">${esc(o.name)} (${o.party === null ? 'bench' : pname(o.party)})</option>`).join('') + `</select></label>`) +
+          `<button data-adv-gear-all="${h.id}" ${away ? 'disabled' : ''} title="Improve weapon, armour and charm as far as you can pay, the lowest first (up to 100 levels)">Improve all gear</button>` +
           `<button data-adv-dismiss="${h.id}" ${away ? 'disabled' : ''}>Dismiss</button></div>`) + `</div>`;
   };
   const placed = a.heroes.filter(h => h.party !== null), benched = a.heroes.filter(h => h.party === null);
@@ -5576,6 +5596,9 @@ $('adventureBody').addEventListener('click', e => {
   if (d.advRecruit) act('adv_recruit', { cls: d.advRecruit });
   else if (d.advGear) { const [hero, slot] = d.advGear.split(':'); act('adv_gear', { hero: +hero, slot, times: e.shiftKey ? 10 : 1 }); }
   else if (d.advBeast) act('adv_beast', { party: +d.advBeast });
+  else if (d.advAgain) act('adv_again', { party: +d.advAgain });
+  else if ('advAgainAll' in d) act('adv_again');
+  else if (d.advGearAll) act('adv_gear_all', { hero: +d.advGearAll });
   else if (d.advPick) { advSend = +d.advPick; renderAdventure(); }
   else if (d.advDismiss) {
     const h = a.heroes.find(x => x.id === +d.advDismiss);
@@ -6071,6 +6094,9 @@ function renderMarket() {
   // ---- offers of this city's that sold out, ready to post again ----
   const finished = (state.finished || []).slice().reverse();
   $('finishedCount').textContent = `(${finished.length})`;
+  const canPost = f => f.give_qty >= 1 && f.want_qty >= 1 && (state.resources[f.give] || 0) >= f.give_qty;
+  $('finishedAll').hidden = finished.filter(canPost).length < 2;
+  $('finishedAll').textContent = `Reactivate all ${finished.filter(canPost).length} I have stock for`;
   const box = (f, side) => `<input data-fin="${f.id}" data-side="${side}" data-k="fin${f.id}:${side}" type="text" inputmode="decimal" autocomplete="off" style="width:110px" ` +
     `value="${f[side] || ''}" title="Type a new amount">`;
   setHTMLKeep($('finished'), finished.length ? `<table><tr><th>You give</th><th>You want</th><th>Change both</th><th>Sold out</th><th></th></tr>` +
@@ -6535,7 +6561,10 @@ $('socViews').onclick = e => {
   const b = e.target.closest('[data-soc-view]');
   if (b) { socView = settings.socView = b.dataset.socView; saveSettings(); renderSocial(); }
 };
-$('socTalks').onclick = e => { const b = e.target.closest('[data-talk]'); if (b) { $('msgTo').value = b.dataset.talk; renderSocial(); $('msgText').focus(); } };
+$('socTalks').onclick = e => {
+  if (e.target.closest('[data-read-all]')) { if (!visiting) act('messages_read', {}); return; }
+  const b = e.target.closest('[data-talk]'); if (b) { $('msgTo').value = b.dataset.talk; renderSocial(); $('msgText').focus(); }
+};
 $('msgTo').oninput = () => { if (view && !visiting) renderSocial(); };
 $('msgForm').onsubmit = async e => {
   e.preventDefault();
@@ -6970,7 +6999,10 @@ $('explore').onclick = e => {
 // The Mastery panel sits above the research list, so its buttons need their own listener.
 $('mastery').onclick = e => {
   const b = e.target.closest('[data-master]');
-  if (b && !visiting) act('mastery', { resource: b.dataset.master });
+  if (b && !visiting && !b.disabled) act('mastery', { resource: b.dataset.master, times: +(b.dataset.times || 1) });
+};
+$('resSummary').onclick = e => {
+  if (e.target.closest('[data-research-all]') && !visiting) act('research_all');
 };
 $('research').onclick = e => {
   if (e.target.dataset.research) act('research', { research: e.target.dataset.research });
@@ -7041,6 +7073,13 @@ $('offers').addEventListener('input', e => {
 $('offers').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset.amount) $('offers').querySelector(`[data-accept="${e.target.dataset.amount}"]`).click();
 });
+$('finishedAll').onclick = async () => {     // one after another, while the stock lasts
+  if (visiting) return;
+  for (const f of (view.state.finished || []).slice()) {
+    const now = (view.state.finished || []).find(x => x.id === f.id);
+    if (now && now.give_qty >= 1 && now.want_qty >= 1 && (view.state.resources[now.give] || 0) >= now.give_qty) await act('offer_reactivate', { offer: now.id });
+  }
+};
 $('finished').onclick = e => {
   const d = e.target.dataset;
   if (d.reactivate) act('offer_reactivate', { offer: +d.reactivate });

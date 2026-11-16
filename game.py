@@ -4486,12 +4486,12 @@ FEATURE_ACTIONS = {      # actions that need a system open
     "offer_post": "market", "offer_accept": "market", "offer_edit": "market", "offer_reactivate": "market",
     "bill_propose": "bills", "bill_accept": "bills",
     "duel_post": "duels", "duel_accept": "duels",
-    "ideology_choose": "ideology", "perk_take": "ideology", "ritual_start": "ideology", "quest_give": "ideology", "tree_take": "ideology",
+    "ideology_choose": "ideology", "perk_take": "ideology", "ritual_start": "ideology", "quest_give": "ideology", "quest_complete": "ideology", "tree_take": "ideology",
     "curse_cast": "hexes",
     "cauldron_set": "cauldron",
     "training_set": "training", "train_idle": "training",
-    "artifact_craft": "artifacts", "artifact_enshrine": "artifacts", "artifact_offer_post": "artifacts", "artifact_offer_accept": "artifacts",
-    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures", "adv_beast": "adventures", "adv_swap": "adventures",
+    "artifact_craft": "artifacts", "artifact_enshrine": "artifacts", "artifact_best": "artifacts", "artifact_offer_post": "artifacts", "artifact_offer_accept": "artifacts",
+    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures", "adv_beast": "adventures", "adv_swap": "adventures", "adv_again": "adventures", "adv_gear_all": "adventures",
     "arena_fight": "adventures", "arena_new": "adventures",
     "adv_start": "adventures",
 }
@@ -5993,20 +5993,30 @@ def mastery_cost(state, res):
     return cost
 
 
-def master(state, now, res):
+def master(state, now, res, times=1):
+    """Study `times` more levels of a resource's mastery (or as many as the city can pay for, if fewer)."""
     if res not in MASTERY_COST:
         return "Pick a resource to master."
     if state["tech"] < MASTERY_TECH:
         return f"Mastery opens when your city is a {TECH_LEVELS[MASTERY_TECH]['name']}."
-    cost = mastery_cost(state, res)
-    short = _missing(state, cost)
-    if short:
-        return f"Not enough to master {RESOURCES[res]} further (need {fmt_goods(short)})."
-    _pay(state, cost)
-    state.setdefault("mastery", {})[res] = mastery_level(state, res) + 1
-    tally(state, "masteries")
-    log(state, now, f"Mastery of {RESOURCES[res]} is now level {mastery_level(state, res)}: buildings make "
-                    f"{round(mastery_bonus(state, res) * 100)}% more {RESOURCES[res]}. It cost {fmt_goods(cost)}.")
+    if not isinstance(times, int) or isinstance(times, bool) or not 1 <= times <= 1000:
+        times = 1
+    paid, done = {}, 0
+    for _ in range(times):
+        cost = mastery_cost(state, res)
+        short = _missing(state, cost)
+        if short:
+            if not done:
+                return f"Not enough to master {RESOURCES[res]} further (need {fmt_goods(short)})."
+            break
+        _pay(state, cost)
+        for k, v in cost.items():
+            paid[k] = paid.get(k, 0) + v
+        state.setdefault("mastery", {})[res] = mastery_level(state, res) + 1
+        tally(state, "masteries")
+        done += 1
+    log(state, now, f"Mastery of {RESOURCES[res]} is now level {mastery_level(state, res)}" + (f" (+{done})" if done > 1 else "")
+                    + f": buildings make {round(mastery_bonus(state, res) * 100)}% more {RESOURCES[res]}. It cost {fmt_goods(paid)}.")
     return None
 
 
@@ -6033,6 +6043,25 @@ def research(state, now, rid):
     tally(state, "researched")
     beasts.note(state, now, "research")
     log(state, now, f"Researched {r['name']}.")
+    return None
+
+
+def research_all(state, now):
+    """Research everything the city can do and afford now, cheapest first (each paid as it goes)."""
+    done = []
+    while True:
+        open_ = [rid for rid in RESEARCH if not research_problem(state, rid) and not _missing(state, RESEARCH[rid]["cost"])]
+        if not open_:
+            break
+        rid = min(open_, key=lambda r: (sum(RESEARCH[r]["cost"].values()), RESEARCH[r]["name"]))
+        _pay(state, RESEARCH[rid]["cost"])
+        state["research"].append(rid)
+        tally(state, "researched")
+        beasts.note(state, now, "research")
+        done.append(RESEARCH[rid]["name"])
+    if not done:
+        return "Nothing can be researched and afforded right now."
+    log(state, now, f"Researched {len(done)} thing{'s' if len(done) != 1 else ''}: {', '.join(done)}.")
     return None
 
 
@@ -6428,6 +6457,8 @@ def apply_action(state, now, action, data):
         return artifacts.craft(state, now, data.get("kind"), data.get("times", 1))
     if action == "artifact_enshrine":
         return artifacts.enshrine(state, now, data.get("artifact"))
+    if action == "artifact_best":
+        return artifacts.fill_shrine(state, now)
     if action == "artifact_unenshrine":
         return artifacts.unenshrine(state, now, data.get("artifact"))
     if action == "artifact_break":
@@ -6441,6 +6472,10 @@ def apply_action(state, now, action, data):
     if action == "adv_party":
         n = data.get("party", 0 if data.get("on") else None) if "party" in data or "on" in data else None
         return adventure.set_party(state, now, data.get("hero"), n)
+    if action == "adv_again":
+        return adventure.send_again(state, now, data.get("party"))
+    if action == "adv_gear_all":
+        return adventure.upgrade_all(state, now, data.get("hero"))
     if action == "adv_swap":
         return adventure.swap(state, now, data.get("hero"), data.get("with"))
     if action == "adv_beast":
@@ -6471,6 +6506,8 @@ def apply_action(state, now, action, data):
         return train_idle(state, now, data.get("count"))
     if action == "tree_take":
         return ideology.tree_take(state, now, data.get("node"))
+    if action == "quest_complete":
+        return ideology.quest_complete(state, now, bool(data.get("many")))
     if action == "quest_give":
         return ideology.quest_give(state, now, data.get("res") or None, data.get("amount"))
     if action == "tutorial":
@@ -6514,9 +6551,11 @@ def apply_action(state, now, action, data):
         state["presents"] = [p for p in state.get("presents", []) if p["id"] != data.get("present")]
         return None
     if action == "mastery":
-        return master(state, now, data.get("resource"))
+        return master(state, now, data.get("resource"), data.get("times", 1))
     if action == "research":
         return research(state, now, data.get("research"))
+    if action == "research_all":
+        return research_all(state, now)
     if action == "explore":
         return send_expedition(state, now, data.get("rx"), data.get("ry"))
     if action == "explore_cancel":

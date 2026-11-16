@@ -254,6 +254,32 @@ def craft(state, now, kind, times=1):
     return None
 
 
+def worth(art, state):
+    """How much an artifact would give, as one number (its stats, and more for the city's own ideology)."""
+    own = state.get("ideology") and ARTIFACTS[art["kind"]].get("ideology") == state.get("ideology")
+    return score(art) * (ATTUNED if own else 1)
+
+
+def fill_shrine(state, now):
+    """Put the best artifacts from the vault into the empty shrine places (one of each kind)."""
+    import game
+    store = _store(state)
+    put = []
+    while len(enshrined(state)) < SHRINE_SLOTS:
+        kinds = {a["kind"] for a in enshrined(state)}
+        pick = max((a for a in store["vault"] if a["id"] not in store["shrine"] and a["kind"] not in kinds),
+                   key=lambda a: worth(a, state), default=None)
+        if not pick:
+            break
+        store["shrine"] = [i for i in store["shrine"] if get(state, i)] + [pick["id"]]
+        put.append(ARTIFACTS[pick["kind"]]["name"])
+    if not put:
+        return ("Your shrine is full." if len(enshrined(state)) >= SHRINE_SLOTS
+                else "There is nothing in your vault of a kind not already enshrined.")
+    game.log(state, now, f"Enshrined {', '.join(put)}.")
+    return None
+
+
 def enshrine(state, now, art_id):
     import game
     store, art = _store(state), get(state, art_id)

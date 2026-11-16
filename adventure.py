@@ -625,6 +625,62 @@ def start(state, now, ai, n=0):
     return None
 
 
+def send_again(state, now, n=None):
+    """Send party `n` (or every party at home and ready) back to the lair it last went to."""
+    ps = parties(state)
+    which = range(len(ps)) if n is None else [n] if isinstance(n, int) and not isinstance(n, bool) and 0 <= n < len(ps) else []
+    if not which:
+        return "Pick a party."
+    sent, why = 0, None
+    for m in which:
+        p = ps[m]
+        if p["trip"] or not p["heroes"] or resting(state, now, m):
+            continue
+        if p.get("last") is None or p["last"] >= len(state["areas"]):
+            why = why or f"{_party_name(m)} hasn't been anywhere yet."
+            continue
+        error = start(state, now, p["last"], m)
+        if error:
+            why = why or error
+        else:
+            sent += 1
+    if not sent:
+        return why or ("No party is at home and ready." if n is None else f"{_party_name(n)} is not at home and ready.")
+    return None
+
+
+def upgrade_all(state, now, hero_id):
+    """Improve this hero's gear as far as the city can pay, the lowest piece first each time (at most 100 levels)."""
+    import game
+    hero = get(state, hero_id)
+    if not hero:
+        return "You have no such hero."
+    if hero_id in away_ids(state):
+        return f"{hero['name']} is away on an adventure."
+    done = 0
+    paid = {}
+    while done < 100:
+        slots = [sl for sl in GEAR if hero["gear"][sl] < gear_cap(state)]
+        slots = [sl for sl in sorted(slots, key=lambda sl: hero["gear"][sl]) if not game._missing(state, gear_cost(state, hero, sl))]
+        if not slots:
+            break
+        cost = gear_cost(state, hero, slots[0])
+        game._pay(state, cost)
+        for k, v in cost.items():
+            paid[k] = paid.get(k, 0) + v
+        hero["gear"][slots[0]] += 1
+        done += 1
+    if not done:
+        if all(hero["gear"][sl] >= gear_cap(state) for sl in GEAR):
+            return f"{hero['name']}'s gear is all at the top for your tech level ({gear_cap(state)})."
+        return f"Not enough to improve any of {hero['name']}'s gear."
+    game.tally(state, "gear_levels", done)
+    levels = ", ".join(GEAR[sl]["name"].lower() + " " + str(hero["gear"][sl]) for sl in GEAR)
+    game.log(state, now, f"{hero['name']}'s gear: {done} level{'s' if done != 1 else ''} better ({levels}), "
+                         f"for {game.fmt_goods(paid)}.")
+    return None
+
+
 def _dur(sec):
     h, m = int(sec // 3600), int(sec % 3600 // 60)
     return f"{h}h {m:02d}m" if h else f"{m}m"
@@ -648,6 +704,7 @@ def _finish(state, n):
     trip, name = party["trip"], _party_name(n)
     when, ai = trip["back"], trip["area"]
     party["trip"] = None
+    party["last"] = ai
     beast = beasts.get(state, trip["beast"]) if trip.get("beast") else None
     if beast:
         beast.pop("adventure", None)
@@ -776,7 +833,7 @@ def view(state, now):
             inspire = _roles(state, ids).get("inspire", 0)
             for i in ids:
                 inspire_of[i] = inspire
-            out_parties.append({"heroes": ids, "trip": p["trip"], "rest": resting(state, now, n),
+            out_parties.append({"heroes": ids, "trip": p["trip"], "rest": resting(state, now, n), "last": p.get("last"),
                                 "power": power(team(state, n=n)), "beast": store.get("beast_party", 0) == n})
         heroes = [{**h, "role": CLASSES[h["cls"]]["role"], "now": hero_stats(state, h, inspire_of.get(h["id"], 0)),
                    "xp_needed": xp_needed(h["level"]), "party": party_of(state, h["id"]), "away": h["id"] in gone,
