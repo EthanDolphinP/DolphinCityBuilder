@@ -35,6 +35,7 @@ from contextlib import contextmanager
 import re
 
 import adventure
+import arena
 import artifacts
 import beasts
 import cauldron
@@ -4490,8 +4491,9 @@ FEATURE_ACTIONS = {      # actions that need a system open
     "cauldron_set": "cauldron",
     "training_set": "training", "train_idle": "training",
     "artifact_craft": "artifacts", "artifact_enshrine": "artifacts", "artifact_offer_post": "artifacts", "artifact_offer_accept": "artifacts",
-    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures", "adv_beast": "adventures",
-    "adv_start": "adventures", "battle_post": "adventures", "battle_accept": "adventures",
+    "adv_recruit": "adventures", "adv_dismiss": "adventures", "adv_gear": "adventures", "adv_party": "adventures", "adv_beast": "adventures", "adv_swap": "adventures",
+    "arena_fight": "adventures", "arena_new": "adventures",
+    "adv_start": "adventures",
 }
 
 
@@ -4580,6 +4582,7 @@ def new_game(name, now, seed=None):
 
 def migrate(state, now):
     """Bring a save from an older version of the game up to date."""
+    arena.migrate(state)
     if "updated" not in state:  # turn-based save
         state.pop("turn", None)
         state.update(founded=now, updated=now, meal=0, hungry=False)
@@ -6438,6 +6441,8 @@ def apply_action(state, now, action, data):
     if action == "adv_party":
         n = data.get("party", 0 if data.get("on") else None) if "party" in data or "on" in data else None
         return adventure.set_party(state, now, data.get("hero"), n)
+    if action == "adv_swap":
+        return adventure.swap(state, now, data.get("hero"), data.get("with"))
     if action == "adv_beast":
         return adventure.set_beast_party(state, now, data.get("party"))
     if action == "adv_start":
@@ -6600,6 +6605,7 @@ def defs():
             "cauldron": cauldron.defs(),
             "artifacts": artifacts.defs(),
             "adventure": adventure.defs(),
+            "arena": arena.defs(),
             "weather": weather.defs(),
         }
     return DEFS
@@ -6959,7 +6965,7 @@ TALLIES = [
     ("beast_trades", "Beast trades"), ("duels_won", "Duels won"), ("duels_lost", "Duels lost"),
     ("rituals", "Rituals held"), ("brews", "Brews from the Cauldron"), ("artifacts_crafted", "Artifacts crafted"), ("artifact_trades", "Artifacts traded"), ("curses_cast", "Hexes, sabotage and the like done to other cities"), ("curses_taken", "Hexes, sabotage and the like done to your city"), ("messages_sent", "Messages sent"), ("messages_received", "Messages received"), ("presents", "Presents opened"),
     ("heroes", "Heroes recruited"), ("hero_levels", "Hero levels gained"), ("gear_levels", "Gear levels made"),
-    ("adventures_won", "Adventures won"), ("adventures_lost", "Adventures lost"), ("battles_won", "Party battles won"), ("battles_lost", "Party battles lost"),
+    ("adventures_won", "Adventures won"), ("adventures_lost", "Adventures lost"), ("battles_won", "Arena fights won"), ("battles_lost", "Arena fights lost"),
 ]
 
 
@@ -7394,4 +7400,15 @@ def summary(state):
         "locked": bool(state.get("locked")),
         "vassal": (state.get("locked") or {}).get("vassal"),
         "party": adventure.party_power(state),
+        **_arena_row(state),
     }
+
+
+def _arena_row(state):
+    """The leaderboard's arena column, and what the arena shows of this city to cities choosing whom to fight."""
+    if state["tech"] < adventure.OPENS_TECH or not state.get("adventure"):
+        return {"arena": arena.points(state), "arena_rank": arena.rank_name(arena.points(state)), "arena_party": [], "arena_power": 0}
+    with _stats_cached():
+        units = arena.defenders(state)
+        return {"arena": arena.points(state), "arena_rank": arena.rank_name(arena.points(state)),
+                "arena_party": arena.public_team(units), "arena_power": adventure.power(units)}

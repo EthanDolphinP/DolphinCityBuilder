@@ -45,6 +45,8 @@ from urllib.parse import parse_qs, urlparse
 if __name__ == "__main__":
     sys.modules.setdefault("server", sys.modules[__name__])
 
+import adventure
+import arena
 import beasts
 import discord_bot
 import game
@@ -127,6 +129,7 @@ def _loaded(name, now, create=False):
         CITIES[name] = state
         SAVED_AT[name] = state["updated"]
         _share_line_tags(state, now)
+        _refund_battles(state, now)
     return state
 
 
@@ -260,6 +263,16 @@ def login(name, password, now):
     del state["sessions"][:-MAX_SESSIONS]
     flush(TOUCHED | {name})
     return 200, reply
+
+
+def arena_choose(state, now, force=False):
+    """Offer the city arena opponents near its rank (from the leaderboard's rows), if it needs new ones."""
+    if state["tech"] < adventure.OPENS_TECH:
+        return
+    a = state.get("arena") or {}
+    if not force and a.get("choices") and now - a.get("chosen_at", 0) < arena.REFRESH_TIME:
+        return
+    arena.choose(state, now, leaderboard(now), set(line_of(state["name"], now)), force=True)
 
 
 def find_city(name, now):
@@ -561,10 +574,24 @@ def startup():
         MARKET.setdefault("beast_offers", [])
         MARKET.setdefault("artifact_offers", [])
         MARKET.setdefault("duels", [])
-        MARKET.setdefault("battles", [])
+        for battle in MARKET.pop("battles", []):     # party battles with bets gave way to the arena: bets go back
+            path = SAVES / f"{battle['city']}.json"
+            if path.exists():
+                REFUNDS.append((battle["city"], battle["bet"]))
         MARKET.setdefault("debts", [])
         for offer in MARKET["beast_offers"]:    # beasts put on offer before every beast had a sex
             offer["beast"].setdefault("sex", random.choice(beasts.SEXES))
+
+
+REFUNDS = []        # bets on old party challenges, given back as each city loads
+
+
+def _refund_battles(state, now):
+    for name, bet in [r for r in REFUNDS if r[0] == state["name"]]:
+        REFUNDS.remove((name, bet))
+        state["resources"][bet["res"]] += bet["qty"]
+        game.log(state, now, f"Party battles are now the ranked arena: your waiting challenge was called off and "
+                             f"{game.fmt_goods({bet['res']: bet['qty']})} returned.")
 
 
 def run_bills(now):
@@ -731,8 +758,10 @@ def _city_view(state, now, area=0, find=None, tile=None, have_defs=None, stats=F
         out["found"] = game.find(state, *find.split(":", 1), here=out["area"])
     out["state"] = _sent_state(state, out["area"])
     out["now"] = now
+    if game.feature_open(state, "adventures") and not state.get("locked"):
+        arena_choose(state, now)
+        out["arena"] = arena.view(state, now, BOARD["rows"].get)
     out["market"] = dict(MARKET, beast_offers=market.beast_offers_view(MARKET), duels=market.duels_view(MARKET, state["name"]),
-                         battles=market.battles_view(MARKET, state["name"]),
                          artifact_offers=market.artifact_offers_view(MARKET),
                          debts=[d for d in market.debts_view(MARKET, now) if state["name"] in (d["debtor"], d["creditor"])])
     out["cities"] = all_city_names()
@@ -843,7 +872,7 @@ def handle_get(path, query, token, now):
         out["state"].pop("social", None)    # who a city deals with, and its lists, are its own business
         out["state"].pop("messages", None)
         out["market"]["duels"] = []     # another city's challenges are its own business
-        out["market"]["battles"] = []
+        out.pop("arena", None)
         return 200, out
 
     return 404, {"error": "Not found."}
@@ -853,7 +882,7 @@ def handle_get(path, query, token, now):
 # would look a list or an object up in its tables. Anything else there is dropped, and the action then
 # says what is missing. "bet" (and a beast trade's "want") may be small objects, whose own name fields are checked too.
 NAME_FIELDS = {"action", "building", "addition", "research", "ideology", "perk", "ritual", "give", "want", "to", "text",
-               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse", "recipe", "cls", "slot"}
+               "other", "name", "list", "kind", "find", "tile", "defs", "password", "res", "species", "city", "curse", "recipe", "cls", "slot", "foe"}
 
 
 def _clean(data, inner=False):
@@ -965,14 +994,23 @@ def handle_post(path, data, token, now):
     elif action == "duel_accept":
         error = market.accept_duel(MARKET, state, now, data.get("duel"),
                                    lambda other: find_city(other, now), data.get("beast"), data.get("bet"))
-    elif action == "battle_post":
-        error = market.post_battle(MARKET, state, now, data, lambda other: find_city(other, now))
-    elif action == "battle_cancel":
-        error = market.cancel_battle(MARKET, state, now, data.get("battle"), lambda other: find_city(other, now))
-    elif action == "battle_accept":
-        error, said = market.accept_battle(MARKET, state, now, data.get("battle"), lambda other: find_city(other, now), data.get("bet"))
+    elif action == "arena_new":
+        error = arena.ask(state, now)
+        if not error:
+            arena_choose(state, now, force=True)
+    elif action == "arena_fight":
+        target = find_city(data.get("foe"), now) if data.get("foe") != name else None
+        if target and target["name"] in line_of(name, now):
+            target = None
+        error, said = arena.fight(state, target, now)
+        if not error:
+            BOARD["rows"].pop(name, None)
+            if target:
+                BOARD["rows"].pop(target["name"], None)
+                DIRTY.add(target["name"])
+            arena_choose(state, now)
         if said:
-            discord_bot.announce("⚔️ " + said)
+            discord_bot.announce("\u2694\ufe0f " + said)
     elif action == "offer_cancel":
         error = market.cancel(MARKET, state, now, data.get("offer"))
     elif action == "offer_accept":

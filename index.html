@@ -1194,24 +1194,15 @@
     <div id="tab-adventure" hidden>
       <div id="adventureBody"></div>
       <div id="battlePanel" class="panel" hidden>
-        <h2>Party battles <span id="battleCount" class="count"></span></h2>
-        <details class="fold" data-fold="battle:how" style="margin-top:0"><summary>How party battles work</summary>
-          <p class="dim small" style="margin:4px 0">Challenge another city's adventurers. Your whole party fights theirs, each with its city's active beast if it has hatched.
-            They see who is in your party but not your bet; if they accept, they bet too, and the winner takes both bets. Every fighter on a side
-            is stronger the more its city bets (every doubling past 200 adds 10%), and the winning heroes gain a little experience. A party away on an adventure can't fight.</p>
+        <h2>Ranked arena <span id="arenaRank" class="count"></span></h2>
+        <details class="fold" data-fold="arena:how" style="margin-top:0"><summary>How the arena works</summary>
+          <p class="dim small" style="margin:4px 0">Pick one of the cities offered, near your rank, and your Party 1 fights theirs at once; they don't need to be online,
+            and their heroes defend even while away on an adventure. Winning gains rank points (more for beating a higher rank) and brings materials, more at
+            higher ranks, and your heroes gain experience; losing costs points. The city you fight gains or loses half as much. Reaching a rank for the first
+            time brings a bigger prize. You have up to 5 fights stored and get one back every 45 minutes. The cities offered change after every fight, every
+            hour, or when you ask (every 10 minutes at most). There are no bets.</p>
         </details>
-        <form id="battleForm" class="bar" style="margin-top:0">
-          <span class="pair">Challenge <input id="battleTo" list="cityList" placeholder="city name" autocomplete="off" style="width:160px"></span>
-          <span class="pair">and bet <input id="battleBetQty" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" value="500" style="width:100px"> <select id="battleBetRes"></select></span>
-          <button type="submit">Challenge</button>
-        </form>
-        <p id="battlePreview" class="small hi" style="margin:4px 0 10px"></p>
-        <div class="cat">Challenges for you</div>
-        <div id="battles" class="scroll"></div>
-        <div class="cat">Challenges you sent</div>
-        <div id="battlesSent" class="scroll"></div>
-        <div class="cat">Your recent party battles</div>
-        <div id="battleResults"></div>
+        <div id="arenaBody"></div>
       </div>
     </div>
 
@@ -2097,7 +2088,7 @@ const INTROS = {
   duels: ['Beast duels', 'Your beasts can now fight other cities\' beasts in the arena, on the Beast tab, for a prize both sides put up.'],
   hexes: ['Hexes and sabotage', 'Your ideology can now be turned against rivals: slow down another city for a while, at a price. Others can do the same to you.'],
   artifacts: ['Artifacts', 'Craft artifacts on the Ideology tab, enshrine up to three for lasting bonuses, and trade them on the market.'],
-  adventures: ['Adventures', 'Recruit heroes on the Adventure tab and equip them with what your city makes. Your party, with your active beast beside it, goes into the lands you have explored for loot, experience, eggs and artifacts, and can fight other cities\' parties for a bet.'],
+  adventures: ['Adventures', 'Recruit heroes on the Adventure tab and equip them with what your city makes. Your party, with your active beast beside it, goes into the lands you have explored for loot, experience, eggs and artifacts, and can climb the arena ranks against other cities\' parties.'],
 };
 // The tabs a system needs open (the others are always there).
 const TAB_FEATURE = { explore: 'explore', beast: 'beast', market: 'market', ideology: 'ideology', cauldron: 'cauldron', adventure: 'adventures' };
@@ -2461,7 +2452,8 @@ const HOWTO = [
   ['Other cities', 'The Leaderboard lists every city. You can visit one to look around without changing anything. Settings lets you ban a city from viewing yours or sending you bills. The Social tab keeps a history of your trades, bills and duels with each city, and lets you mark cities as allies or enemies so they are easy to find; the lists are private and change nothing in the game. From there you can also send another city a message and see which cities have the game open at the moment.'],
   ['Rituals', 'Each ideology has five rituals (rites, exhibitions, fairs, calls, ceremonies or gatherings), held by giving Gold on the Ideology tab: each gives a bonus for a few hours. They are opened one by one by very expensive research, one at each tech level from Village up (Sacred Calendar, Ceremonial Halls, Grand Rituals, Rituals of State, Eternal Rituals), and each rank also makes every ritual stronger and longer. The least Gold a ritual takes grows with your tech level; giving more makes it stronger and longer, with no top, but every doubling of the gift adds the same step (5x the least: 1.7x as strong and 2.4x as long; 32x: 2.5x and 4x). Different rituals can run at once.'],
   ['Blueprints', 'For big cities. Select one of your buildings and press "Save this as a blueprint": it keeps the building and its additions, in the order they are attached. On an empty tile the blueprints that fit there are listed: one click builds the building with all its additions. A blueprint can also build itself on every free tile of the same land (in this area or in all of them), or on any free land it fits, up to as many tiles as you say; tiles with wild animals are left alone. On a building, a blueprint can bring every one of that building, in this area or in all of them, up to the blueprint, adding whatever additions each is missing while there is room. Everything is paid for tile by tile, so a big job simply stops where the materials run out. Blueprints are saved with your city.'],
-  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Heroes go out in parties of up to 3 at Town, 4 at City, 5 at Metropolis and 6 at Megacity. A city has one party; the Adventurers\' Guild, Mercenary Camp and Hall of Heroes each let one more go out at the same time, so heroes can be split into small parties (even one hero each) for easy lairs, or kept together for a hard one. Only one party can be in a lair at a time, each rests on its own after a beating, and Party 1 is the one that fights other cities\' parties. Your active beast fights beside the party you pick, if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. In Party battles your party fights another city\'s for a bet, as beasts do in duels.'],
+  ['Adventures', 'Adventures open when your city becomes a Town. On the Adventure tab recruit heroes, each of a class: Warriors take the blows, Rangers make trips quicker, Mages hit two enemies at once, Clerics heal, Rogues are hard to hit and bring home more loot, and Bards make the whole party learn faster and hit harder. Each hero costs more than the last. Heroes grow with experience and with three pieces of gear (weapon, armour and charm) that you improve with your city\'s materials, a level at a time; how high gear can go depends on your tech level. Heroes go out in parties of up to 3 at Town, 4 at City, 5 at Metropolis and 6 at Megacity. A city has one party; the Adventurers\' Guild, Mercenary Camp and Hall of Heroes each let one more go out at the same time, so heroes can be split into small parties (even one hero each) for easy lairs, or kept together for a hard one. Only one party can be in a lair at a time, each rests on its own after a beating, and Party 1 is the one that fights other cities\' parties. Your active beast fights beside the party you pick, if it has hatched (it is busy while away: it can\'t duel or be traded). Every area you own is somewhere to go: the further from home, the harder and the richer, and every win there opens a deeper delve. Each place is rated Easy, Fair, Risky or Deadly against your party. A won adventure brings home materials (more the more your city makes), experience for the heroes and the beast, and sometimes a beast egg or an artifact; a lost one brings a little experience and the party rests before it can go again. What makes adventures better: the Adventurers\' Guild, Sparring Ring, Healers\' Hall, Armoury, Mercenary Camp and Hall of Heroes (each needs research) and their additions, every ideology (Faith heals, Progress makes gear cheaper, Commerce finds more loot, the Wild makes your beast fight harder, Wayfarers travel faster, Community learns faster, and each one\'s grandest ritual helps too), two Cauldron recipes, an artifact for each ideology, and trained people (experience). Hexes that slow expeditions slow adventures too. Heroes in no party sit on the bench (6 places): they don\'t fight, and can be swapped with someone in a party between adventures.'],
+  ['Ranked arena', 'Your Party 1 can fight other cities\' Party 1 in the ranked arena on the Adventure tab, whether or not they are online (their heroes defend even while away). You are offered three cities near your rank; pick one and the fight happens at once. Winning gains rank points, more for beating a higher rank, and brings materials (more at higher ranks) and experience; losing costs points, and the city you fought gains or loses half as much. The ranks are Bronze, Silver, Gold, Platinum, Diamond, Master, Grandmaster and Legend, each but Legend in three divisions (III, II, I). Reaching a rank for the first time brings a bigger prize. You have up to 5 fights stored and get one back every 45 minutes. The cities offered change after each fight, every hour, or when you ask for others (every 10 minutes at most). The leaderboard\'s Arena column shows everyone\'s rank.'],
   ['Cauldron', 'The Cauldron tab is open from the start. Set one recipe and how much of it goes in: every hour the cauldron takes those ingredients and brews for that hour, again and again, even while you are away, until you change or stop it. Only one brew works at a time, and each does two or three things: faster food, materials, trade or knowledge buildings, more arrivals, more wildlife, faster and cheaper expeditions, stronger generators, help for your beasts, or shelter from the night and the weather. Putting in more makes the brew stronger, never longer, with no top: each extra handful adds a little less than the one before. If an hour\'s ingredients are not there, the cauldron goes cold for that hour and tries again the next. Recipes that need Ore, Gold, Tools or Electronics open when your city has some.'],
 
   ['Hexes, sabotage and rivals', 'Each ideology can also act against another city in its own way: The Old Faith lays Hexes, Progress commits Sabotage, Commerce sets Embargoes, Kinship with the Wild spreads Blights, The Wayfarers send Misfortunes and Community starts Feuds. Each has five, opened by the same research as its rituals, that slow another city for a few hours (its food, materials, trade or knowledge buildings, power, expeditions, wildlife, hatching or beast missions). They are far weaker than rituals. You can act against cities from one tech level below yours to two above, and each of yours can be on one city at a time; those from different cities pile up on the same city, each with less effect than the last. They cost Gold, and the later ones Livestock, Food, Tools, Electronics and Knowledge too. Anything rivals have done to your city is shown on the Ideology tab and wears off by itself.'],
@@ -3016,6 +3008,12 @@ function render() {
     timers['ritual:' + id] = { cycle: Math.max(0, x.until - view.now), progress: 0, speed: 1, waiting: [] };
   if (view.cauldron && view.cauldron.until > view.now)
     timers.cauldron = { cycle: view.cauldron.until - view.now, progress: 0, speed: 1, waiting: [] };
+  if (view.arena) {
+    const ar = view.arena;
+    if (ar.next_fight) timers.arenaFight = { cycle: Math.max(0, ar.next_fight - view.now), progress: 0, speed: 1, waiting: [] };
+    timers.arenaNew = { cycle: Math.max(0, ar.refresh_at - view.now), progress: 0, speed: 1, waiting: [] };
+    if (ar.ask_at > view.now) timers.arenaAsk = { cycle: ar.ask_at - view.now, progress: 0, speed: 1, waiting: [] };
+  }
   ((view.adventure || {}).parties || []).forEach((p, n) => {
     if (p.trip) timers['adv:' + n] = { cycle: Math.max(0, p.trip.back - view.now), progress: 0, speed: 1, waiting: [] };
     if (p.rest > view.now) timers['advRest:' + n] = { cycle: p.rest - view.now, progress: 0, speed: 1, waiting: [] };
@@ -5392,9 +5390,7 @@ const ADV_STAT = { hp: 'HP', atk: 'Atk', def: 'Def', spd: 'Spd' };
 const ADV_BONUS = { adv_power: 'Party strength', adv_speed: 'Adventure speed', adv_loot: 'Loot', adv_xp: 'Hero experience',
                     adv_heal: 'Recovery', adv_beast: 'Beast on adventures', adv_cost: 'Cheaper heroes and gear' };
 let advAllPlaces = false, advSend = 0;     // all lairs or the nearest; which party "Set out" sends
-const battleQty = new Map(), battleRes = new Map();     // challenge id -> what the player typed to bet on it
 const advStats = st => Object.entries(ADV_STAT).map(([k, label]) => `${label} <span class="hi">${num(st[k])}</span>`).join(' &middot; ');
-const advBoost = qty => Math.round((1 + 0.1 * Math.log2(1 + qty / 200)) * 100) / 100;
 function renderAdventure() {
   if (tab !== 'adventure' || !view) return;
   if (!featureOpen('adventures') || !view.adventure) {
@@ -5417,7 +5413,7 @@ function renderAdventure() {
     `<p class="dim small" style="margin-top:0">Split your heroes into parties that go out at the same time, down to a hero each, or put them together ` +
     `for a harder lair. Each party holds up to ${size} heroes (more at higher tech levels). ` +
     (P.length < D.max_parties ? `The Adventurers' Guild, Mercenary Camp and Hall of Heroes each let one more party out at once. ` : '') +
-    `Party 1 is the one that fights other cities' parties. Your beast goes with one party.</p><div class="heroGrid">` +
+    `Party 1 is the one that fights in the ranked arena (below). Your beast goes with one party.</p><div class="heroGrid">` +
     P.map((p, n) => `<div class="heroCard ${p.trip ? '' : p.heroes.length ? 'inParty' : ''}"><div class="heroHead"><span class="heroName">${pname(n)}</span>` +
       `<span class="dim small">${p.heroes.length} of ${size} heroes</span></div><div class="small">${partyStatus(p, n)}</div>` +
       kv([['Strength', `<span class="hi">${num(p.power)}</span>`],
@@ -5430,8 +5426,8 @@ function renderAdventure() {
     (a.beast ? `<div class="small" style="margin-top:6px">Beast on adventures: ${esc(a.beast.name)} <span class="dim">level ${a.beast.level}</span> ${advStats(a.beast)}</div>` : '') +
     `</div>`;
   // ---- the heroes
-  html += `<div class="panel"><h2>Heroes <span class="dim small">${a.heroes.length} of ${a.cap}</span></h2>` +
-    (a.heroes.length ? `<div class="heroGrid">` + a.heroes.map(h => {
+  const benchFull = a.bench.length >= a.bench_slots;
+  const heroCard = h => {
       const c = D.classes[h.cls], away = h.away;
       const gear = Object.entries(D.gear).map(([slot, g]) => {
         const lvl = h.gear[slot], top = lvl >= a.gear_cap, cost = h.costs[slot];
@@ -5445,15 +5441,25 @@ function renderAdventure() {
         `<span class="dim">${esc(c.name)}, level ${h.level}</span></div>` +
         `<div style="display:flex;gap:10px;align-items:center"><pre class="heroArt">${esc(HERO_ART[h.cls] || '')}</pre>` +
         `<div class="small">${advStats(h.now)}<div class="dim">Experience ${num(h.xp)} / ${num(h.xp_needed)}</div>` +
-        (away ? `<div class="hi">Away with ${pname(h.party)}</div>` : h.party !== null ? `<div class="good">In ${pname(h.party)}</div>` : '<div class="dim">Staying home</div>') + `</div></div>` +
+        (away ? `<div class="hi">Away with ${pname(h.party)}</div>` : h.party !== null ? `<div class="good">In ${pname(h.party)}</div>` : '<div class="dim">On the bench (does not fight)</div>') + `</div></div>` +
         gear +
         (visiting ? '' : `<div class="bar" style="margin-top:6px">` +
           `<label class="small">Party <select data-adv-party="${h.id}" ${away ? 'disabled' : ''}>` +
-            `<option value="" ${h.party === null ? 'selected' : ''}>Stay home</option>` +
+            `<option value="" ${h.party === null ? 'selected' : ''} ${h.party !== null && benchFull ? 'disabled' : ''}>Bench (${a.bench.length}/${a.bench_slots})</option>` +
             P.map((p, n) => `<option value="${n}" ${h.party === n ? 'selected' : ''} ${h.party !== n && (p.trip || p.heroes.length >= size) ? 'disabled' : ''}>` +
               `${pname(n)} (${p.heroes.length}/${size})${p.trip ? ', away' : ''}</option>`).join('') + `</select></label>` +
+          (away ? '' : `<label class="small">Swap with <select data-adv-swap="${h.id}"><option value="">...</option>` +
+            a.heroes.filter(o => o.id !== h.id && !o.away && o.party !== h.party).map(o =>
+              `<option value="${o.id}">${esc(o.name)} (${o.party === null ? 'bench' : pname(o.party)})</option>`).join('') + `</select></label>`) +
           `<button data-adv-dismiss="${h.id}" ${away ? 'disabled' : ''}>Dismiss</button></div>`) + `</div>`;
-    }).join('') + `</div>` : `<p class="dim">No heroes yet.</p>`) + `</div>`;
+  };
+  const placed = a.heroes.filter(h => h.party !== null), benched = a.heroes.filter(h => h.party === null);
+  html += `<div class="panel"><h2>Heroes <span class="dim small">${a.heroes.length} of ${a.cap}</span></h2>` +
+    (placed.length ? `<div class="heroGrid">` + placed.map(heroCard).join('') + `</div>` : `<p class="dim">${a.heroes.length ? 'Nobody is in a party.' : 'No heroes yet.'}</p>`) +
+    `<div class="cat" style="margin-top:10px">Bench <span class="count">${benched.length} of ${a.bench_slots}</span></div>` +
+    `<p class="dim small" style="margin:2px 0 6px">Heroes on the bench don't go on adventures or fight in the arena. Swap them with someone in a party ` +
+    `whenever both are at home, between adventures and fights.</p>` +
+    (benched.length ? `<div class="heroGrid">` + benched.map(heroCard).join('') + `</div>` : `<p class="dim small">Nobody on the bench.</p>`) + `</div>`;
   // ---- recruiting
   if (!visiting) {
     const full = a.heroes.length >= a.cap, afford = Object.entries(a.recruit).every(([k, v]) => (view.state.resources[k] || 0) >= v);
@@ -5501,81 +5507,67 @@ function renderAdventure() {
     (r.story.length ? `<ul class="advStory small">${r.story.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '') + `</details>`).join('')
     : `<p class="dim">No adventures yet.</p>`) + `</div>`;
   setHTMLKeep($('adventureBody'), html);
-  renderBattles();
+  renderArena();
 }
-function renderBattles() {
-  const a = view.adventure, R = view.defs.resources, D = view.defs.adventure;
-  $('battlePanel').hidden = visiting;
-  if (visiting) return;
-  if (!$('battleBetRes').options.length) {
-    $('battleBetRes').innerHTML = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
-    $('battleBetRes').value = 'gold';
-  }
-  const me = view.state.name, all = view.market.battles || [], forMe = all.filter(b => b.to === me), sent = all.filter(b => b.city === me);
-  $('battleCount').textContent = forMe.length ? `(${forMe.length} for you)` : sent.length ? `(${sent.length} sent)` : '';
-  const who = p => p.map(u => u.beast ? `${esc(u.name)} <span class="dim">(beast, ${u.level})</span>` : `${esc(u.name)} <span class="dim">(${esc((D.classes[u.cls] || {}).name || '')}, ${u.level})</span>`).join(', ');
-  const materials = view.defs.tradeable.map(k => `<option value="${esc(k)}">${esc(R[k])}</option>`).join('');
-  setHTMLKeep($('battles'), forMe.length ? `<table><tr><th>From</th><th>Their party</th><th class="n">Strength</th><th>Your answer</th></tr>` +
-    forMe.map(b => `<tr><td>${esc(b.city)}</td><td class="small">${who(b.party)}</td><td class="n">${num(b.power)} <span class="dim small">(yours ${num(a.power)})</span></td><td>` +
-      `<div class="buy"><input data-battle-qty="${b.id}" data-k="battle${b.id}" type="text" inputmode="decimal" autocomplete="off" title="A number; 1,000,000 or 2.5m or 40k work too" style="width:90px"> ` +
-      `<select data-battle-res="${b.id}">${materials}</select> <button data-battle-accept="${b.id}" ${a.parties[0].trip ? 'disabled title="Party 1 is away"' : ''}>Accept</button> ` +
-      `<button data-battle-cancel="${b.id}">Decline</button></div><div data-battle-note="${b.id}" class="small"></div></td></tr>`).join('') + `</table>`
-    : `<span class="dim small">None waiting.</span>`, fillBattles);
-  setHTMLKeep($('battlesSent'), sent.length ? `<table><tr><th>To</th><th>Your bet</th><th></th></tr>` +
-    sent.map(b => `<tr><td>${esc(b.to)}</td><td>${esc(b.bet.text)} <span class="dim small">(x${b.boost})</span></td><td><button data-battle-cancel="${b.id}">Withdraw</button></td></tr>`).join('') + `</table>`
-    : `<span class="dim small">None.</span>`);
-  setHTMLKeep($('battleResults'), (a.battles || []).length ? a.battles.map(r => {
-    const me = r.sides[0], foe = r.sides[1];
-    return `<details class="fold" data-fold="battle:${r.id}" ${isOpen('battle:' + r.id, false) ? 'open' : ''}><summary><span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> ` +
-      `against ${esc(foe.city)} <span class="dim small">${clock(r.t)}</span></summary>` +
-      `<div class="small">${r.won ? `You won ${esc(r.prize)}.` : `You lost your bet of ${esc(me.bet)}.`} Your party: strength ${num(me.power)} (x${me.boost} from your bet); ` +
-      `theirs: strength ${num(foe.power)} (bet ${esc(foe.bet)}, x${foe.boost}).</div>` +
+// ---- the ranked arena (see arena.py) ----
+function arenaTeam(party) {
+  const D = view.defs.adventure;
+  return party.map(u => u.beast ? `${esc(u.name)} <span class="dim">(beast, ${u.level})</span>`
+    : `${esc(u.name)} <span class="dim">(${esc((D.classes[u.cls] || {}).name || '')}, ${u.level})</span>`).join(', ') || '<span class="dim">nobody</span>';
+}
+function renderArena() {
+  const ar = view.arena, a = view.adventure, now = view.now;
+  $('battlePanel').hidden = visiting || !ar;
+  if (visiting || !ar) return;
+  $('arenaRank').textContent = `(${ar.rank})`;
+  const p1 = a.parties[0], ready = p1 && !p1.trip && p1.heroes.length;
+  const why = !p1 || !p1.heroes.length ? 'Put heroes in Party 1 first' : p1.trip ? 'Party 1 is away on an adventure' : ar.fights < 1 ? 'No fights left yet' : '';
+  const ranks = view.defs.arena.ranks;
+  const ladder = ranks.map((r, i) => {
+    const on = ar.points >= r.points && (i === ranks.length - 1 || ar.points < ranks[i + 1].points);
+    return `<span class="${on ? 'hi' : ar.best_points >= r.points ? '' : 'dim'}" title="From ${num(r.points)} points">${on ? '[' + esc(r.name) + ']' : esc(r.name)}</span>`;
+  }).join(' <span class="dim">&gt;</span> ');
+  let html = kv([
+    ['Rank', `<span class="hi">${esc(ar.rank)}</span> <span class="dim">${num(ar.points)} points</span>`],
+    ['Best', `${esc(ar.best)} <span class="dim">(${num(ar.best_points)})</span>`],
+    ['Record', `${num(ar.wins)} won, ${num(ar.losses)} lost <span class="dim">attacking</span>; ${num(ar.held)} held, ${num(ar.fell)} fell <span class="dim">defending</span>`],
+    ['Fights', `<span class="hi">${ar.fights}</span> of ${ar.fights_max}` + (ar.next_fight ? ` <span class="dim small">next in <span data-timer="arenaFight"></span></span>` : '')],
+    ['Party 1', `strength <span class="hi">${num(ar.power)}</span>` + (why ? ` <span class="bad small">${esc(why)}</span>` : '')]]) +
+    `<div class="small" style="margin:6px 0">${ladder}</div>`;
+  const ask = ar.ask_at > now;
+  html += `<div class="cat">Opponents near your rank</div>` + (ar.choices.length ? `<div class="heroGrid">` + ar.choices.map(c =>
+    `<div class="heroCard"><div class="heroHead"><span class="heroName">${esc(c.city)}</span><span class="dim">${esc(c.rank)}, ${num(c.points)} points</span></div>` +
+    `<div class="small">${arenaTeam(c.party)}</div>` +
+    kv([['Strength', `${num(c.power)} <span class="dim small">(yours ${num(ar.power)})</span>`],
+        ['Rating', `<span class="advRating ${esc(c.rating)}">${esc(c.rating)}</span>`],
+        ['At stake', `<span class="good">+${c.gain}</span> if you win, <span class="bad">-${c.loss}</span> if you lose`]]) +
+    `<div class="bar" style="margin-top:4px"><button data-arena-fight="${esc(c.city)}" ${ready && ar.fights > 0 ? '' : 'disabled'} ${why ? `title="${esc(why)}"` : ''}>Fight ${esc(c.city)}</button></div></div>`).join('') + `</div>`
+    : `<p class="dim small">Nobody near your rank has a party right now. Ask again in a while.</p>`) +
+    `<div class="bar" style="margin-top:6px"><button data-arena-new ${ask ? 'disabled' : ''}>Other opponents</button>` +
+    (ask ? `<span class="dim small">can ask again in <span data-timer="arenaAsk"></span></span>` : '') +
+    `<span class="dim small">New ones on their own in <span data-timer="arenaNew"></span></span></div>`;
+  html += `<div class="cat">Recent arena fights</div>` + (ar.results.length ? ar.results.map(r => {
+    const me = r.sides[0], foe = r.sides[1], ch = r.change > 0 ? `<span class="good">+${r.change}</span>` : r.change < 0 ? `<span class="bad">${r.change}</span>` : '<span class="dim">+0</span>';
+    return `<details class="fold" data-fold="arena:${r.t}:${esc(r.foe)}" ${isOpen('arena:' + r.t + ':' + r.foe, false) ? 'open' : ''}><summary>` +
+      `<span class="${r.won ? 'good' : 'bad'}">${r.won ? 'Won' : 'Lost'}</span> ${r.attacked ? 'against' : 'defending against'} ${esc(r.foe)} ` +
+      `${ch} <span class="dim small">now ${esc(r.rank)}, ${clock(r.t)}</span></summary>` +
+      (Object.keys(r.prize || {}).length ? `<div class="small">Won ${plain(r.prize)}.</div>` : '') +
+      `<div class="small">Your party (strength ${num(me.power)}): ${arenaTeam(me.party)}</div>` +
+      `<div class="small">${esc(foe.city)}'s (strength ${num(foe.power)}): ${arenaTeam(foe.party)}</div>` +
       (r.story.length ? `<ul class="advStory small">${r.story.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '') + `</details>`;
-  }).join('') : `<span class="dim small">No party battles yet.</span>`);
-  fillBattles();
+  }).join('') : `<span class="dim small">No arena fights yet.</span>`);
+  setHTMLKeep($('arenaBody'), html);
 }
-// Put what was typed back into the answer boxes, and say what each bet would do.
-function fillBattles() {
-  const q = amount($('battleBetQty').value);
-  $('battlePreview').textContent = q >= 1 ? `Betting ${num(q)} raises every fighter in your party by x${advBoost(q)}.` : '';
-  for (const box of $('battles').querySelectorAll('[data-battle-qty]')) {
-    const id = +box.dataset.battleQty, res = $('battles').querySelector(`[data-battle-res="${id}"]`), out = $('battles').querySelector(`[data-battle-note="${id}"]`);
-    if (!battleQty.has(id)) battleQty.set(id, '500');
-    if (!battleRes.has(id)) battleRes.set(id, 'gold');
-    if (box.value !== battleQty.get(id)) box.value = battleQty.get(id);
-    if (res.value !== battleRes.get(id)) res.value = battleRes.get(id);
-    const bet = amount(box.value);
-    out.textContent = bet >= 1 ? `Your party would fight at x${advBoost(bet)}.` : 'Type how much to bet.';
-  }
-}
-$('battles').addEventListener('input', e => {
-  const d = e.target.dataset;
-  if (d.battleQty) battleQty.set(+d.battleQty, e.target.value);
-  if (d.battleRes) battleRes.set(+d.battleRes, e.target.value);
-  fillBattles();
-});
-$('battles').addEventListener('change', e => { if (e.target.dataset.battleRes) { battleRes.set(+e.target.dataset.battleRes, e.target.value); fillBattles(); } });
-$('battleForm').addEventListener('input', () => { if (view) fillBattles(); });
-$('battleForm').onsubmit = e => {
-  e.preventDefault();
-  const to = $('battleTo').value.trim(), qty = amount($('battleBetQty').value);
-  if (!to) { say('Type the name of the city to challenge.'); return; }
-  if (!(qty >= 1)) { say('Say how much to bet.'); return; }
-  act('battle_post', { to, bet: { res: $('battleBetRes').value, qty } });
-};
-$('battlePanel').addEventListener('click', async e => {
+$('battlePanel').addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (!b || !view) return;
-  const d = b.dataset;
-  if (d.battleAccept) {
-    const id = +d.battleAccept, qty = amount(battleQty.get(id) || '');
-    if (!(qty >= 1)) { say('Say how much to bet.'); return; }
-    await act('battle_accept', { battle: id, bet: { res: battleRes.get(id) || 'gold', qty } });
-  } else if (d.battleCancel) await act('battle_cancel', { battle: +d.battleCancel });
+  if (!b || !view || b.disabled || visiting) return;
+  if (b.dataset.arenaFight) act('arena_fight', { foe: b.dataset.arenaFight });
+  else if ('arenaNew' in b.dataset) act('arena_new');
 });
 $('adventureBody').addEventListener('change', e => {
   const d = e.target.dataset;
   if (d.advParty && !visiting) act('adv_party', { hero: +d.advParty, party: e.target.value === '' ? null : +e.target.value });
+  if (d.advSwap && e.target.value && !visiting) act('adv_swap', { hero: +d.advSwap, with: +e.target.value });
 });
 $('adventureBody').addEventListener('click', e => {
   const b = e.target.closest('button');
@@ -6190,12 +6182,13 @@ window.addEventListener('resize', fitBoardBar);
 function renderBoard() {
   if (!board || !view) return;
   const R = view.defs.resources;
-  const general = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas'], ['beast', 'Beast level'], ['party', 'Party'], ['quests', 'Quests']];
+  const general = [['tech', 'Tech level'], ['population', 'Population'], ['buildings', 'Buildings'], ['research', 'Research'], ['areas', 'Areas'], ['beast', 'Beast level'], ['party', 'Party'], ['arena', 'Arena'], ['quests', 'Quests']];
   const all = [...general, ...Object.entries(R)];
   const views = { overview: ['Overview', general], materials: ['Materials', Object.entries(R)], all: ['Everything', all] };
   const val = (c, k) => k in R ? c.resources[k] : (c[k] || 0);
   const show = (c, k) => k === 'tech' ? `${esc(c.tech_name)} (${c.tech + 1})`
     : k === 'population' && c.trained ? `<span title="${num(c.population - c.trained)} workers + ${num(c.trained)} trained">${num(c.population)}</span><div class="dim small">${num(c.trained)} trained</div>`
+    : k === 'arena' ? `${esc(c.arena_rank || 'Bronze III')}<div class="dim small">${num(c.arena || 0)} points</div>`
     : k === 'research' && c.mastery ? `<span title="${num(c.researched)} researched + ${num(c.mastery)} Mastery levels">${num(val(c, k))}</span>`
     : num(val(c, k));   // follows the number settings
   const sortLabel = all.find(([k]) => k === boardSort)[1];

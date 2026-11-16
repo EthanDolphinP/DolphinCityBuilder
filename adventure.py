@@ -12,7 +12,7 @@ deeper in, harder again and richer. An adventure takes time; when it is over the
 the party comes home with materials (more the bigger the city: see _loot), experience for every hero and the beast,
 and sometimes a beast egg or an artifact. A beaten party comes home with nothing much and rests a while first.
 
-Party battles (market.py) put two cities' parties against each other for what both bet, as beast duels do.
+In the ranked arena (arena.py) a city's Party 1 fights other cities' Party 1 for rank points.
 
 What makes a party stronger, faster or richer is the city's adventure bonuses ("adv_*" below), which come from
 the same places as everything else: buildings and their additions, the ideology (and its perks, rituals and trees),
@@ -35,6 +35,7 @@ MIN, HOUR = 60, 3600
 OPENS_TECH = 2                     # a Town (see game.FEATURES)
 PARTY_SIZE = [0, 0, 3, 4, 5, 6]    # heroes who go out together, by tech level
 BASE_HEROES = 6                    # heroes a city can keep (more from buildings: "hero_slots")
+BENCH_SLOTS = 6                    # heroes in no party (they don't fight), on top of hero_cap
 MAX_PARTIES = 6                    # parties out at once: 1, and 1 more for each "adv_parties" (adventure buildings)
 STAT_SPREAD = 0.15                 # a hero's stats are rolled within this of its class's
 LEVEL_STEP = 0.07                  # every level past the first: all stats this much more
@@ -118,9 +119,8 @@ FIRST_NAMES = ["Aldric", "Bryn", "Cass", "Dorian", "Elsa", "Fenn", "Greta", "Hol
                "Marek", "Nessa", "Oren", "Petra", "Quill", "Rowan", "Sable", "Tamsin", "Ulric", "Vera", "Wren", "Yara",
                "Zeke", "Ansel", "Brielle", "Corwin", "Dagny", "Edric", "Fiora", "Gideon", "Hesper", "Ivo", "Juno"]
 
-# ---- party battles (see market.py) ----
+# ---- arena fights (see arena.py) ----
 BATTLE_XP = 10                    # experience for every hero of the winning party
-BATTLE_RESULTS_KEPT = 6
 FIGHT_ROUNDS = 60
 
 
@@ -236,8 +236,15 @@ def get(state, hero_id):
 
 
 def hero_cap(state):
+    """Heroes the city can keep, bench included."""
     import game
-    return BASE_HEROES + int(game.city_stat(state, "hero_slots"))
+    return BASE_HEROES + int(game.city_stat(state, "hero_slots")) + BENCH_SLOTS
+
+
+def bench(state):
+    """The heroes in no party."""
+    placed = {i for p in _store(state)["parties"] for i in p["heroes"]}
+    return [h["id"] for h in _store(state)["heroes"] if h["id"] not in placed]
 
 
 def party_size(state):
@@ -453,6 +460,9 @@ def recruit(state, now, cls, name=None):
     store = _store(state)
     if len(store["heroes"]) >= hero_cap(state):
         return f"Your city can keep {hero_cap(state)} heroes. Build a guild hall (or let one go) to make room."
+    seat = any(not p["trip"] and len(p["heroes"]) < party_size(state) for p in parties(state))
+    if not seat and len(bench(state)) >= BENCH_SLOTS:
+        return f"Every party and all {BENCH_SLOTS} bench places are full. Let a hero go first."
     cost = recruit_cost(state)
     short = game._missing(state, cost)
     if short:
@@ -510,8 +520,30 @@ def set_party(state, now, hero_id, n):
             return f"{_party_name(n)} is full ({party_size(state)} heroes). Take someone out first."
     for p in ps:
         p["heroes"] = [i for i in p["heroes"] if i != hero_id]
+    if n is None and party_of(state, hero_id) is not None and len(bench(state)) >= BENCH_SLOTS:
+        return f"The bench is full ({BENCH_SLOTS} heroes). Swap instead, or put someone in a party first."
     if n is not None:
         ps[n]["heroes"].append(hero_id)
+    return None
+
+
+def swap(state, now, hero_id, other_id):
+    """Two heroes change places (parties, or a party and the bench)."""
+    a, b = get(state, hero_id), get(state, other_id)
+    if not a or not b or a is b:
+        return "Pick two heroes."
+    gone = away_ids(state)
+    for h in (a, b):
+        if h["id"] in gone:
+            return f"{h['name']} is away on an adventure: swap when they are back."
+    ps = parties(state)
+    pa, pb = party_of(state, a["id"]), party_of(state, b["id"])
+    if pa == pb:
+        return f"{a['name']} and {b['name']} are already together."
+    for n, out, into in ((pa, a["id"], b["id"]), (pb, b["id"], a["id"])):
+        if n is not None:
+            heroes = ps[n]["heroes"]
+            heroes[heroes.index(out)] = into
     return None
 
 
@@ -696,11 +728,6 @@ def battle_team(state):
     return units, None
 
 
-def bet_boost(qty):
-    """What a party battle bet of `qty` (of anything) puts on every fighter's stats: every doubling past 200 adds 10%."""
-    return round(1 + 0.1 * math.log2(1 + qty / 200), 2)
-
-
 def battle_won(state, now, ids):
     for h in (get(state, i) for i in ids):
         if h:
@@ -767,10 +794,11 @@ def view(state, now):
                            "times": [round(trip_time(state, ai, q["heroes"])) for q in out_parties]})
         bonuses = {k: round(bonus(state, k), 3) for k in BONUSES}
     return {"open": state["tech"] >= OPENS_TECH, "heroes": heroes, "parties": out_parties, "party_size": party_size(state),
+            "bench": bench(state), "bench_slots": BENCH_SLOTS,
             "parties_allowed": len(ps), "cap": hero_cap(state), "recruit": recruit_cost(state), "gear_cap": gear_cap(state),
             "power": out_parties[0]["power"],
             "beast": dict(beast_stats(state, beast), name=beasts.title(beast), level=beast["level"], id=beast["id"],
                           away=bool(beast.get("adventure"))) if beast else None,
             "places": places, "reports": store["reports"][::-1],
-            "bonuses": bonuses, "sources": bonus_sources(state), "battles": state.get("battles", [])[::-1],
+            "bonuses": bonuses, "sources": bonus_sources(state),
             "words": {k: ideology.describe({k: v})[0] if v else "" for k, v in bonuses.items()}}
